@@ -1,0 +1,4 @@
+{
+  "expression": "0 4 * * *",
+  "mode": "cron"
+}

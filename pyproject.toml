@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pullpilot"
+version = "0.1.0"
+description = "Servicio ligero para actualizar imágenes Docker de un homelab y exponer configuración por API."
+authors = [{ name = "PullPilot Maintainers" }]
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["docker", "homelab", "automation", "fastapi"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Environment :: Console",
+  "Topic :: System :: Systems Administration",
+]
+
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = ["E","F","W","I","UP"]
+fix = true
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[project.urls]
+Homepage = "https://github.com/USER/pullpilot"
+Documentation = "https://github.com/USER/pullpilot#readme"
+Issues = "https://github.com/USER/pullpilot/issues"
