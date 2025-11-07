@@ -1,10 +1,8 @@
-name: Build & publish to GHCR
+name: Release → GHCR
 
 on:
-  push:
-    branches: ["main"]
-    tags: ["v*"]
-  workflow_dispatch:
+  release:
+    types: [published]   # Solo al publicar la release
 
 permissions:
   contents: read
@@ -12,16 +10,19 @@ permissions:
 
 jobs:
   build-and-push:
+    if: ${{ !github.event.release.prerelease }}  # omite pre-releases
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout tag
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
 
-      - name: Set up QEMU (for multi-arch)
+      - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Set up Docker Buildx
+      - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
@@ -35,12 +36,10 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: |
-            ghcr.io/${{ github.repository_owner }}/pullpilot
+          images: ghcr.io/${{ github.repository_owner }}/pullpilot
           tags: |
-            type=ref,event=branch
-            type=ref,event=tag
-            type=sha
+            type=semver,pattern={{version}},value=${{ github.event.release.tag_name }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ github.event.release.tag_name }}
 
       - name: Build & push
         uses: docker/build-push-action@v6
