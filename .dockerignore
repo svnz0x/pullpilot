@@ -1,0 +1,19 @@
+# Ignore VCS, caches, and development files
+.git
+.github
+.DS_Store
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.swp
+.Python
+.venv
+venv/
+.pytest_cache
+.mypy_cache
+.ruff_cache
+tests/
+.env*
+docker-compose*.yml
+*.md
