@@ -99,3 +99,39 @@ def test_save_does_not_touch_config_when_multiline_fails(
         store.save(values, multiline)
 
     assert config_path.read_text(encoding="utf-8") == original_content
+
+
+def test_multiline_path_must_reside_in_allowed_directory(
+    tmp_path: Path, schema_path: Path
+) -> None:
+    config_path = tmp_path / "updater.conf"
+    config_path.write_text('COMPOSE_PROJECTS_FILE=""\n', encoding="utf-8")
+    store = ConfigStore(config_path, schema_path)
+
+    data = store.load()
+    values = data.values.copy()
+    values["COMPOSE_PROJECTS_FILE"] = str(tmp_path.parent / "escape.txt")
+    multiline = {"COMPOSE_PROJECTS_FILE": "/srv/app\n"}
+
+    with pytest.raises(ValidationError) as exc:
+        store.save(values, multiline)
+
+    assert any(error["field"] == "COMPOSE_PROJECTS_FILE" for error in exc.value.errors)
+    assert not (tmp_path.parent / "escape.txt").exists()
+
+
+def test_multiline_path_rejects_parent_segments(
+    tmp_path: Path, schema_path: Path
+) -> None:
+    store = ConfigStore(tmp_path / "updater.conf", schema_path)
+    data = store.load()
+    values = data.values.copy()
+    multiline = data.multiline.copy()
+
+    values["COMPOSE_PROJECTS_FILE"] = "/tmp/../etc/passwd"
+    multiline["COMPOSE_PROJECTS_FILE"] = "/srv/app\n"
+
+    with pytest.raises(ValidationError) as exc:
+        store.save(values, multiline)
+
+    assert any(error["field"] == "COMPOSE_PROJECTS_FILE" for error in exc.value.errors)

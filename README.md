@@ -47,6 +47,7 @@ docker run --rm -p 8000:8000 ghcr.io/USER/pullpilot:latest
 - Edita `config/updater.conf` para ajustar rutas, proyectos, notificaciones, etc.
 - El esquema JSON en `config/schema.json` documenta cada opción.
 - Para validación rápida: `python scripts/validate_config.py`
+- Los archivos auxiliares multilinea (p. ej. `COMPOSE_PROJECTS_FILE`) deben residir dentro del mismo directorio de configuración (por defecto `config/`). La API rechazará rutas fuera de ese árbol o que incluyan `..`.
 
 ### Autenticación de la API
 
