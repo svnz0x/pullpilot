@@ -17,7 +17,7 @@ from .app import create_app
 from .config import ConfigStore
 from .resources import get_resource_path
 from .schedule import ScheduleStore
-from .scheduler.watch import build_watcher_from_env
+from .scheduler.watch import build_watcher
 
 LOGGER = logging.getLogger("pullpilot.runner")
 
@@ -27,8 +27,6 @@ DISABLE_SCHEDULER_ENV = "PULLPILOT_DISABLE_SCHEDULER"
 HOST_ENV = "PULLPILOT_HOST"
 PORT_ENV = "PULLPILOT_PORT"
 LOG_LEVEL_ENV = "PULLPILOT_LOG_LEVEL"
-SCHEDULE_FILE_ENV = "PULLPILOT_SCHEDULE_FILE"
-
 DEFAULT_CONFIG_TARGET = Path("/app/config")
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 8000
@@ -130,15 +128,6 @@ def _copy_missing_config(config_dir: Path, default_dir: Optional[Path]) -> None:
         LOGGER.info("Copiado archivo de configuración por defecto: %s", target)
 
 
-def _ensure_schedule_env(config_dir: Path) -> Path:
-    existing = os.environ.get(SCHEDULE_FILE_ENV)
-    if existing:
-        return Path(existing)
-    schedule_path = config_dir / "pullpilot.schedule"
-    os.environ[SCHEDULE_FILE_ENV] = str(schedule_path)
-    return schedule_path
-
-
 def _configure_logging(level: str) -> None:
     # Defer to Uvicorn for structured logging but ensure the root handler exists.
     logging.basicConfig(level=getattr(logging, level.upper(), logging.INFO))
@@ -153,7 +142,7 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
     default_dir = _discover_default_config_dir()
     _copy_missing_config(config_dir, default_dir)
 
-    schedule_path = _ensure_schedule_env(config_dir)
+    schedule_path = config_dir / "pullpilot.schedule"
     config_path = config_dir / "updater.conf"
     schema_path = get_resource_path("config/schema.json")
 
@@ -176,7 +165,7 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
     should_run_scheduler = not args.no_scheduler and not _env_flag(DISABLE_SCHEDULER_ENV)
 
     if should_run_scheduler:
-        watcher = build_watcher_from_env()
+        watcher = build_watcher(schedule_path=schedule_path)
 
         def _run_scheduler() -> None:
             try:
