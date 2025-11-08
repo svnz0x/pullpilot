@@ -112,6 +112,10 @@ class ScheduleStore:
 
 
 CRON_FIELD_PATTERN = re.compile(r"^[\w*/,.-]+$")
+DURATION_PATTERN = re.compile(
+    r"^[-+]?((?:\d+(?:\.\d+)?|\.\d+)(?:ns|us|µs|ms|s|m|h))+"
+)
+
 CRON_MACROS = {
     "@yearly",
     "@annually",
@@ -130,7 +134,7 @@ def _is_valid_cron(expression: str) -> bool:
         parts = lowered.split(maxsplit=1)
         if len(parts) < 2:
             return False
-        return bool(parts[1].strip())
+        return bool(DURATION_PATTERN.fullmatch(parts[1].strip()))
     if lowered in CRON_MACROS:
         return True
     parts = [part for part in expression.split() if part]
