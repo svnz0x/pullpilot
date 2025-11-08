@@ -45,6 +45,12 @@ def test_save_rejects_invalid_cron(schedule_path: Path) -> None:
         store.save({"mode": "cron", "expression": "bad"})
 
 
+def test_save_rejects_every_without_interval(schedule_path: Path) -> None:
+    store = ScheduleStore(schedule_path)
+    with pytest.raises(ScheduleValidationError):
+        store.save({"mode": "cron", "expression": "@every"})
+
+
 def test_save_normalizes_datetime(schedule_path: Path) -> None:
     store = ScheduleStore(schedule_path)
     saved = store.save({"mode": "once", "datetime": "2035-12-01T23:15:00+02:00"})
