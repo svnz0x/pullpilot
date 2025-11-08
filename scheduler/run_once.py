@@ -35,7 +35,11 @@ def main(argv: List[str] | None = None) -> int:
         print("No command provided to run once", file=sys.stderr)
         return 2
 
-    target = parse_datetime(args.when)
+    try:
+        target = parse_datetime(args.when)
+    except ValueError as exc:
+        print(f"Invalid datetime value for --at: {exc}", file=sys.stderr)
+        return 2
     now = datetime.now(timezone.utc)
     seconds = (target - now).total_seconds()
     while seconds > 0:

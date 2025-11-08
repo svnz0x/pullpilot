@@ -39,3 +39,13 @@ def test_main_strips_command_separator(monkeypatch):
     assert exit_code == 0
     assert called["command"] == ["echo", "hi"]
     assert called["check"] is True
+
+
+def test_main_with_invalid_datetime_returns_error_without_traceback(capsys):
+    exit_code = run_once.main(["--at", "not-a-date", "echo", "hi"])
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "Invalid datetime value for --at" in captured.err
+    assert "Traceback" not in captured.err
