@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
 import shlex
 import subprocess
 import sys
@@ -181,36 +180,27 @@ def resolve_default_updater_command() -> str:
     return DEFAULT_COMMAND
 
 
-def build_watcher_from_env() -> SchedulerWatcher:
-    schedule_file_env = os.environ.get("PULLPILOT_SCHEDULE_FILE")
-    schedule_file = (
-        Path(schedule_file_env) if schedule_file_env else DEFAULT_SCHEDULE_FILE
-    )
-    cron_file = Path(os.environ.get("PULLPILOT_CRON_FILE", DEFAULT_CRON_FILE))
-    default_updater_command = resolve_default_updater_command()
-    updater_command = os.environ.get(
-        "PULLPILOT_UPDATER_COMMAND", default_updater_command
-    )
-    interval_env = os.environ.get("PULLPILOT_SCHEDULE_POLL_INTERVAL")
-    try:
-        interval = float(interval_env) if interval_env is not None else DEFAULT_INTERVAL
-    except (TypeError, ValueError):
-        _log(
-            "Intervalo de sondeo inválido en PULLPILOT_SCHEDULE_POLL_INTERVAL; usando valor por defecto"
-        )
-        interval = DEFAULT_INTERVAL
-    else:
-        if interval <= 0:
-            _log(
-                "Intervalo de sondeo no positivo en PULLPILOT_SCHEDULE_POLL_INTERVAL; usando valor por defecto"
-            )
-            interval = DEFAULT_INTERVAL
+def build_watcher(
+    schedule_path: Path = DEFAULT_SCHEDULE_FILE,
+    *,
+    cron_path: Path = DEFAULT_CRON_FILE,
+    updater_command: str | None = None,
+    interval: float = DEFAULT_INTERVAL,
+) -> SchedulerWatcher:
+    """Create a scheduler watcher using the default runtime configuration.
 
-    return SchedulerWatcher(schedule_file, cron_file, updater_command, interval)
+    The helper intentionally avoids environment variables so callers have to
+    provide any overrides explicitly. When the optional arguments are omitted it
+    will rely on the constants exposed by this module, mirroring the behaviour
+    of the previous helper but with deterministic inputs.
+    """
+
+    command = updater_command or resolve_default_updater_command()
+    return SchedulerWatcher(schedule_path, cron_path, command, interval)
 
 
 def main() -> None:
-    watcher = build_watcher_from_env()
+    watcher = build_watcher()
     watcher.run()
 
 
