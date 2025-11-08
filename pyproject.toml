@@ -33,6 +33,7 @@ include-package-data = true
 pullpilot = [
   "resources/config/*",
   "resources/scripts/*",
+  "resources/ui/*",
 ]
 
 [tool.ruff]

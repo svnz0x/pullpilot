@@ -4,6 +4,8 @@ from __future__ import annotations
 import base64
 import json
 import os
+from collections import deque
+from datetime import datetime, timezone
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Tuple
@@ -146,6 +148,7 @@ def _match_basic_credentials(username: str, password: str, header: str) -> bool:
 
 DEFAULT_CONFIG_PATH = get_resource_path("config/updater.conf")
 DEFAULT_SCHEMA_PATH = get_resource_path("config/schema.json")
+MAX_UI_LOG_LINES = 400
 
 
 class ConfigAPI:
@@ -174,6 +177,8 @@ class ConfigAPI:
         headers: Optional[Mapping[str, str]] = None,
     ) -> Tuple[int, Dict[str, Any]]:
         method = method.upper()
+        if path.startswith("/ui"):
+            return self._handle_ui_request(method, path, payload)
         if path not in {"/config", "/schedule"}:
             return HTTPStatus.NOT_FOUND, {"error": "not found"}
         if self.authenticator and not self.authenticator.authorize(headers):
@@ -198,6 +203,98 @@ class ConfigAPI:
         if method == "PUT":
             return self._handle_schedule_put(payload)
         return HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method not allowed"}
+
+    # ------------------------------------------------------------------
+    # UI helpers
+    def _handle_ui_request(
+        self,
+        method: str,
+        path: str,
+        payload: Optional[Mapping[str, Any]] = None,
+    ) -> Tuple[int, Dict[str, Any]]:
+        if path == "/ui/config":
+            if method == "GET":
+                return HTTPStatus.OK, self._serialize(self.store.load())
+            if method in {"POST", "PUT"}:
+                return self._handle_put(payload)
+            return HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method not allowed"}
+
+        if path == "/ui/logs":
+            if method not in {"GET", "POST"}:
+                return HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method not allowed"}
+            if payload is not None and not isinstance(payload, Mapping):
+                return HTTPStatus.BAD_REQUEST, {"error": "payload must be an object"}
+            selected_name = None
+            if payload is not None:
+                candidate = payload.get("name")
+                if candidate is not None and not isinstance(candidate, str):
+                    return HTTPStatus.BAD_REQUEST, {"error": "'name' must be a string"}
+                selected_name = candidate
+            return HTTPStatus.OK, self._gather_logs(selected_name)
+
+        if path in {"/", "/ui"}:
+            return HTTPStatus.OK, {"message": "ui"}
+
+        return HTTPStatus.NOT_FOUND, {"error": "not found"}
+
+    def _gather_logs(self, selected_name: Optional[str] = None) -> Dict[str, Any]:
+        data = self.store.load()
+        log_dir_raw = data.values.get("LOG_DIR", "")
+        log_dir_str = str(log_dir_raw) if log_dir_raw is not None else ""
+        try:
+            log_dir = Path(log_dir_str).expanduser()
+        except Exception:
+            log_dir = Path(log_dir_str)
+
+        files_payload = []
+        selected_payload: Optional[Dict[str, Any]] = None
+        entries: list[Tuple[Path, os.stat_result]] = []
+        try:
+            if log_dir.exists():
+                for entry in log_dir.iterdir():
+                    if not entry.is_file() or entry.suffix != ".log":
+                        continue
+                    try:
+                        stat_result = entry.stat()
+                    except OSError:
+                        continue
+                    entries.append((entry, stat_result))
+        except OSError:
+            entries = []
+
+        entries.sort(key=lambda item: item[1].st_mtime, reverse=True)
+        available_names = {entry.name for entry, _ in entries}
+        target_name = (
+            selected_name
+            if selected_name and selected_name in available_names
+            else (entries[0][0].name if entries else None)
+        )
+
+        for entry, stat_result in entries:
+            file_payload = {
+                "name": entry.name,
+                "size": stat_result.st_size,
+                "modified": datetime.fromtimestamp(stat_result.st_mtime, timezone.utc).isoformat(),
+            }
+            files_payload.append(file_payload)
+            if target_name and entry.name == target_name and selected_payload is None:
+                content = self._read_log_tail(entry)
+                selected_payload = dict(file_payload)
+                selected_payload["content"] = content
+
+        return {
+            "log_dir": str(log_dir),
+            "files": files_payload,
+            "selected": selected_payload,
+        }
+
+    def _read_log_tail(self, path: Path, max_lines: int = MAX_UI_LOG_LINES) -> str:
+        try:
+            with path.open("r", encoding="utf-8", errors="replace") as handle:
+                lines = deque(handle, maxlen=max_lines)
+        except OSError:
+            return ""
+        return "".join(lines)
 
     def _handle_put(self, payload: Optional[Mapping[str, Any]]) -> Tuple[int, Dict[str, Any]]:
         if payload is None:
@@ -250,9 +347,10 @@ def create_app(
     api = ConfigAPI(store=store, schedule_store=schedule_store)
     try:  # pragma: no cover - exercised when FastAPI is available
         from fastapi import Depends, FastAPI, HTTPException, Request
-        from fastapi.responses import JSONResponse
+        from fastapi.responses import HTMLResponse, JSONResponse
 
         app = FastAPI()
+        ui_index_content = get_resource_path("ui/index.html").read_text(encoding="utf-8")
 
         async def _require_auth(request: Request) -> None:
             if not api.authenticator:
@@ -260,6 +358,40 @@ def create_app(
             if api.authenticator.authorize(request.headers):
                 return
             raise HTTPException(status_code=HTTPStatus.UNAUTHORIZED, detail={"error": "unauthorized"})
+
+        @app.get("/", response_class=HTMLResponse)
+        @app.get("/ui", response_class=HTMLResponse)
+        def get_ui_page() -> HTMLResponse:
+            return HTMLResponse(ui_index_content)
+
+        @app.get("/ui/config")
+        def get_ui_config():
+            status, body = api.handle_request("GET", "/ui/config")
+            if status != HTTPStatus.OK:
+                raise HTTPException(status_code=status, detail=body)
+            return JSONResponse(body, status_code=status)
+
+        @app.post("/ui/config")
+        def post_ui_config(payload: Dict[str, Any]):
+            status, body = api.handle_request("POST", "/ui/config", payload)
+            if status != HTTPStatus.OK:
+                raise HTTPException(status_code=status, detail=body)
+            return JSONResponse(body, status_code=status)
+
+        @app.get("/ui/logs")
+        def get_ui_logs(name: Optional[str] = None):
+            payload = {"name": name} if name is not None else None
+            status, body = api.handle_request("GET", "/ui/logs", payload)
+            if status != HTTPStatus.OK:
+                raise HTTPException(status_code=status, detail=body)
+            return JSONResponse(body, status_code=status)
+
+        @app.post("/ui/logs")
+        def post_ui_logs(payload: Dict[str, Any]):
+            status, body = api.handle_request("POST", "/ui/logs", payload)
+            if status != HTTPStatus.OK:
+                raise HTTPException(status_code=status, detail=body)
+            return JSONResponse(body, status_code=status)
 
         @app.get("/config")
         def get_config(request: Request, _: None = Depends(_require_auth)):

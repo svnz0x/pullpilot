@@ -266,3 +266,87 @@ def test_fastapi_get_propagates_error(
 
     response = client.get("/config")
     assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+def test_ui_config_accessible_without_auth(
+    monkeypatch: pytest.MonkeyPatch, store: ConfigStore, schedule_store: ScheduleStore
+) -> None:
+    monkeypatch.delenv("PULLPILOT_ALLOW_ANONYMOUS", raising=False)
+    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
+    monkeypatch.delenv("PULLPILOT_USERNAME", raising=False)
+    monkeypatch.delenv("PULLPILOT_PASSWORD", raising=False)
+
+    api = ConfigAPI(store=store, schedule_store=schedule_store)
+
+    status, body = api.handle_request("GET", "/ui/config")
+    assert status == HTTPStatus.OK
+    assert "values" in body
+
+
+def test_ui_config_put_updates_values(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    store: ConfigStore,
+    schedule_store: ScheduleStore,
+) -> None:
+    monkeypatch.delenv("PULLPILOT_ALLOW_ANONYMOUS", raising=False)
+    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
+    monkeypatch.delenv("PULLPILOT_USERNAME", raising=False)
+    monkeypatch.delenv("PULLPILOT_PASSWORD", raising=False)
+
+    api = ConfigAPI(store=store, schedule_store=schedule_store)
+    status, body = api.handle_request("GET", "/ui/config")
+    assert status == HTTPStatus.OK
+
+    values = dict(body["values"])
+    values["LOG_RETENTION_DAYS"] = 7
+    projects_file = tmp_path / "projects.txt"
+    values["COMPOSE_PROJECTS_FILE"] = str(projects_file)
+    multiline = {"COMPOSE_PROJECTS_FILE": "/data/app\n"}
+
+    status, updated = api.handle_request(
+        "POST", "/ui/config", {"values": values, "multiline": multiline}
+    )
+    assert status == HTTPStatus.OK
+    assert updated["values"]["LOG_RETENTION_DAYS"] == 7
+    assert projects_file.read_text(encoding="utf-8") == multiline["COMPOSE_PROJECTS_FILE"]
+
+
+def test_ui_logs_listing_and_selection(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    store: ConfigStore,
+    schedule_store: ScheduleStore,
+) -> None:
+    monkeypatch.delenv("PULLPILOT_ALLOW_ANONYMOUS", raising=False)
+    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
+    monkeypatch.delenv("PULLPILOT_USERNAME", raising=False)
+    monkeypatch.delenv("PULLPILOT_PASSWORD", raising=False)
+
+    api = ConfigAPI(store=store, schedule_store=schedule_store)
+    status, body = api.handle_request("GET", "/ui/config")
+    assert status == HTTPStatus.OK
+
+    values = dict(body["values"])
+    values["LOG_DIR"] = str(tmp_path)
+    status, _ = api.handle_request("POST", "/ui/config", {"values": values})
+    assert status == HTTPStatus.OK
+
+    first_log = tmp_path / "uno.log"
+    first_log.write_text("linea 1\nlinea 2\n", encoding="utf-8")
+    second_log = tmp_path / "dos.log"
+    second_log.write_text("hola\n", encoding="utf-8")
+
+    status, logs = api.handle_request("GET", "/ui/logs")
+    assert status == HTTPStatus.OK
+    assert {entry["name"] for entry in logs["files"]} == {"uno.log", "dos.log"}
+    assert logs["selected"] is None or logs["selected"]["name"] in {"uno.log", "dos.log"}
+
+    status, selected = api.handle_request("GET", "/ui/logs", {"name": "uno.log"})
+    assert status == HTTPStatus.OK
+    assert selected["selected"]["name"] == "uno.log"
+    assert "linea 1" in selected["selected"]["content"]
+
+    status, error = api.handle_request("POST", "/ui/logs", {"name": 123})
+    assert status == HTTPStatus.BAD_REQUEST
+    assert error["error"] == "'name' must be a string"
