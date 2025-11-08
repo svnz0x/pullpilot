@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Tuple
 
 from .config import ConfigData, ConfigStore, ValidationError
+from .resources import get_resource_path
 from .schedule import DEFAULT_SCHEDULE_PATH, ScheduleStore, ScheduleValidationError
 
 TOKEN_ENV = "PULLPILOT_TOKEN"
@@ -143,8 +144,8 @@ def _match_basic_credentials(username: str, password: str, header: str) -> bool:
     return received_user == username and received_pass == password
 
 
-DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "updater.conf"
-DEFAULT_SCHEMA_PATH = Path(__file__).resolve().parents[2] / "config" / "schema.json"
+DEFAULT_CONFIG_PATH = get_resource_path("config/updater.conf")
+DEFAULT_SCHEMA_PATH = get_resource_path("config/schema.json")
 
 
 class ConfigAPI:

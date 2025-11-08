@@ -10,7 +10,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, MutableMapping, Optional
 
-DEFAULT_SCHEDULE_PATH = Path(__file__).resolve().parents[2] / "config" / "pullpilot.schedule"
+from .resources import get_resource_path
+
+DEFAULT_SCHEDULE_PATH = get_resource_path("config/pullpilot.schedule")
 DEFAULT_CRON_EXPRESSION = "0 4 * * *"
 
 

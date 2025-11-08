@@ -93,6 +93,8 @@ def test_default_path_uses_config_location(monkeypatch: pytest.MonkeyPatch, tmp_
     assert payload["expression"] == "45 3 * * 3"
 
 
-def test_default_schedule_path_points_to_config_dir() -> None:
-    expected = Path(__file__).resolve().parents[1] / "config" / "pullpilot.schedule"
+def test_default_schedule_path_points_to_packaged_file() -> None:
+    from pullpilot.resources import get_resource_path
+
+    expected = get_resource_path("config/pullpilot.schedule")
     assert DEFAULT_SCHEDULE_PATH == expected
