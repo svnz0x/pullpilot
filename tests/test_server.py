@@ -94,6 +94,28 @@ def test_put_returns_validation_errors(
     assert any(error["field"] == "BASE_DIR" for error in body["details"])
 
 
+def test_put_rejects_multiline_paths_outside_allowed_directory(
+    allow_anonymous: None,
+    tmp_path: Path,
+    store: ConfigStore,
+    schedule_store: ScheduleStore,
+) -> None:
+    api = create_app(store=store, schedule_store=schedule_store)
+    status, body = api.handle_request("GET", "/config")
+    assert status == HTTPStatus.OK
+
+    values = dict(body["values"])
+    values["COMPOSE_PROJECTS_FILE"] = str(tmp_path.parent / "escape.txt")
+    multiline = {"COMPOSE_PROJECTS_FILE": "/tmp/app\n"}
+
+    status, response = api.handle_request(
+        "PUT", "/config", {"values": values, "multiline": multiline}
+    )
+
+    assert status == HTTPStatus.BAD_REQUEST
+    assert any(error["field"] == "COMPOSE_PROJECTS_FILE" for error in response["details"])
+
+
 def test_requests_rejected_without_credentials(monkeypatch, store: ConfigStore, schedule_store: ScheduleStore) -> None:
     monkeypatch.delenv("PULLPILOT_ALLOW_ANONYMOUS", raising=False)
     monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)

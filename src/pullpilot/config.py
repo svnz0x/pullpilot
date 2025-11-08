@@ -79,14 +79,29 @@ _MULTILINE_FIELDS = {"COMPOSE_PROJECTS_FILE"}
 class ConfigStore:
     """High level helper that loads and stores configuration values."""
 
-    def __init__(self, config_path: Path, schema_path: Path):
-        self.config_path = Path(config_path)
-        self.schema_path = Path(schema_path)
+    def __init__(
+        self,
+        config_path: Path,
+        schema_path: Path,
+        *,
+        allowed_multiline_dirs: Optional[Iterable[Path]] = None,
+    ):
+        self.config_path = Path(config_path).expanduser()
+        self.schema_path = Path(schema_path).expanduser()
         self.schema: List[SchemaVariable] = self._load_schema(self.schema_path)
         self.schema_map: Dict[str, SchemaVariable] = {
             variable.name: variable for variable in self.schema
         }
         self.schema_order: List[str] = [variable.name for variable in self.schema]
+        base_dirs = (
+            list(allowed_multiline_dirs)
+            if allowed_multiline_dirs is not None
+            else [self.config_path.parent or Path(".")]
+        )
+        self.allowed_multiline_dirs: List[Path] = [
+            Path(directory).expanduser().resolve()
+            for directory in base_dirs
+        ]
 
     # ------------------------------------------------------------------
     # Public helpers
@@ -248,6 +263,9 @@ class ConfigStore:
             max_length = constraints.get("max_length")
             if max_length is not None and len(string_value) > int(max_length):
                 return f"maximum length is {max_length}"
+            if constraints.get("disallow_path_traversal") and string_value:
+                if ".." in Path(string_value).parts:
+                    return "path cannot contain '..' segments"
             allowed_values = constraints.get("allowed_values")
             if allowed_values and string_value not in allowed_values:
                 return "value must be one of: " + ", ".join(map(str, allowed_values))
@@ -461,9 +479,16 @@ class ConfigStore:
             if not path_value:
                 multiline[key] = ""
                 continue
-            file_path = Path(str(path_value))
+            file_path = Path(str(path_value)).expanduser()
             try:
-                multiline[key] = file_path.read_text(encoding="utf-8")
+                resolved = file_path.resolve()
+            except FileNotFoundError:
+                resolved = file_path.resolve(strict=False)
+            if not self._is_path_allowed(resolved):
+                multiline[key] = ""
+                continue
+            try:
+                multiline[key] = resolved.read_text(encoding="utf-8")
             except FileNotFoundError:
                 multiline[key] = ""
         return multiline
@@ -472,6 +497,7 @@ class ConfigStore:
         self, values: Mapping[str, Any], multiline: Mapping[str, str]
     ) -> None:
         pending_writes: List[Tuple[Path, str]] = []
+        errors: List[Dict[str, Any]] = []
         for key in _MULTILINE_FIELDS:
             if key not in multiline:
                 continue
@@ -483,11 +509,45 @@ class ConfigStore:
                         [{"field": key, "message": "path required for provided content"}]
                     )
                 continue
-            pending_writes.append((Path(str(path_value)), content))
+            try:
+                normalized = self._normalize_multiline_path(key, Path(str(path_value)))
+            except ValidationError as exc:
+                errors.extend(exc.errors)
+                continue
+            pending_writes.append((normalized, content))
+
+        if errors:
+            raise ValidationError(errors)
 
         for target, content in pending_writes:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
+
+    def _normalize_multiline_path(self, key: str, raw: Path) -> Path:
+        normalized = raw.expanduser()
+        if not normalized.is_absolute():
+            raise ValidationError(
+                [{"field": key, "message": "path must be absolute"}]
+            )
+        try:
+            resolved = normalized.resolve()
+        except FileNotFoundError:
+            resolved = normalized.resolve(strict=False)
+        if not self._is_path_allowed(resolved):
+            allowed = ", ".join(str(directory) for directory in self.allowed_multiline_dirs)
+            raise ValidationError(
+                [{"field": key, "message": f"path must reside within: {allowed}"}]
+            )
+        return resolved
+
+    def _is_path_allowed(self, path: Path) -> bool:
+        for directory in self.allowed_multiline_dirs:
+            try:
+                path.relative_to(directory)
+            except ValueError:
+                continue
+            return True
+        return False
 
 
 __all__ = ["ConfigStore", "ConfigError", "ValidationError", "ConfigData"]

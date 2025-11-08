@@ -142,7 +142,8 @@
       "description": "Ruta opcional a un archivo con rutas absolutas de proyectos docker-compose, una por línea.",
       "constraints": {
         "allow_empty": true,
-        "pattern": "^$|^/.*"
+        "pattern": "^$|^/.*",
+        "disallow_path_traversal": true
       }
     },
     {
