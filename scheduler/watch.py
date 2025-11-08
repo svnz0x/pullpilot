@@ -126,6 +126,7 @@ class SchedulerWatcher:
         _log(f"Modo desconocido '{mode}'; no se inicia ningún proceso")
 
     def _write_cron_file(self, expression: str) -> None:
+        self.cron_path.parent.mkdir(parents=True, exist_ok=True)
         self.cron_path.write_text(f"{expression} {self.updater_command}\n", encoding="utf-8")
 
     def _stop_process(self) -> None:
