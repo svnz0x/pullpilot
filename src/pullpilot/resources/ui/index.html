@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PullPilot · Panel local</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg-color: #0f172a;
+        --card-color: rgba(15, 23, 42, 0.6);
+        --card-border: rgba(148, 163, 184, 0.35);
+        --accent: #38bdf8;
+        --accent-strong: #0ea5e9;
+        --text: #e2e8f0;
+        --text-secondary: #94a3b8;
+        --danger: #f87171;
+        --success: #4ade80;
+        font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+      }
+
+      body {
+        margin: 0;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      header {
+        padding: 2.5rem 1.5rem 1rem;
+        text-align: center;
+      }
+
+      header h1 {
+        margin: 0;
+        font-size: clamp(2rem, 5vw, 3rem);
+        letter-spacing: -0.03em;
+      }
+
+      header p {
+        margin: 0.75rem auto 0;
+        max-width: 40rem;
+        color: var(--text-secondary);
+        line-height: 1.5;
+      }
+
+      main {
+        flex: 1 0 auto;
+        width: min(1100px, 92vw);
+        margin: 0 auto 3rem;
+        display: grid;
+        gap: 2rem;
+      }
+
+      section {
+        background: var(--card-color);
+        border-radius: 1.25rem;
+        border: 1px solid var(--card-border);
+        backdrop-filter: blur(18px);
+        padding: clamp(1.5rem, 2vw, 2rem);
+        box-shadow: 0 20px 35px rgba(15, 23, 42, 0.35);
+      }
+
+      section h2 {
+        margin-top: 0;
+        font-size: 1.5rem;
+        letter-spacing: -0.015em;
+      }
+
+      .config-grid {
+        display: grid;
+        gap: 1.25rem;
+      }
+
+      .config-field {
+        display: grid;
+        gap: 0.5rem;
+      }
+
+      .config-field label {
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .config-field .field-input {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+
+      .config-field input[type="text"],
+      .config-field input[type="number"],
+      .config-field select,
+      .config-field textarea {
+        width: min(100%, 30rem);
+        padding: 0.65rem 0.75rem;
+        border-radius: 0.75rem;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        background: rgba(15, 23, 42, 0.35);
+        color: inherit;
+        font: inherit;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        resize: vertical;
+      }
+
+      .config-field textarea.multiline-input {
+        width: min(100%, 42rem);
+        min-height: 6rem;
+        line-height: 1.4;
+      }
+
+      .config-field input[type="checkbox"] {
+        width: 1.25rem;
+        height: 1.25rem;
+        accent-color: var(--accent);
+      }
+
+      .config-field input:focus,
+      .config-field select:focus,
+      .config-field textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+      }
+
+      .config-field .field-description {
+        margin: 0;
+        color: var(--text-secondary);
+        line-height: 1.45;
+        font-size: 0.95rem;
+      }
+
+      .config-field .field-default {
+        display: inline-block;
+        margin-top: 0.35rem;
+        font-size: 0.85rem;
+        color: rgba(148, 163, 184, 0.8);
+      }
+
+      .form-actions {
+        margin-top: 1.5rem;
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+
+      button {
+        appearance: none;
+        border: none;
+        border-radius: 999px;
+        padding: 0.75rem 1.6rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+
+      button.primary {
+        background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+        color: #0f172a;
+        box-shadow: 0 15px 30px rgba(56, 189, 248, 0.25);
+      }
+
+      button.secondary {
+        background: rgba(148, 163, 184, 0.15);
+        color: inherit;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+      }
+
+      button:active {
+        transform: translateY(1px);
+      }
+
+      .status {
+        margin-top: 1rem;
+        padding: 0.85rem 1rem;
+        border-radius: 0.9rem;
+        font-size: 0.95rem;
+        background: rgba(148, 163, 184, 0.12);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        color: var(--text-secondary);
+      }
+
+      .status.success {
+        background: rgba(74, 222, 128, 0.18);
+        border-color: rgba(74, 222, 128, 0.35);
+        color: #bef264;
+      }
+
+      .status.error {
+        background: rgba(248, 113, 113, 0.18);
+        border-color: rgba(248, 113, 113, 0.35);
+        color: #fecaca;
+      }
+
+      .logs-header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+      }
+
+      .logs-header select {
+        min-width: 14rem;
+      }
+
+      .log-meta {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+      }
+
+      .log-output {
+        background: rgba(15, 23, 42, 0.55);
+        border-radius: 1rem;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        padding: 1rem;
+        margin-top: 1rem;
+        max-height: 24rem;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", "Courier New", monospace;
+        font-size: 0.85rem;
+        line-height: 1.45;
+      }
+
+      @media (max-width: 768px) {
+        main {
+          gap: 1.25rem;
+        }
+
+        section {
+          padding: 1.25rem;
+        }
+
+        .config-field input[type="text"],
+        .config-field input[type="number"],
+        .config-field select,
+        .config-field textarea {
+          width: 100%;
+        }
+
+        .config-field textarea.multiline-input {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>PullPilot</h1>
+      <p>
+        Administra los parámetros del script de actualización y revisa los últimos logs directamente desde
+        tu navegador. Esta interfaz está pensada para uso local, sin autenticación.
+      </p>
+    </header>
+    <main>
+      <section id="config-section">
+        <h2>Configuración del updater</h2>
+        <form id="config-form">
+          <div class="config-grid" id="config-fields"></div>
+          <div class="form-actions">
+            <button type="submit" class="primary">Guardar cambios</button>
+            <button type="button" class="secondary" id="reset-config">Descartar cambios</button>
+          </div>
+        </form>
+        <div class="status" id="config-status" role="status" aria-live="polite" hidden></div>
+      </section>
+
+      <section id="logs-section">
+        <h2>Logs recientes</h2>
+        <div class="logs-header">
+          <label for="log-select">Archivo</label>
+          <select id="log-select"></select>
+          <button type="button" class="secondary" id="refresh-logs">Actualizar</button>
+          <span class="log-meta" id="log-meta"></span>
+        </div>
+        <div class="status" id="logs-status" role="status" aria-live="polite" hidden></div>
+        <pre class="log-output" id="log-content">Cargando logs…</pre>
+      </section>
+    </main>
+    <script>
+      (() => {
+        const form = document.getElementById("config-form");
+        const fieldsContainer = document.getElementById("config-fields");
+        const resetButton = document.getElementById("reset-config");
+        const configStatus = document.getElementById("config-status");
+        const logSelect = document.getElementById("log-select");
+        const logContent = document.getElementById("log-content");
+        const logMeta = document.getElementById("log-meta");
+        const logsStatus = document.getElementById("logs-status");
+        const refreshLogs = document.getElementById("refresh-logs");
+
+        let lastConfigSnapshot = null;
+
+        const showStatus = (element, message, kind = "info") => {
+          element.textContent = message;
+          element.hidden = false;
+          element.classList.toggle("success", kind === "success");
+          element.classList.toggle("error", kind === "error");
+        };
+
+        const hideStatus = (element) => {
+          element.hidden = true;
+          element.classList.remove("success", "error");
+        };
+
+        const booleanValue = (value) => {
+          if (typeof value === "boolean") return value;
+          if (typeof value === "string") return value.toLowerCase() === "true";
+          return Boolean(value);
+        };
+
+        const createField = (variable, values, multilineValues, multilineSet) => {
+          const wrapper = document.createElement("div");
+          wrapper.className = "config-field";
+          wrapper.dataset.name = variable.name;
+
+          const label = document.createElement("label");
+          label.htmlFor = `field-${variable.name}`;
+          label.textContent = variable.name;
+          wrapper.appendChild(label);
+
+          const inputContainer = document.createElement("div");
+          inputContainer.className = "field-input";
+
+          const defaultValue = values[variable.name];
+          let control;
+
+          if (variable.type === "boolean") {
+            control = document.createElement("input");
+            control.type = "checkbox";
+            control.id = `field-${variable.name}`;
+            control.className = "value-input";
+            control.dataset.type = "boolean";
+            control.checked = booleanValue(defaultValue);
+          } else if (
+            variable.constraints && Array.isArray(variable.constraints.allowed_values) &&
+            variable.constraints.allowed_values.length > 0
+          ) {
+            control = document.createElement("select");
+            control.id = `field-${variable.name}`;
+            control.className = "value-input";
+            control.dataset.type = variable.type;
+            const allowed = variable.constraints.allowed_values;
+            allowed.forEach((option) => {
+              const opt = document.createElement("option");
+              opt.value = option;
+              opt.textContent = option;
+              if (String(option) === String(defaultValue)) {
+                opt.selected = true;
+              }
+              control.appendChild(opt);
+            });
+          } else {
+            control = document.createElement(variable.multiline ? "textarea" : "input");
+            if (variable.multiline) {
+              control.classList.add("multiline-input");
+            }
+            control.id = `field-${variable.name}`;
+            control.classList.add("value-input");
+            control.dataset.type = variable.type;
+            if (variable.type === "integer") {
+              control.type = "number";
+              control.step = "1";
+            } else if (!variable.multiline) {
+              control.type = "text";
+            }
+            control.value = defaultValue ?? "";
+          }
+
+          inputContainer.appendChild(control);
+
+          if (multilineSet.has(variable.name)) {
+            const area = document.createElement("textarea");
+            area.className = "multiline-input";
+            area.dataset.multiline = variable.name;
+            area.placeholder = "Contenido del archivo asociado";
+            area.value = multilineValues?.[variable.name] ?? "";
+            inputContainer.appendChild(area);
+          }
+
+          wrapper.appendChild(inputContainer);
+
+          const description = document.createElement("p");
+          description.className = "field-description";
+          description.textContent = variable.description || "Sin descripción";
+
+          if (variable.default !== undefined && variable.default !== null && String(variable.default).length) {
+            const defaultTag = document.createElement("span");
+            defaultTag.className = "field-default";
+            defaultTag.textContent = `Valor por defecto: ${variable.default}`;
+            description.appendChild(document.createElement("br"));
+            description.appendChild(defaultTag);
+          }
+
+          wrapper.appendChild(description);
+          return wrapper;
+        };
+
+        const populateConfig = (data) => {
+          const { schema, values, multiline, meta } = data;
+          fieldsContainer.innerHTML = "";
+          const multilineSet = new Set(meta?.multiline_fields ?? []);
+          schema?.variables?.forEach((variable) => {
+            const field = createField(variable, values, multiline, multilineSet);
+            fieldsContainer.appendChild(field);
+          });
+          lastConfigSnapshot = data;
+        };
+
+        const readFormValues = () => {
+          const payload = { values: {}, multiline: {} };
+          fieldsContainer.querySelectorAll(".config-field").forEach((field) => {
+            const name = field.dataset.name;
+            if (!name) return;
+            const control = field.querySelector(".value-input");
+            if (!control) return;
+            const type = control.dataset.type;
+            if (type === "boolean") {
+              payload.values[name] = control.checked;
+            } else if (type === "integer") {
+              payload.values[name] = control.value === "" ? null : Number(control.value);
+            } else {
+              payload.values[name] = control.value;
+            }
+            const multilineControl = field.querySelector("textarea[data-multiline]");
+            if (multilineControl) {
+              payload.multiline[name] = multilineControl.value;
+            }
+          });
+          if (Object.keys(payload.multiline).length === 0) {
+            delete payload.multiline;
+          }
+          return payload;
+        };
+
+        const fetchConfig = async () => {
+          hideStatus(configStatus);
+          try {
+            const response = await fetch("/ui/config");
+            if (!response.ok) {
+              throw new Error(`Error HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            populateConfig(data);
+            showStatus(configStatus, "Configuración cargada correctamente.", "success");
+            setTimeout(() => hideStatus(configStatus), 2500);
+          } catch (error) {
+            console.error(error);
+            showStatus(configStatus, "No se pudo cargar la configuración.", "error");
+          }
+        };
+
+        const submitConfig = async (event) => {
+          event.preventDefault();
+          hideStatus(configStatus);
+          const payload = readFormValues();
+          try {
+            const response = await fetch("/ui/config", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            const data = await response.json().catch(() => null);
+            if (!response.ok) {
+              const detail = data?.details
+                ? ` Detalle: ${JSON.stringify(data.details)}`
+                : data?.error
+                ? ` (${data.error})`
+                : "";
+              throw new Error(`Error HTTP ${response.status}${detail}`);
+            }
+            populateConfig(data);
+            showStatus(configStatus, "Cambios guardados.", "success");
+          } catch (error) {
+            console.error(error);
+            showStatus(configStatus, "No se pudo guardar la configuración. Revisa los datos e inténtalo de nuevo.", "error");
+          }
+        };
+
+        const resetConfig = () => {
+          if (!lastConfigSnapshot) return;
+          populateConfig(lastConfigSnapshot);
+          showStatus(configStatus, "Se restauraron los valores cargados.");
+          setTimeout(() => hideStatus(configStatus), 2500);
+        };
+
+        const fetchLogs = async (selectedName = null) => {
+          hideStatus(logsStatus);
+          const params = new URLSearchParams();
+          if (selectedName) {
+            params.set("name", selectedName);
+          }
+          const url = params.toString() ? `/ui/logs?${params}` : "/ui/logs";
+          try {
+            const response = await fetch(url);
+            if (!response.ok) {
+              throw new Error(`Error HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            renderLogs(data);
+          } catch (error) {
+            console.error(error);
+            showStatus(logsStatus, "No se pudieron cargar los logs.", "error");
+            logContent.textContent = "Sin datos disponibles.";
+          }
+        };
+
+        const renderLogs = (data) => {
+          const files = Array.isArray(data.files) ? data.files : [];
+          logSelect.innerHTML = "";
+
+          if (files.length === 0) {
+            const option = document.createElement("option");
+            option.textContent = "Sin archivos de log";
+            option.disabled = true;
+            option.selected = true;
+            logSelect.appendChild(option);
+            logSelect.disabled = true;
+            logContent.textContent = "No se encontraron archivos .log en el directorio configurado.";
+            logMeta.textContent = data.log_dir ? `Directorio: ${data.log_dir}` : "";
+            return;
+          }
+
+          logSelect.disabled = false;
+          files.forEach((file) => {
+            const option = document.createElement("option");
+            option.value = file.name;
+            const formattedDate = file.modified
+              ? new Date(file.modified).toLocaleString()
+              : "sin fecha";
+            option.textContent = `${file.name} · ${formattedDate}`;
+            logSelect.appendChild(option);
+          });
+
+          const selectedName = data.selected?.name || logSelect.options[0]?.value;
+          if (selectedName) {
+            logSelect.value = selectedName;
+          }
+
+          if (data.selected?.content) {
+            logContent.textContent = data.selected.content;
+          } else if (data.selected) {
+            logContent.textContent = "Archivo sin contenido o no legible.";
+          } else {
+            logContent.textContent = "No hay contenido disponible para el archivo seleccionado.";
+          }
+
+          const size = data.selected?.size;
+          const modified = data.selected?.modified ? new Date(data.selected.modified).toLocaleString() : "";
+          logMeta.textContent = `${data.log_dir ? `Directorio: ${data.log_dir}` : ""}${
+            modified ? ` · Última modificación: ${modified}` : ""
+          }${size ? ` · Tamaño: ${size} bytes` : ""}`;
+        };
+
+        form.addEventListener("submit", submitConfig);
+        resetButton.addEventListener("click", resetConfig);
+        logSelect.addEventListener("change", (event) => {
+          const { value } = event.target;
+          if (!value || logSelect.disabled) return;
+          fetchLogs(value);
+        });
+        refreshLogs.addEventListener("click", () => {
+          const selected = logSelect.disabled ? null : logSelect.value;
+          fetchLogs(selected || null);
+        });
+
+        fetchConfig();
+        fetchLogs();
+      })();
+    </script>
+  </body>
+</html>
