@@ -60,9 +60,21 @@ class SchedulerWatcher:
 
                 if self.process and self.process.poll() is not None:
                     code = self.process.returncode
-                    _log(f"El proceso programador finalizó con código {code}; reiniciando")
-                    self._stop_process()
-                    self.current_signature = None
+                    mode = schedule.get("mode") if isinstance(schedule, dict) else None
+                    if mode == "once" and code == 0:
+                        _log(
+                            "El proceso programador finalizó con código 0; ejecución única completada"
+                        )
+                        try:
+                            self.process.wait()
+                        finally:
+                            self.process = None
+                    else:
+                        _log(
+                            f"El proceso programador finalizó con código {code}; reiniciando"
+                        )
+                        self._stop_process()
+                        self.current_signature = None
 
                 if signature != self.current_signature:
                     self._stop_process()
