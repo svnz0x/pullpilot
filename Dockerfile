@@ -10,7 +10,12 @@ WORKDIR /app
 # Install system dependencies and supercronic
 ARG SUPERCRONIC_VERSION=0.2.24
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates bash \
+    && apt-get install -y --no-install-recommends \
+        bash \
+        ca-certificates \
+        curl \
+        docker-compose-plugin \
+        docker.io \
     && rm -rf /var/lib/apt/lists/* \
     && curl -fsSL "https://github.com/aptible/supercronic/releases/download/v${SUPERCRONIC_VERSION}/supercronic-linux-amd64" \
         -o /usr/local/bin/supercronic \
