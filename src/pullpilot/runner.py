@@ -35,6 +35,23 @@ DEFAULT_PORT = 8000
 DEFAULT_LOG_LEVEL = "info"
 
 
+def _resolve_port_default(raw_value: Optional[str]) -> int:
+    """Return a valid default port value from the environment."""
+
+    if not raw_value:
+        return DEFAULT_PORT
+    try:
+        return int(raw_value)
+    except ValueError:
+        LOGGER.warning(
+            "Valor de %s inválido (%r); usando el puerto por defecto %s",
+            PORT_ENV,
+            raw_value,
+            DEFAULT_PORT,
+        )
+        return DEFAULT_PORT
+
+
 def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Ejecuta la API y el scheduler de Pullpilot")
     parser.add_argument(
@@ -42,10 +59,11 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
         default=os.environ.get(HOST_ENV, DEFAULT_HOST),
         help="Dirección donde exponer la API (default: %(default)s)",
     )
+    default_port = _resolve_port_default(os.environ.get(PORT_ENV))
     parser.add_argument(
         "--port",
         type=int,
-        default=int(os.environ.get(PORT_ENV, str(DEFAULT_PORT))),
+        default=default_port,
         help="Puerto donde exponer la API (default: %(default)s)",
     )
     parser.add_argument(
