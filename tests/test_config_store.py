@@ -80,3 +80,22 @@ def test_validation_error_collects_all_fields(tmp_path: Path, schema_path: Path)
     messages = {error["field"] for error in exc.value.errors}
     assert "BASE_DIR" in messages
     assert "LOG_RETENTION_DAYS" in messages
+
+
+def test_save_does_not_touch_config_when_multiline_fails(
+    tmp_path: Path, schema_path: Path
+) -> None:
+    config_path = tmp_path / "updater.conf"
+    original_content = 'BASE_DIR="/srv/compose"\n'
+    config_path.write_text(original_content, encoding="utf-8")
+
+    store = ConfigStore(config_path, schema_path)
+    data = store.load()
+    values = data.values.copy()
+    multiline = data.multiline.copy()
+    multiline["COMPOSE_PROJECTS_FILE"] = "/srv/app\n"
+
+    with pytest.raises(ValidationError):
+        store.save(values, multiline)
+
+    assert config_path.read_text(encoding="utf-8") == original_content

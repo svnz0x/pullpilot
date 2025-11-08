@@ -103,14 +103,20 @@ class ConfigStore:
         multiline = self._load_multiline_content(defaults)
         return ConfigData(defaults, multiline)
 
-    def save(self, values: Mapping[str, Any], multiline: Optional[Mapping[str, str]] = None) -> ConfigData:
+    def save(
+        self,
+        values: Mapping[str, Any],
+        multiline: Optional[Mapping[str, str]] = None,
+    ) -> ConfigData:
         """Persist ``values`` and optional ``multiline`` payload."""
 
         sanitized = self._validate(values)
+        multiline_payload = multiline or {}
+        self._persist_multiline_files(sanitized, multiline_payload)
+
         document = self._read_document()
         self._update_document(document, sanitized)
         self._write_document(document)
-        self._persist_multiline_files(sanitized, multiline or {})
         return self.load()
 
     # ------------------------------------------------------------------
@@ -462,7 +468,10 @@ class ConfigStore:
                 multiline[key] = ""
         return multiline
 
-    def _persist_multiline_files(self, values: Mapping[str, Any], multiline: Mapping[str, str]) -> None:
+    def _persist_multiline_files(
+        self, values: Mapping[str, Any], multiline: Mapping[str, str]
+    ) -> None:
+        pending_writes: List[Tuple[Path, str]] = []
         for key in _MULTILINE_FIELDS:
             if key not in multiline:
                 continue
@@ -474,7 +483,9 @@ class ConfigStore:
                         [{"field": key, "message": "path required for provided content"}]
                     )
                 continue
-            target = Path(str(path_value))
+            pending_writes.append((Path(str(path_value)), content))
+
+        for target, content in pending_writes:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
 
