@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from ..resources import get_resource_path
 from ..schedule import DEFAULT_SCHEDULE_PATH, ScheduleStore, ScheduleValidationError
 
 DEFAULT_SCHEDULE_FILE = DEFAULT_SCHEDULE_PATH
@@ -169,6 +170,9 @@ def resolve_default_updater_command() -> str:
     scripts_path = _project_root() / "scripts" / "updater.sh"
     if scripts_path.exists():
         return str(scripts_path)
+    packaged = get_resource_path("scripts/updater.sh")
+    if packaged.exists():
+        return str(packaged)
     return DEFAULT_COMMAND
 
 

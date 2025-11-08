@@ -86,12 +86,16 @@ def test_default_updater_command_prefers_local_script(
     assert resolve_default_updater_command() == str(local_script)
 
 
-def test_default_updater_command_falls_back_to_container_path(
+def test_default_updater_command_falls_back_to_packaged_script(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    from pullpilot.resources import get_resource_path
+
     monkeypatch.setattr("pullpilot.scheduler.watch._project_root", lambda: tmp_path)
 
-    assert resolve_default_updater_command() == "/app/updater.sh"
+    assert resolve_default_updater_command() == str(
+        get_resource_path("scripts/updater.sh")
+    )
 
 
 def test_scheduler_package_reexports_watcher() -> None:
