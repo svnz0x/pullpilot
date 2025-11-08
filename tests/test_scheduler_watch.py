@@ -58,6 +58,19 @@ def test_run_once_uses_split_command(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     assert calls["args"] == expected
 
 
+def test_write_cron_file_creates_missing_parent(tmp_path: Path) -> None:
+    schedule_path = tmp_path / "schedule.json"
+    schedule_path.write_text("{}", encoding="utf-8")
+
+    cron_path = tmp_path / "nested" / "cron" / "pullpilot.cron"
+    watcher = SchedulerWatcher(schedule_path, cron_path, "echo hello", 1.0)
+
+    watcher._write_cron_file("* * * * *")
+
+    assert cron_path.parent.is_dir()
+    assert cron_path.read_text(encoding="utf-8") == "* * * * * echo hello\n"
+
+
 def test_watcher_default_schedule_path_matches_store_default() -> None:
     assert DEFAULT_SCHEDULE_FILE == DEFAULT_SCHEDULE_PATH
 
