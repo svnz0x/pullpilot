@@ -39,6 +39,13 @@ def test_save_accepts_macros(schedule_path: Path) -> None:
     assert saved.expression == "@hourly"
 
 
+@pytest.mark.parametrize("expression", ["@every 5m", "@every 1h30m"])
+def test_save_accepts_every_durations(schedule_path: Path, expression: str) -> None:
+    store = ScheduleStore(schedule_path)
+    saved = store.save({"mode": "cron", "expression": expression})
+    assert saved.expression == expression
+
+
 def test_save_rejects_invalid_cron(schedule_path: Path) -> None:
     store = ScheduleStore(schedule_path)
     with pytest.raises(ScheduleValidationError):
@@ -49,6 +56,15 @@ def test_save_rejects_every_without_interval(schedule_path: Path) -> None:
     store = ScheduleStore(schedule_path)
     with pytest.raises(ScheduleValidationError):
         store.save({"mode": "cron", "expression": "@every"})
+
+
+@pytest.mark.parametrize("expression", ["@every potato", "@every 5m 10s"])
+def test_save_rejects_invalid_every_durations(
+    schedule_path: Path, expression: str
+) -> None:
+    store = ScheduleStore(schedule_path)
+    with pytest.raises(ScheduleValidationError):
+        store.save({"mode": "cron", "expression": expression})
 
 
 def test_save_preserves_existing_file_on_write_failure(
