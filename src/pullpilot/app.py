@@ -177,12 +177,14 @@ class ConfigAPI:
         headers: Optional[Mapping[str, str]] = None,
     ) -> Tuple[int, Dict[str, Any]]:
         method = method.upper()
+        requires_auth = path.startswith("/ui") or path in {"/config", "/schedule"}
+        if self.authenticator and requires_auth and not self.authenticator.authorize(headers):
+            return HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"}
+
         if path.startswith("/ui"):
             return self._handle_ui_request(method, path, payload)
         if path not in {"/config", "/schedule"}:
             return HTTPStatus.NOT_FOUND, {"error": "not found"}
-        if self.authenticator and not self.authenticator.authorize(headers):
-            return HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"}
 
         if path == "/config":
             if method == "GET":
@@ -364,31 +366,37 @@ def create_app(
         def get_ui_page() -> HTMLResponse:
             return HTMLResponse(ui_index_content)
 
-        @app.get("/ui/config")
-        def get_ui_config():
-            status, body = api.handle_request("GET", "/ui/config")
+        @app.get("/ui/config", dependencies=[Depends(_require_auth)])
+        def get_ui_config(request: Request):
+            status, body = api.handle_request("GET", "/ui/config", headers=request.headers)
             if status != HTTPStatus.OK:
                 raise HTTPException(status_code=status, detail=body)
             return JSONResponse(body, status_code=status)
 
-        @app.post("/ui/config")
-        def post_ui_config(payload: Dict[str, Any]):
-            status, body = api.handle_request("POST", "/ui/config", payload)
+        @app.post("/ui/config", dependencies=[Depends(_require_auth)])
+        def post_ui_config(payload: Dict[str, Any], request: Request):
+            status, body = api.handle_request(
+                "POST", "/ui/config", payload, request.headers
+            )
             if status != HTTPStatus.OK:
                 raise HTTPException(status_code=status, detail=body)
             return JSONResponse(body, status_code=status)
 
-        @app.get("/ui/logs")
-        def get_ui_logs(name: Optional[str] = None):
+        @app.get("/ui/logs", dependencies=[Depends(_require_auth)])
+        def get_ui_logs(request: Request, name: Optional[str] = None):
             payload = {"name": name} if name is not None else None
-            status, body = api.handle_request("GET", "/ui/logs", payload)
+            status, body = api.handle_request(
+                "GET", "/ui/logs", payload, request.headers
+            )
             if status != HTTPStatus.OK:
                 raise HTTPException(status_code=status, detail=body)
             return JSONResponse(body, status_code=status)
 
-        @app.post("/ui/logs")
-        def post_ui_logs(payload: Dict[str, Any]):
-            status, body = api.handle_request("POST", "/ui/logs", payload)
+        @app.post("/ui/logs", dependencies=[Depends(_require_auth)])
+        def post_ui_logs(payload: Dict[str, Any], request: Request):
+            status, body = api.handle_request(
+                "POST", "/ui/logs", payload, request.headers
+            )
             if status != HTTPStatus.OK:
                 raise HTTPException(status_code=status, detail=body)
             return JSONResponse(body, status_code=status)
