@@ -25,14 +25,17 @@ RUN apt-get update \
 RUN pip install --no-cache-dir fastapi "uvicorn[standard]"
 
 # Application files
+COPY config ./config.defaults
+RUN cp -r ./config.defaults ./config
 COPY scripts/updater.sh ./updater.sh
+COPY scripts/docker-entrypoint.sh ./docker-entrypoint.sh
 COPY config/updater.conf ./updater.conf
-COPY config ./config
 COPY src ./src
 COPY scheduler ./scheduler
 
-RUN chmod +x /app/updater.sh
+RUN chmod +x /app/updater.sh /app/docker-entrypoint.sh
 
 EXPOSE 8000
 
+ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["uvicorn", "pullpilot.app:create_app", "--host", "0.0.0.0", "--port", "8000"]
