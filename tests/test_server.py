@@ -11,6 +11,11 @@ from pullpilot.app import ConfigAPI, create_app
 
 
 @pytest.fixture()
+def allow_anonymous(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PULLPILOT_ALLOW_ANONYMOUS", "1")
+
+
+@pytest.fixture()
 def store(tmp_path: Path) -> ConfigStore:
     schema = Path(__file__).resolve().parents[1] / "config" / "schema.json"
     config_path = tmp_path / "updater.conf"
@@ -23,14 +28,18 @@ def schedule_store(tmp_path: Path) -> ScheduleStore:
     return ScheduleStore(schedule_path)
 
 
-def test_get_returns_defaults(store: ConfigStore, schedule_store: ScheduleStore) -> None:
+def test_get_returns_defaults(
+    allow_anonymous: None, store: ConfigStore, schedule_store: ScheduleStore
+) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
     status, body = api.handle_request("GET", "/config")
     assert status == HTTPStatus.OK
     assert body["values"]["BASE_DIR"] == "/srv/compose"
 
 
-def test_get_includes_schema_metadata(store: ConfigStore, schedule_store: ScheduleStore) -> None:
+def test_get_includes_schema_metadata(
+    allow_anonymous: None, store: ConfigStore, schedule_store: ScheduleStore
+) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
     status, body = api.handle_request("GET", "/config")
     assert status == HTTPStatus.OK
@@ -42,7 +51,10 @@ def test_get_includes_schema_metadata(store: ConfigStore, schedule_store: Schedu
 
 
 def test_put_updates_config_and_multiline(
-    tmp_path: Path, store: ConfigStore, schedule_store: ScheduleStore
+    allow_anonymous: None,
+    tmp_path: Path,
+    store: ConfigStore,
+    schedule_store: ScheduleStore,
 ) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
     status, body = api.handle_request("GET", "/config")
@@ -69,7 +81,9 @@ def test_put_updates_config_and_multiline(
     assert "LOG_RETENTION_DAYS=30" in text
 
 
-def test_put_returns_validation_errors(store: ConfigStore, schedule_store: ScheduleStore) -> None:
+def test_put_returns_validation_errors(
+    allow_anonymous: None, store: ConfigStore, schedule_store: ScheduleStore
+) -> None:
     api = ConfigAPI(store=store, schedule_store=schedule_store)
     status, body = api.handle_request(
         "PUT",
@@ -78,6 +92,22 @@ def test_put_returns_validation_errors(store: ConfigStore, schedule_store: Sched
     )
     assert status == HTTPStatus.BAD_REQUEST
     assert any(error["field"] == "BASE_DIR" for error in body["details"])
+
+
+def test_requests_rejected_without_credentials(monkeypatch, store: ConfigStore, schedule_store: ScheduleStore) -> None:
+    monkeypatch.delenv("PULLPILOT_ALLOW_ANONYMOUS", raising=False)
+    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
+    monkeypatch.delenv("PULLPILOT_USERNAME", raising=False)
+    monkeypatch.delenv("PULLPILOT_PASSWORD", raising=False)
+    api = ConfigAPI(store=store, schedule_store=schedule_store)
+
+    status, body = api.handle_request("GET", "/config")
+    assert status == HTTPStatus.UNAUTHORIZED
+    assert body["error"] == "unauthorized"
+
+    status, body = api.handle_request("PUT", "/config", {"values": {}})
+    assert status == HTTPStatus.UNAUTHORIZED
+    assert body["error"] == "unauthorized"
 
 
 def test_token_auth_blocks_unauthenticated_access(
@@ -92,6 +122,20 @@ def test_token_auth_blocks_unauthenticated_access(
 
     status, body = api.handle_request("GET", "/config", headers={"Authorization": "Bearer super-secret"})
     assert status == HTTPStatus.OK
+
+
+def test_explicit_anonymous_mode_allows_requests(
+    monkeypatch: pytest.MonkeyPatch, store: ConfigStore, schedule_store: ScheduleStore
+) -> None:
+    monkeypatch.setenv("PULLPILOT_ALLOW_ANONYMOUS", "true")
+    api = ConfigAPI(store=store, schedule_store=schedule_store)
+
+    status, body = api.handle_request("GET", "/config")
+    assert status == HTTPStatus.OK
+
+    status, updated = api.handle_request("PUT", "/config", {"values": body["values"]})
+    assert status == HTTPStatus.OK
+    assert updated["values"] == body["values"]
 
 
 def test_legacy_env_vars_supported(
@@ -125,7 +169,9 @@ def test_basic_auth_accepts_valid_credentials(
     assert status == HTTPStatus.OK
 
 
-def test_schedule_get_returns_defaults(schedule_store: ScheduleStore, store: ConfigStore) -> None:
+def test_schedule_get_returns_defaults(
+    allow_anonymous: None, schedule_store: ScheduleStore, store: ConfigStore
+) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
     status, body = api.handle_request("GET", "/schedule")
     assert status == HTTPStatus.OK
@@ -133,7 +179,9 @@ def test_schedule_get_returns_defaults(schedule_store: ScheduleStore, store: Con
     assert body["expression"] == "0 4 * * *"
 
 
-def test_schedule_put_accepts_valid_cron(schedule_store: ScheduleStore, store: ConfigStore) -> None:
+def test_schedule_put_accepts_valid_cron(
+    allow_anonymous: None, schedule_store: ScheduleStore, store: ConfigStore
+) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
     status, body = api.handle_request("PUT", "/schedule", {"mode": "cron", "expression": "15 2 * * 1"})
     assert status == HTTPStatus.OK
@@ -142,7 +190,9 @@ def test_schedule_put_accepts_valid_cron(schedule_store: ScheduleStore, store: C
     assert saved.expression == "15 2 * * 1"
 
 
-def test_schedule_put_rejects_invalid_expression(schedule_store: ScheduleStore, store: ConfigStore) -> None:
+def test_schedule_put_rejects_invalid_expression(
+    allow_anonymous: None, schedule_store: ScheduleStore, store: ConfigStore
+) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
     status, body = api.handle_request("PUT", "/schedule", {"mode": "cron", "expression": "bad"})
     assert status == HTTPStatus.BAD_REQUEST
@@ -150,7 +200,9 @@ def test_schedule_put_rejects_invalid_expression(schedule_store: ScheduleStore, 
     assert body["details"][0]["field"] == "expression"
 
 
-def test_schedule_put_accepts_datetime(schedule_store: ScheduleStore, store: ConfigStore) -> None:
+def test_schedule_put_accepts_datetime(
+    allow_anonymous: None, schedule_store: ScheduleStore, store: ConfigStore
+) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
     status, body = api.handle_request(
         "PUT",
@@ -163,9 +215,13 @@ def test_schedule_put_accepts_datetime(schedule_store: ScheduleStore, store: Con
 
 
 def test_fastapi_get_propagates_error(
-    monkeypatch: pytest.MonkeyPatch, store: ConfigStore, schedule_store: ScheduleStore
+    allow_anonymous: None,
+    monkeypatch: pytest.MonkeyPatch,
+    store: ConfigStore,
+    schedule_store: ScheduleStore,
 ) -> None:
     pytest.importorskip("fastapi")
+    pytest.importorskip("httpx")
     from fastapi.testclient import TestClient
 
     original_handle_request = ConfigAPI.handle_request

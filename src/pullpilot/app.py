@@ -21,6 +21,7 @@ CREDENTIALS_ENV = "PULLPILOT_CREDENTIALS_FILE"
 LEGACY_USERNAME_ENV = "PULLPILOT_UI_USERNAME"
 LEGACY_PASSWORD_ENV = "PULLPILOT_UI_PASSWORD"
 LEGACY_CREDENTIALS_ENV = "PULLPILOT_UI_CREDENTIALS_FILE"
+ALLOW_ANONYMOUS_ENV = "PULLPILOT_ALLOW_ANONYMOUS"
 
 
 class Authenticator:
@@ -43,6 +44,9 @@ class Authenticator:
         ``username:password`` format.
         """
 
+        allow_anonymous_raw = os.getenv(ALLOW_ANONYMOUS_ENV, "")
+        allow_anonymous = allow_anonymous_raw.strip().lower() in {"1", "true", "yes", "on"}
+
         token = _read_secret(TOKEN_ENV, TOKEN_FILE_ENV, LEGACY_TOKEN_ENV, LEGACY_TOKEN_FILE_ENV)
         if token:
             return cls(token=token)
@@ -51,7 +55,10 @@ class Authenticator:
         if username and password:
             return cls(username=username, password=password)
 
-        return None
+        if allow_anonymous:
+            return None
+
+        return cls()
 
     def authorize(self, headers: Optional[Mapping[str, str]]) -> bool:
         if not headers:
@@ -151,7 +158,10 @@ class ConfigAPI:
     ):
         self.store = store or ConfigStore(DEFAULT_CONFIG_PATH, DEFAULT_SCHEMA_PATH)
         self.schedule_store = schedule_store or ScheduleStore(DEFAULT_SCHEDULE_PATH)
-        self.authenticator = authenticator or Authenticator.from_env()
+        if authenticator is not None:
+            self.authenticator = authenticator
+        else:
+            self.authenticator = Authenticator.from_env()
 
     # ------------------------------------------------------------------
     # Request helpers
