@@ -1,7 +1,6 @@
 """Minimal API surface for exposing updater configuration endpoints."""
 from __future__ import annotations
 
-import base64
 import json
 import os
 from collections import deque
@@ -15,48 +14,30 @@ from .resources import get_resource_path
 from .schedule import DEFAULT_SCHEDULE_PATH, ScheduleStore, ScheduleValidationError
 
 TOKEN_ENV = "PULLPILOT_TOKEN"
-TOKEN_FILE_ENV = "PULLPILOT_TOKEN_FILE"
-LEGACY_TOKEN_ENV = "PULLPILOT_UI_TOKEN"
-LEGACY_TOKEN_FILE_ENV = "PULLPILOT_UI_TOKEN_FILE"
-USERNAME_ENV = "PULLPILOT_USERNAME"
-PASSWORD_ENV = "PULLPILOT_PASSWORD"
-CREDENTIALS_ENV = "PULLPILOT_CREDENTIALS_FILE"
-LEGACY_USERNAME_ENV = "PULLPILOT_UI_USERNAME"
-LEGACY_PASSWORD_ENV = "PULLPILOT_UI_PASSWORD"
-LEGACY_CREDENTIALS_ENV = "PULLPILOT_UI_CREDENTIALS_FILE"
 ALLOW_ANONYMOUS_ENV = "PULLPILOT_ALLOW_ANONYMOUS"
 
 
 class Authenticator:
     """Simple helper that validates Authorization headers when configured."""
 
-    def __init__(self, *, token: Optional[str] = None, username: Optional[str] = None, password: Optional[str] = None) -> None:
+    def __init__(self, *, token: Optional[str] = None) -> None:
         self.token = token
-        self.username = username
-        self.password = password
 
     @classmethod
     def from_env(cls) -> Optional["Authenticator"]:
         """Create an authenticator from environment variables, if enabled.
 
-        The handler supports either bearer-token authentication or HTTP basic
-        auth credentials. Tokens can be passed directly via ``PULLPILOT_TOKEN``
-        (or legacy ``PULLPILOT_UI_TOKEN``) or read from ``PULLPILOT_TOKEN_FILE``.
-        Basic auth credentials are read from ``PULLPILOT_USERNAME`` and
-        ``PULLPILOT_PASSWORD`` or from ``PULLPILOT_CREDENTIALS_FILE`` in
-        ``username:password`` format.
+        The handler supports bearer-token authentication using the
+        ``PULLPILOT_TOKEN`` environment variable.
         """
 
         allow_anonymous_raw = os.getenv(ALLOW_ANONYMOUS_ENV, "")
         allow_anonymous = allow_anonymous_raw.strip().lower() in {"1", "true", "yes", "on"}
 
-        token = _read_secret(TOKEN_ENV, TOKEN_FILE_ENV, LEGACY_TOKEN_ENV, LEGACY_TOKEN_FILE_ENV)
+        token_raw = os.getenv(TOKEN_ENV, "")
+        token = token_raw.strip() or None
         if token:
             return cls(token=token)
-
-        username, password = _read_credentials()
-        if username and password:
-            return cls(username=username, password=password)
 
         if allow_anonymous:
             return None
@@ -75,54 +56,7 @@ class Authenticator:
             return False
         if self.token:
             return _match_token(self.token, auth_header)
-        if self.username and self.password:
-            return _match_basic_credentials(self.username, self.password, auth_header)
         return False
-
-
-def _getenv(name: str, legacy: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
-    if name in os.environ:
-        return os.environ[name], name
-    if legacy is not None and legacy in os.environ:
-        return os.environ[legacy], legacy
-    return None, None
-
-
-def _read_secret(value_var: str, file_var: str, legacy_value_var: Optional[str] = None, legacy_file_var: Optional[str] = None) -> Optional[str]:
-    """Read a secret either directly from an env-var or from a file path."""
-
-    direct, _ = _getenv(value_var, legacy_value_var)
-    if direct:
-        return direct.strip()
-    path_value, path_source = _getenv(file_var, legacy_file_var)
-    if not path_value:
-        return None
-    secret_path = Path(path_value)
-    if not secret_path.exists():
-        variable = path_source or file_var
-        raise FileNotFoundError(f"Secret file referenced by {variable} not found: {secret_path}")
-    return secret_path.read_text(encoding="utf-8").strip()
-
-
-def _read_credentials() -> Tuple[Optional[str], Optional[str]]:
-    username, _ = _getenv(USERNAME_ENV, LEGACY_USERNAME_ENV)
-    password, _ = _getenv(PASSWORD_ENV, LEGACY_PASSWORD_ENV)
-    creds_file, creds_source = _getenv(CREDENTIALS_ENV, LEGACY_CREDENTIALS_ENV)
-    if creds_file:
-        path = Path(creds_file)
-        if not path.exists():
-            variable = creds_source or CREDENTIALS_ENV
-            raise FileNotFoundError(
-                f"Credentials file referenced by {variable} not found: {path}"
-            )
-        content = path.read_text(encoding="utf-8").strip()
-        if ":" in content:
-            file_username, file_password = content.split(":", 1)
-            username = file_username.strip()
-            password = file_password.strip()
-    if username and password:
-        return username, password
-    return None, None
 
 
 def _match_token(expected: str, header: str) -> bool:
@@ -132,18 +66,6 @@ def _match_token(expected: str, header: str) -> bool:
     if scheme.lower() in {"bearer", "token"}:
         return value == expected
     return False
-
-
-def _match_basic_credentials(username: str, password: str, header: str) -> bool:
-    scheme, _, value = header.partition(" ")
-    if scheme.lower() != "basic" or not value:
-        return False
-    try:
-        decoded = base64.b64decode(value).decode("utf-8")
-    except Exception:  # pragma: no cover - defensive guard for malformed input
-        return False
-    received_user, _, received_pass = decoded.partition(":")
-    return received_user == username and received_pass == password
 
 
 DEFAULT_CONFIG_PATH = get_resource_path("config/updater.conf")

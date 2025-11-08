@@ -1,4 +1,3 @@
-import base64
 from http import HTTPStatus
 from pathlib import Path
 
@@ -119,8 +118,6 @@ def test_put_rejects_multiline_paths_outside_allowed_directory(
 def test_requests_rejected_without_credentials(monkeypatch, store: ConfigStore, schedule_store: ScheduleStore) -> None:
     monkeypatch.delenv("PULLPILOT_ALLOW_ANONYMOUS", raising=False)
     monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
-    monkeypatch.delenv("PULLPILOT_USERNAME", raising=False)
-    monkeypatch.delenv("PULLPILOT_PASSWORD", raising=False)
     api = ConfigAPI(store=store, schedule_store=schedule_store)
 
     status, body = api.handle_request("GET", "/config")
@@ -183,34 +180,18 @@ def test_explicit_anonymous_mode_allows_requests(
     assert updated["values"] == body["values"]
 
 
-def test_legacy_env_vars_supported(
-    monkeypatch, store: ConfigStore, schedule_store: ScheduleStore
+def test_token_env_whitespace_trimmed(
+    monkeypatch: pytest.MonkeyPatch, store: ConfigStore, schedule_store: ScheduleStore
 ) -> None:
-    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
-    monkeypatch.setenv("PULLPILOT_UI_TOKEN", "legacy-secret")
+    monkeypatch.setenv("PULLPILOT_TOKEN", "  my-token \n")
     api = ConfigAPI(store=store, schedule_store=schedule_store)
 
     status, body = api.handle_request("GET", "/config")
     assert status == HTTPStatus.UNAUTHORIZED
     assert body["error"] == "unauthorized"
 
-    status, body = api.handle_request("GET", "/config", headers={"Authorization": "Bearer legacy-secret"})
-    assert status == HTTPStatus.OK
-
-
-def test_basic_auth_accepts_valid_credentials(
-    monkeypatch, store: ConfigStore, schedule_store: ScheduleStore
-) -> None:
-    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
-    monkeypatch.setenv("PULLPILOT_USERNAME", "demo")
-    monkeypatch.setenv("PULLPILOT_PASSWORD", "pass")
-    api = ConfigAPI(store=store, schedule_store=schedule_store)
-
-    status, _ = api.handle_request("GET", "/config")
-    assert status == HTTPStatus.UNAUTHORIZED
-
-    credentials = base64.b64encode(b"demo:pass").decode("ascii")
-    status, _ = api.handle_request("GET", "/config", headers={"Authorization": f"Basic {credentials}"})
+    headers = {"Authorization": "Bearer my-token"}
+    status, body = api.handle_request("GET", "/config", headers=headers)
     assert status == HTTPStatus.OK
 
 
