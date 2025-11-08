@@ -68,8 +68,11 @@ class SchedulerWatcher:
                 if signature != self.current_signature:
                     self._stop_process()
                     if schedule:
-                        self._start_process(schedule)
-                        self.current_signature = signature
+                        started = self._start_process(schedule)
+                        if started:
+                            self.current_signature = signature
+                        else:
+                            self.current_signature = None
                     else:
                         self.current_signature = None
                 time.sleep(self.interval)
@@ -79,40 +82,51 @@ class SchedulerWatcher:
             self._stop_process()
 
     # ------------------------------------------------------------------
-    def _start_process(self, schedule: Dict[str, Any]) -> None:
+    def _start_process(self, schedule: Dict[str, Any]) -> bool:
         mode = schedule.get("mode")
         if mode == "cron":
             expression = schedule.get("expression")
             if not isinstance(expression, str):
                 _log("Expresión cron inválida; omitiendo")
-                return
+                return True
             self._write_cron_file(expression)
             _log(f"Iniciando supercronic con expresión '{expression}'")
-            self.process = subprocess.Popen(["supercronic", "-quiet", str(self.cron_path)])
-            return
+            try:
+                self.process = subprocess.Popen(["supercronic", "-quiet", str(self.cron_path)])
+            except (FileNotFoundError, OSError) as exc:
+                _log(f"No se pudo iniciar supercronic: {exc}")
+                self.process = None
+                return False
+            return True
         if mode == "once":
             datetime_value = schedule.get("datetime")
             if not isinstance(datetime_value, str):
                 _log("Fecha/hora inválida; omitiendo")
-                return
+                return True
             try:
                 command_args = shlex.split(self.updater_command)
             except ValueError:
                 command_args = [self.updater_command]
             _log(f"Planificando ejecución única para {datetime_value}")
-            self.process = subprocess.Popen(
-                [
-                    sys.executable,
-                    "-m",
-                    "pullpilot.scheduler.run_once",
-                    "--at",
-                    datetime_value,
-                    "--",
-                    *command_args,
-                ]
-            )
-            return
+            try:
+                self.process = subprocess.Popen(
+                    [
+                        sys.executable,
+                        "-m",
+                        "pullpilot.scheduler.run_once",
+                        "--at",
+                        datetime_value,
+                        "--",
+                        *command_args,
+                    ]
+                )
+            except (FileNotFoundError, OSError) as exc:
+                _log(f"No se pudo iniciar la ejecución única: {exc}")
+                self.process = None
+                return False
+            return True
         _log(f"Modo desconocido '{mode}'; no se inicia ningún proceso")
+        return True
 
     def _write_cron_file(self, expression: str) -> None:
         self.cron_path.parent.mkdir(parents=True, exist_ok=True)
