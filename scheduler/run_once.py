@@ -27,7 +27,7 @@ def parse_datetime(value: str) -> datetime:
 
 
 def main(argv: List[str] | None = None) -> int:
-    args = parse_args(argv or sys.argv[1:])
+    args = parse_args(argv if argv is not None else sys.argv[1:])
     if not args.command:
         print("No command provided to run once", file=sys.stderr)
         return 2
