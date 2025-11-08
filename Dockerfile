@@ -1,6 +1,10 @@
 # syntax=docker/dockerfile:1
 FROM python:3.11-slim AS pullpilot
 
+ARG TARGETOS
+ARG TARGETARCH
+ARG TARGETVARIANT
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app/src
@@ -17,7 +21,13 @@ RUN apt-get update \
         docker-compose-plugin \
         docker.io \
     && rm -rf /var/lib/apt/lists/* \
-    && curl -fsSL "https://github.com/aptible/supercronic/releases/download/v${SUPERCRONIC_VERSION}/supercronic-linux-amd64" \
+    && set -euo pipefail \
+    && case "${TARGETARCH}" in \
+        amd64) SUPERCRONIC_ARTIFACT="supercronic-linux-amd64" ;; \
+        arm64) SUPERCRONIC_ARTIFACT="supercronic-linux-arm64" ;; \
+        *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && curl -fsSL "https://github.com/aptible/supercronic/releases/download/v${SUPERCRONIC_VERSION}/${SUPERCRONIC_ARTIFACT}" \
         -o /usr/local/bin/supercronic \
     && chmod +x /usr/local/bin/supercronic
 
