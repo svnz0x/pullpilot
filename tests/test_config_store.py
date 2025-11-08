@@ -135,3 +135,53 @@ def test_multiline_path_rejects_parent_segments(
         store.save(values, multiline)
 
     assert any(error["field"] == "COMPOSE_PROJECTS_FILE" for error in exc.value.errors)
+
+
+def test_compose_bin_accepts_safe_values(tmp_path: Path, schema_path: Path) -> None:
+    store = ConfigStore(tmp_path / "updater.conf", schema_path)
+    data = store.load()
+    values = data.values.copy()
+
+    values["COMPOSE_BIN"] = " docker compose "
+    result = store.save(values, data.multiline)
+    assert result.values["COMPOSE_BIN"] == "docker compose"
+
+    values = result.values.copy()
+    values["COMPOSE_BIN"] = "docker-compose"
+    result = store.save(values, data.multiline)
+    assert result.values["COMPOSE_BIN"] == "docker-compose"
+
+    values = result.values.copy()
+    values["COMPOSE_BIN"] = "/usr/bin/docker compose"
+    result = store.save(values, data.multiline)
+    assert result.values["COMPOSE_BIN"] == "/usr/bin/docker compose"
+
+    values = result.values.copy()
+    values["COMPOSE_BIN"] = "/opt/bin/docker-compose"
+    result = store.save(values, data.multiline)
+    assert result.values["COMPOSE_BIN"] == "/opt/bin/docker-compose"
+
+
+@pytest.mark.parametrize(
+    "compose_value",
+    [
+        "docker; compose",
+        "docker -c 'rm -rf /'",
+        'docker "compose',
+        "docker compose --ansi never",
+        "/tmp/docker",
+        "/tmp/docker-compose --version",
+    ],
+)
+def test_compose_bin_rejects_dangerous_values(
+    tmp_path: Path, schema_path: Path, compose_value: str
+) -> None:
+    store = ConfigStore(tmp_path / "updater.conf", schema_path)
+    data = store.load()
+    values = data.values.copy()
+    values["COMPOSE_BIN"] = compose_value
+
+    with pytest.raises(ValidationError) as exc:
+        store.save(values, data.multiline)
+
+    assert any(error["field"] == "COMPOSE_BIN" for error in exc.value.errors)
