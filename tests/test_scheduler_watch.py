@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
@@ -106,3 +107,64 @@ def test_watch_module_imports_without_src_path(monkeypatch: pytest.MonkeyPatch) 
 
     assert module.DEFAULT_SCHEDULE_PATH is not None
     assert str(resolved_src) in sys.path
+
+
+def test_once_completion_keeps_signature(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    schedule_data = {"mode": "once", "datetime": "2023-09-01T10:00:00Z"}
+    signature = json.dumps(schedule_data, sort_keys=True)
+
+    watcher = SchedulerWatcher(
+        tmp_path / "schedule.json",
+        tmp_path / "schedule.cron",
+        "echo hi",
+        0.1,
+    )
+
+    class DummySchedule:
+        def to_dict(self) -> Dict[str, Any]:
+            return schedule_data
+
+    class DummyStore:
+        def load(self) -> DummySchedule:
+            return DummySchedule()
+
+    watcher.store = DummyStore()  # type: ignore[assignment]
+    watcher.current_signature = signature
+
+    class FinishedProcess:
+        def __init__(self) -> None:
+            self.returncode = 0
+            self.wait_calls = 0
+
+        def poll(self) -> int:
+            return self.returncode
+
+        def wait(self, timeout: float | None = None) -> int:
+            self.wait_calls += 1
+            return self.returncode
+
+    process = FinishedProcess()
+    watcher.process = process  # type: ignore[assignment]
+
+    started: List[Dict[str, Any]] = []
+
+    def fake_start(self: SchedulerWatcher, schedule: Dict[str, Any]) -> None:
+        started.append(schedule)
+
+    monkeypatch.setattr(SchedulerWatcher, "_start_process", fake_start)
+
+    class StopLoop(RuntimeError):
+        pass
+
+    def fake_sleep(_: float) -> None:
+        raise StopLoop()
+
+    monkeypatch.setattr("scheduler.watch.time.sleep", fake_sleep)
+
+    with pytest.raises(StopLoop):
+        watcher.run()
+
+    assert started == []
+    assert watcher.current_signature == signature
+    assert watcher.process is None
+    assert process.wait_calls == 1
