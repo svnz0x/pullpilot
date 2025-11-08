@@ -41,7 +41,6 @@ COPY scripts/updater.sh ./updater.sh
 COPY scripts/docker-entrypoint.sh ./docker-entrypoint.sh
 COPY config/updater.conf ./updater.conf
 COPY src ./src
-COPY scheduler ./scheduler
 
 RUN chmod +x /app/updater.sh /app/docker-entrypoint.sh
 

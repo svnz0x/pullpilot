@@ -97,7 +97,7 @@ services:
     # build: .
     depends_on:
       - pullpilot
-    command: python -m scheduler.watch
+    command: python -m pullpilot.scheduler.watch
     environment:
       PULLPILOT_SCHEDULE_FILE: ${PULLPILOT_SCHEDULE_FILE:-/app/config/pullpilot.schedule}
       PULLPILOT_CRON_FILE: ${PULLPILOT_CRON_FILE:-/app/scheduler/pullpilot.cron}
