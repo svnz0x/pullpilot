@@ -106,8 +106,11 @@ CRON_MACROS = {
 
 def _is_valid_cron(expression: str) -> bool:
     lowered = expression.lower()
-    if lowered.startswith("@every "):
-        return bool(lowered.split(maxsplit=1)[1].strip())
+    if lowered.startswith("@every"):
+        parts = lowered.split(maxsplit=1)
+        if len(parts) < 2:
+            return False
+        return bool(parts[1].strip())
     if lowered in CRON_MACROS:
         return True
     parts = [part for part in expression.split() if part]
