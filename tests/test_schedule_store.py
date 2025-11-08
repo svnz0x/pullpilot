@@ -51,6 +51,25 @@ def test_save_rejects_every_without_interval(schedule_path: Path) -> None:
         store.save({"mode": "cron", "expression": "@every"})
 
 
+def test_save_preserves_existing_file_on_write_failure(
+    schedule_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original_payload = {"mode": "cron", "expression": "0 0 * * *"}
+    schedule_path.write_text(json.dumps(original_payload), encoding="utf-8")
+    store = ScheduleStore(schedule_path)
+
+    def explode(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("pullpilot.schedule.json.dump", explode)
+
+    with pytest.raises(RuntimeError):
+        store.save({"mode": "cron", "expression": "10 5 * * 1"})
+
+    assert schedule_path.exists()
+    assert json.loads(schedule_path.read_text(encoding="utf-8")) == original_payload
+
+
 def test_save_normalizes_datetime(schedule_path: Path) -> None:
     store = ScheduleStore(schedule_path)
     saved = store.save({"mode": "once", "datetime": "2035-12-01T23:15:00+02:00"})

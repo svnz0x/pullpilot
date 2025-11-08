@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -61,9 +63,25 @@ class ScheduleStore:
     def save(self, payload: Mapping[str, Any]) -> ScheduleData:
         data = self._validate(payload)
         self.schedule_path.parent.mkdir(parents=True, exist_ok=True)
-        with self.schedule_path.open("w", encoding="utf-8") as handle:
-            json.dump(data.to_dict(), handle, indent=2, sort_keys=True)
-            handle.write("\n")
+
+        fd, temp_path = tempfile.mkstemp(
+            dir=self.schedule_path.parent,
+            prefix=f".{self.schedule_path.name}",
+            suffix=".tmp",
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                json.dump(data.to_dict(), handle, indent=2, sort_keys=True)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temp_path, self.schedule_path)
+        except Exception:
+            try:
+                os.unlink(temp_path)
+            except FileNotFoundError:
+                pass
+            raise
         return data
 
     # ------------------------------------------------------------------
