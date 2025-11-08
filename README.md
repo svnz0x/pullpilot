@@ -84,26 +84,12 @@ services:
       PULLPILOT_USERNAME: ${PULLPILOT_USERNAME:-}
       PULLPILOT_PASSWORD: ${PULLPILOT_PASSWORD:-}
       PULLPILOT_CREDENTIALS_FILE: ${PULLPILOT_CREDENTIALS_FILE:-}
-    ports:
-      - "${PULLPILOT_PORT:-8000}:8000"
-    volumes:
-      - pullpilot_config:/app/config:rw
-      - ${PULLPILOT_LOG_DIR:-./logs}:/var/log/docker-updater:rw
-      - ${PULLPILOT_PROJECTS_DIR:-./compose-projects}:/srv/compose:rw
-      - /var/run/docker.sock:/var/run/docker.sock:rw
-    restart: unless-stopped
-
-  scheduler:
-    image: ghcr.io/svnz0x/pullpilot:latest
-    # build: .
-    depends_on:
-      - pullpilot
-    command: python -m pullpilot.scheduler.watch
-    environment:
       PULLPILOT_SCHEDULE_FILE: ${PULLPILOT_SCHEDULE_FILE:-/app/config/pullpilot.schedule}
       PULLPILOT_CRON_FILE: ${PULLPILOT_CRON_FILE:-/app/scheduler/pullpilot.cron}
       PULLPILOT_UPDATER_COMMAND: ${PULLPILOT_UPDATER_COMMAND:-/app/updater.sh}
       PULLPILOT_SCHEDULE_POLL_INTERVAL: ${PULLPILOT_SCHEDULE_POLL_INTERVAL:-2.5}
+    ports:
+      - "${PULLPILOT_PORT:-8000}:8000"
     volumes:
       - pullpilot_config:/app/config:rw
       - ${PULLPILOT_LOG_DIR:-./logs}:/var/log/docker-updater:rw
@@ -115,7 +101,7 @@ volumes:
   pullpilot_config:
 ```
 
-> ℹ️ **¿Por qué los volúmenes son de lectura/escritura y se monta el socket de Docker?** La API expone endpoints para actualizar tanto la configuración (`updater.conf`) como la programación (`pullpilot.schedule`), por lo que necesita permisos de escritura sobre esos archivos y el directorio de proyectos. También genera registros bajo `logs/`. Además, la aplicación debe comunicarse con el daemon de Docker para recrear servicios y comprobar imágenes, de ahí el montaje del socket `/var/run/docker.sock`. Si prefieres gestionar tus propios secretos o rutas, ajusta las variables `PULLPILOT_*` del ejemplo anterior en un archivo `.env` compatible con Compose.
+> ℹ️ **¿Por qué los volúmenes son de lectura/escritura y se monta el socket de Docker?** La API expone endpoints para actualizar tanto la configuración (`updater.conf`) como la programación (`pullpilot.schedule`), por lo que necesita permisos de escritura sobre esos archivos y el directorio de proyectos. También genera registros bajo `logs/`. Además, la aplicación debe comunicarse con el daemon de Docker para recrear servicios y comprobar imágenes, de ahí el montaje del socket `/var/run/docker.sock`. Si prefieres gestionar tus propios secretos o rutas, ajusta las variables `PULLPILOT_*` del ejemplo anterior en un archivo `.env` compatible con Compose. Puedes deshabilitar el scheduler embebido con `PULLPILOT_DISABLE_SCHEDULER=1` o pasando `--no-scheduler` en la línea de comandos cuando corresponda.
 
 ## Licencia
 

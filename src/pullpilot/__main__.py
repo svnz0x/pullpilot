@@ -1,10 +1,5 @@
-from .app import create_app
-import uvicorn
+from .runner import main
+
 
 if __name__ == "__main__":
-    uvicorn.run(
-        "pullpilot.app:create_app",
-        host="0.0.0.0",
-        port=8000,
-        factory=True,
-    )
+    main()
