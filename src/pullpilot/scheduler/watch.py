@@ -191,7 +191,20 @@ def build_watcher_from_env() -> SchedulerWatcher:
     updater_command = os.environ.get(
         "PULLPILOT_UPDATER_COMMAND", default_updater_command
     )
-    interval = float(os.environ.get("PULLPILOT_SCHEDULE_POLL_INTERVAL", DEFAULT_INTERVAL))
+    interval_env = os.environ.get("PULLPILOT_SCHEDULE_POLL_INTERVAL")
+    try:
+        interval = float(interval_env) if interval_env is not None else DEFAULT_INTERVAL
+    except (TypeError, ValueError):
+        _log(
+            "Intervalo de sondeo inválido en PULLPILOT_SCHEDULE_POLL_INTERVAL; usando valor por defecto"
+        )
+        interval = DEFAULT_INTERVAL
+    else:
+        if interval <= 0:
+            _log(
+                "Intervalo de sondeo no positivo en PULLPILOT_SCHEDULE_POLL_INTERVAL; usando valor por defecto"
+            )
+            interval = DEFAULT_INTERVAL
 
     return SchedulerWatcher(schedule_file, cron_file, updater_command, interval)
 
