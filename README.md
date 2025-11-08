@@ -70,14 +70,48 @@ uvicorn pullpilot.app:create_app --host 0.0.0.0 --port 8000 --reload
 ## Extra: docker‑compose (ejemplo)
 
 ```yaml
+version: "3.9"
+
 services:
   pullpilot:
-    image: ghcr.io/USER/pullpilot:latest
-    ports: ["8000:8000"]
+    image: ghcr.io/svnz0x/pullpilot:latest
+    # Usa "build: ." si prefieres construir la imagen localmente
+    # build: .
+    environment:
+      PULLPILOT_TOKEN: ${PULLPILOT_TOKEN:-}
+      PULLPILOT_TOKEN_FILE: ${PULLPILOT_TOKEN_FILE:-}
+      PULLPILOT_USERNAME: ${PULLPILOT_USERNAME:-}
+      PULLPILOT_PASSWORD: ${PULLPILOT_PASSWORD:-}
+      PULLPILOT_CREDENTIALS_FILE: ${PULLPILOT_CREDENTIALS_FILE:-}
+    ports:
+      - "${PULLPILOT_PORT:-8000}:8000"
     volumes:
-      - ./config:/app/config:ro
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ${PULLPILOT_UPDATER_CONF:-./config/updater.conf}:/app/config/updater.conf:rw
+      - ${PULLPILOT_LOG_DIR:-./logs}:/var/log/docker-updater:rw
+      - ${PULLPILOT_PROJECTS_DIR:-./compose-projects}:/srv/compose:rw
+      - ${PULLPILOT_SCHEDULE_FILE:-./config/pullpilot.schedule}:/app/config/pullpilot.schedule:rw
+    restart: unless-stopped
+
+  scheduler:
+    image: ghcr.io/svnz0x/pullpilot:latest
+    # build: .
+    depends_on:
+      - pullpilot
+    command: python -m scheduler.watch
+    environment:
+      PULLPILOT_SCHEDULE_FILE: ${PULLPILOT_SCHEDULE_FILE:-/app/config/pullpilot.schedule}
+      PULLPILOT_CRON_FILE: ${PULLPILOT_CRON_FILE:-/app/scheduler/pullpilot.cron}
+      PULLPILOT_UPDATER_COMMAND: ${PULLPILOT_UPDATER_COMMAND:-/app/updater.sh}
+      PULLPILOT_SCHEDULE_POLL_INTERVAL: ${PULLPILOT_SCHEDULE_POLL_INTERVAL:-2.5}
+    volumes:
+      - ${PULLPILOT_UPDATER_CONF:-./config/updater.conf}:/app/config/updater.conf:rw
+      - ${PULLPILOT_LOG_DIR:-./logs}:/var/log/docker-updater:rw
+      - ${PULLPILOT_PROJECTS_DIR:-./compose-projects}:/srv/compose:rw
+      - ${PULLPILOT_SCHEDULE_FILE:-./config/pullpilot.schedule}:/app/config/pullpilot.schedule:rw
+    restart: unless-stopped
 ```
+
+> ℹ️ **¿Por qué los volúmenes son de lectura/escritura?** La API expone endpoints para actualizar tanto la configuración (`updater.conf`) como la programación (`pullpilot.schedule`), por lo que necesita permisos de escritura sobre esos archivos y el directorio de proyectos. También genera registros bajo `logs/`. Si prefieres gestionar tus propios secretos o rutas, ajusta las variables `PULLPILOT_*` del ejemplo anterior (por ejemplo `PULLPILOT_UPDATER_CONF=/ruta/a/otra.conf`) o sobreescríbelas en un archivo `.env` compatible con Compose.
 
 ## Licencia
 
