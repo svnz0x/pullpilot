@@ -40,13 +40,15 @@ class SchedulerWatcher:
     def run(self, stop_event: Event | None = None) -> None:
         try:
             while not (stop_event and stop_event.is_set()):
+                load_failed = False
                 try:
                     schedule = self.store.load().to_dict()
                     signature = json.dumps(schedule, sort_keys=True)
                 except (ScheduleValidationError, json.JSONDecodeError) as exc:
                     _log(f"No se pudo interpretar la programación: {exc}")
                     schedule = None
-                    signature = None
+                    signature = self.current_signature
+                    load_failed = True
 
                 if self.process and self.process.poll() is not None:
                     code = self.process.returncode
@@ -75,7 +77,8 @@ class SchedulerWatcher:
                         else:
                             self.current_signature = None
                     else:
-                        self.current_signature = None
+                        if not load_failed:
+                            self.current_signature = None
                 if stop_event:
                     if stop_event.wait(self.interval):
                         break

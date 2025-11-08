@@ -213,6 +213,110 @@ def test_run_handles_missing_subprocess(monkeypatch: pytest.MonkeyPatch, tmp_pat
     assert watcher.current_signature is None
 
 
+def test_run_keeps_process_alive_when_schedule_load_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    initial_schedule = {"mode": "once", "datetime": "2023-09-01T10:00:00Z"}
+    initial_signature = json.dumps(initial_schedule, sort_keys=True)
+    new_schedule = {"mode": "once", "datetime": "2023-09-01T12:00:00Z"}
+    new_signature = json.dumps(new_schedule, sort_keys=True)
+
+    watcher = SchedulerWatcher(
+        tmp_path / "schedule.json",
+        tmp_path / "schedule.cron",
+        "echo hi",
+        0.01,
+    )
+    watcher.current_signature = initial_signature
+
+    class ActiveProcess:
+        def __init__(self) -> None:
+            self.terminated = False
+
+        def poll(self) -> None:
+            return None
+
+        def terminate(self) -> None:
+            self.terminated = True
+
+        def wait(self, timeout: float | None = None) -> None:
+            pass
+
+        def kill(self) -> None:  # pragma: no cover - defensive
+            self.terminated = True
+
+    running_process = ActiveProcess()
+    watcher.process = running_process  # type: ignore[assignment]
+
+    class DummySchedule:
+        def __init__(self, data: Dict[str, Any]) -> None:
+            self.data = data
+
+        def to_dict(self) -> Dict[str, Any]:
+            return self.data
+
+    class FlakyStore:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def load(self) -> DummySchedule:
+            self.calls += 1
+            if self.calls == 1:
+                raise json.JSONDecodeError("boom", "{}", 0)
+            return DummySchedule(new_schedule)
+
+    store = FlakyStore()
+    watcher.store = store  # type: ignore[assignment]
+
+    stop_store_calls: List[int] = []
+    original_stop = SchedulerWatcher._stop_process
+
+    def tracking_stop(self: SchedulerWatcher) -> None:
+        stop_store_calls.append(store.calls)
+        original_stop(self)
+
+    monkeypatch.setattr(SchedulerWatcher, "_stop_process", tracking_stop)
+
+    started: List[Dict[str, Any]] = []
+    started_processes: List[ActiveProcess] = []
+
+    def fake_start(self: SchedulerWatcher, schedule: Dict[str, Any]) -> bool:
+        started.append(schedule)
+        new_process = ActiveProcess()
+        started_processes.append(new_process)
+        self.process = new_process  # type: ignore[assignment]
+        return True
+
+    monkeypatch.setattr(SchedulerWatcher, "_start_process", fake_start)
+
+    class StopLoop(RuntimeError):
+        pass
+
+    observed_processes: List[ActiveProcess | None] = []
+
+    def fake_sleep(_: float) -> None:
+        observed_processes.append(watcher.process)  # type: ignore[arg-type]
+        if len(observed_processes) >= 2:
+            raise StopLoop()
+
+    monkeypatch.setattr("pullpilot.scheduler.watch.time.sleep", fake_sleep)
+
+    with pytest.raises(StopLoop):
+        watcher.run()
+
+    # After the first failed load, the running process remains active and _stop_process wasn't
+    # triggered until the schedule recovered (store.calls == 2). The final call corresponds to the
+    # teardown in the ``finally`` block when the loop exits.
+    assert observed_processes[0] is running_process
+    assert stop_store_calls == [2, 2]
+
+    # Once a valid schedule is available the watcher restarts the process with the new signature.
+    assert started == [new_schedule]
+    assert started_processes
+    assert watcher.current_signature == new_signature
+    assert stop_store_calls[0] == 2
+    assert started_processes[0] is not running_process
+
 def test_run_respects_stop_event(tmp_path: Path) -> None:
     watcher = SchedulerWatcher(
         tmp_path / "schedule.json",
