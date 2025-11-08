@@ -37,6 +37,6 @@ line-length = 100
 target-version = ["py311"]
 
 [project.urls]
-Homepage = "https://github.com/USER/pullpilot"
-Documentation = "https://github.com/USER/pullpilot#readme"
-Issues = "https://github.com/USER/pullpilot/issues"
+Homepage = "https://github.com/svnz0x/pullpilot"
+Documentation = "https://github.com/svnz0x/pullpilot#readme"
+Issues = "https://github.com/svnz0x/pullpilot/issues"
