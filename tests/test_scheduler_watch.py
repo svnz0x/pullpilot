@@ -9,14 +9,15 @@ from typing import Any, Dict, List
 
 import pytest
 
-from pullpilot.scheduler import (
+from pullpilot.scheduler.watch import (
+    DEFAULT_CRON_FILE,
+    DEFAULT_INTERVAL,
     DEFAULT_SCHEDULE_FILE,
     DEFAULT_SCHEDULE_PATH,
     SchedulerWatcher,
     build_watcher,
     resolve_default_updater_command,
 )
-from pullpilot.scheduler.watch import DEFAULT_CRON_FILE, DEFAULT_INTERVAL
 
 
 class DummyProcess:

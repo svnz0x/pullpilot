@@ -303,8 +303,6 @@ def test_ui_config_accessible_without_auth(
     schedule_store: ScheduleStore,
 ) -> None:
     monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
-    monkeypatch.delenv("PULLPILOT_USERNAME", raising=False)
-    monkeypatch.delenv("PULLPILOT_PASSWORD", raising=False)
 
     api = ConfigAPI(store=store, schedule_store=schedule_store)
 
@@ -321,8 +319,6 @@ def test_ui_config_put_updates_values(
     schedule_store: ScheduleStore,
 ) -> None:
     monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
-    monkeypatch.delenv("PULLPILOT_USERNAME", raising=False)
-    monkeypatch.delenv("PULLPILOT_PASSWORD", raising=False)
 
     api = ConfigAPI(store=store, schedule_store=schedule_store)
     status, body = api.handle_request("GET", "/ui/config")
@@ -350,8 +346,6 @@ def test_ui_logs_listing_and_selection(
     schedule_store: ScheduleStore,
 ) -> None:
     monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
-    monkeypatch.delenv("PULLPILOT_USERNAME", raising=False)
-    monkeypatch.delenv("PULLPILOT_PASSWORD", raising=False)
 
     api = ConfigAPI(store=store, schedule_store=schedule_store)
     status, body = api.handle_request("GET", "/ui/config")
