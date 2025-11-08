@@ -219,10 +219,6 @@ fi
 
 assert_compose_command_safe
 
-if [[ "${PULLPILOT_VALIDATE_COMPOSE_ONLY:-0}" == 1 ]]; then
-  exit 0
-fi
-
 if compose_version=$(get_compose_version "${COMPOSE_CMD[@]}"); then
   compose_version=${compose_version#v}
   if [[ "${compose_version%%.*}" -ge 2 ]]; then
@@ -657,7 +653,7 @@ elapsed=$(( end_ts - start_ts ))
 declare -A display_name_counts=()
 for _key in "${!project_display_names[@]}"; do
   _name="${project_display_names[$_key]}"
-  (( display_name_counts[$_name]++ ))
+  (( display_name_counts[$_name] += 1 ))
 done
 unset _key _name
 
