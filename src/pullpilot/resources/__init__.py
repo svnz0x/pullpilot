@@ -53,7 +53,11 @@ def resource_exists(relative: str) -> bool:
     """Return ``True`` when the given resource exists in the package."""
 
     try:
-        resources.files(__name__).joinpath(relative)
+        origin = resources.files(__name__).joinpath(relative)
     except FileNotFoundError:
         return False
-    return True
+
+    try:
+        return origin.is_file() or origin.is_dir()
+    except FileNotFoundError:
+        return False
