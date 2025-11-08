@@ -36,11 +36,8 @@ con opciones de ejecución programada, notificaciones y una pequeña API para ge
 ## Uso rápido (Docker)
 
 ```bash
-docker run --rm -p 8000:8000 ghcr.io/USER/pullpilot:latest
+docker run --rm -p 8000:8000 ghcr.io/svnz0x/pullpilot:latest
 ```
-
-> Sustituye `USER` por tu usuario u organización de GitHub.
-> Si marcas el paquete como **público**, se puede *pull* sin autenticación.
 
 ## Variables y configuración
 
@@ -69,21 +66,6 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e .
 uvicorn pullpilot.app:create_app --host 0.0.0.0 --port 8000 --reload
 ```
-
-## Publicar la imagen en GHCR con GitHub Actions
-
-Este repositorio incluye el workflow: `.github/workflows/ghcr-publish.yml`.
-Publica una imagen multi‑arquitectura en `ghcr.io/USER/pullpilot` al hacer *push* a `main` o crear un tag `v*`.
-
-### Pasos desde la interfaz web
-
-1. **Activa GitHub Actions**: en tu repo, ve a **Actions** → *I understand my workflows…* → **Enable Actions**.
-2. **Crea el workflow** (si no existe): **Actions** → **New workflow** → **set up a workflow yourself** → pega el contenido de `ghcr-publish.yml` y **Commit**.
-3. **Permisos del token**: el workflow ya define `permissions: packages: write`, necesario para publicar en GHCR.
-4. **Primera ejecución**: haz un *push* a `main` o crea un tag `v0.1.0` para disparar la build y el *push*.
-5. **Haz público el paquete** (opcional): en **Packages** → tu imagen → **Package settings** → **Change visibility** a **Public**.
-
-> El workflow usa `GITHUB_TOKEN` para autenticarse en GHCR y etiquetar imágenes con rama, tag y SHA.
 
 ## Extra: docker‑compose (ejemplo)
 
