@@ -17,6 +17,7 @@ services:
       - ${PULLPILOT_LOG_DIR:-./logs}:/var/log/docker-updater:rw
       - ${PULLPILOT_PROJECTS_DIR:-./compose-projects}:/srv/compose:rw
       - ${PULLPILOT_SCHEDULE_FILE:-./config/pullpilot.schedule}:/app/config/pullpilot.schedule:rw
+      - /var/run/docker.sock:/var/run/docker.sock:rw
     restart: unless-stopped
 
   scheduler:
@@ -34,4 +35,5 @@ services:
       - ${PULLPILOT_LOG_DIR:-./logs}:/var/log/docker-updater:rw
       - ${PULLPILOT_PROJECTS_DIR:-./compose-projects}:/srv/compose:rw
       - ${PULLPILOT_SCHEDULE_FILE:-./config/pullpilot.schedule}:/app/config/pullpilot.schedule:rw
+      - /var/run/docker.sock:/var/run/docker.sock:rw
     restart: unless-stopped
