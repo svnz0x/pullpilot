@@ -135,61 +135,135 @@ COMPOSE_BIN=${COMPOSE_BIN:-""}
 COMPOSE_SUPPORTS_WAIT=false
 COMPOSE_SUPPORTS_QUIET_PULL=false
 COMPOSE_SUPPORTS_PULL_POLICY=true
+COMPOSE_CMD=()
+
+compose_value_is_safe() {
+  local value="$1"
+  [[ -z "$value" ]] && return 1
+  [[ "$value" =~ ^[A-Za-z0-9._/-]+( compose)?$ ]]
+}
+
+set_compose_cmd_from_value() {
+  local value="$1" bin_path
+  if [[ "$value" == "docker compose" ]]; then
+    COMPOSE_CMD=(docker compose)
+    return 0
+  fi
+  if [[ "$value" == "docker-compose" ]]; then
+    COMPOSE_CMD=(docker-compose)
+    return 0
+  fi
+  if [[ "$value" == */docker\ compose ]]; then
+    bin_path=${value% compose}
+    COMPOSE_CMD=("$bin_path" compose)
+    return 0
+  fi
+  if [[ "$value" == */docker-compose ]]; then
+    COMPOSE_CMD=("$value")
+    return 0
+  fi
+  return 1
+}
+
+assert_compose_command_safe() {
+  local bin="${COMPOSE_CMD[0]:-}" display="${COMPOSE_CMD[*]:-}"
+  [[ -n "$bin" ]] || die "COMPOSE_BIN no puede estar vacío"
+  case "$bin" in
+    docker)
+      command -v docker >/dev/null 2>&1 || die "No se encontró 'docker' en PATH"
+      [[ "${COMPOSE_CMD[1]:-}" == compose ]] || die "COMPOSE_BIN debe terminar en 'docker compose'"
+      ;;
+    docker-compose)
+      command -v docker-compose >/dev/null 2>&1 || die "No se encontró 'docker-compose' en PATH"
+      COMPOSE_SUPPORTS_PULL_POLICY=false
+      ;;
+    /*)
+      if [[ ! -x "$bin" ]]; then
+        die "El binario $bin no existe o no es ejecutable"
+      fi
+      case "$(basename "$bin")" in
+        docker)
+          [[ "${COMPOSE_CMD[1]:-}" == compose ]] || die "COMPOSE_BIN debe usar 'compose' como segundo argumento"
+          ;;
+        docker-compose)
+          ((${#COMPOSE_CMD[@]} == 1)) || die "COMPOSE_BIN no debe añadir argumentos extra"
+          COMPOSE_SUPPORTS_PULL_POLICY=false
+          ;;
+        *)
+          die "Solo se permiten rutas a 'docker' o 'docker-compose'"
+          ;;
+      esac
+      ;;
+    *)
+      die "COMPOSE_BIN inválido: $display"
+      ;;
+  esac
+}
+
 if [[ -z "$COMPOSE_BIN" ]]; then
   if docker compose version &>/dev/null; then
     COMPOSE_BIN="docker compose"
+    COMPOSE_CMD=(docker compose)
   elif command -v docker-compose &>/dev/null; then
     COMPOSE_BIN="docker-compose"
+    COMPOSE_CMD=(docker-compose)
     COMPOSE_SUPPORTS_PULL_POLICY=false
   else
     die "Necesitas Docker con plugin 'compose' o docker-compose v1"
   fi
+else
+  if ! compose_value_is_safe "$COMPOSE_BIN" || ! set_compose_cmd_from_value "$COMPOSE_BIN"; then
+    die "COMPOSE_BIN inválido: $COMPOSE_BIN"
+  fi
 fi
 
-read -r -a _compose_check <<<"$COMPOSE_BIN"
-if compose_version=$(get_compose_version "${_compose_check[@]}"); then
+assert_compose_command_safe
+
+if [[ "${PULLPILOT_VALIDATE_COMPOSE_ONLY:-0}" == 1 ]]; then
+  exit 0
+fi
+
+if compose_version=$(get_compose_version "${COMPOSE_CMD[@]}"); then
   compose_version=${compose_version#v}
   if [[ "${compose_version%%.*}" -ge 2 ]]; then
     COMPOSE_SUPPORTS_PULL_POLICY=true
-    if version_ge "$compose_version" "$MIN_COMPOSE_WAIT_VERSION" && compose_wait_flag_present "${_compose_check[@]}"; then
+    if version_ge "$compose_version" "$MIN_COMPOSE_WAIT_VERSION" && compose_wait_flag_present "${COMPOSE_CMD[@]}"; then
       COMPOSE_SUPPORTS_WAIT=true
     fi
-    if compose_quiet_pull_flag_present "${_compose_check[@]}"; then
+    if compose_quiet_pull_flag_present "${COMPOSE_CMD[@]}"; then
       COMPOSE_SUPPORTS_QUIET_PULL=true
     fi
   else
     COMPOSE_SUPPORTS_PULL_POLICY=false
   fi
 else
-  if [[ "${_compose_check[*]}" == docker\ compose* ]]; then
+  bin_basename="$(basename "${COMPOSE_CMD[0]}")"
+  if [[ "$bin_basename" == docker ]]; then
     COMPOSE_SUPPORTS_PULL_POLICY=true
-    if compose_wait_flag_present "${_compose_check[@]}"; then
+    if compose_wait_flag_present "${COMPOSE_CMD[@]}"; then
       COMPOSE_SUPPORTS_WAIT=true
     fi
-    if compose_quiet_pull_flag_present "${_compose_check[@]}"; then
+    if compose_quiet_pull_flag_present "${COMPOSE_CMD[@]}"; then
       COMPOSE_SUPPORTS_QUIET_PULL=true
     fi
-  elif [[ "${_compose_check[*]}" == docker-compose* ]]; then
+  elif [[ "$bin_basename" == docker-compose ]]; then
     COMPOSE_SUPPORTS_PULL_POLICY=false
   else
     COMPOSE_SUPPORTS_PULL_POLICY=true
-    if compose_quiet_pull_flag_present "${_compose_check[@]}"; then
+    if compose_quiet_pull_flag_present "${COMPOSE_CMD[@]}"; then
       COMPOSE_SUPPORTS_QUIET_PULL=true
     fi
   fi
 fi
+unset bin_basename
 
 if [[ "$COMPOSE_SUPPORTS_WAIT" != true ]]; then
-  warn "El comando '${_compose_check[*]}' no soporta '--wait'; se omitirá"
+  warn "El comando '${COMPOSE_CMD[*]}' no soporta '--wait'; se omitirá"
 fi
 
 if [[ "$QUIET_PULL" == true && "$COMPOSE_SUPPORTS_QUIET_PULL" != true ]]; then
-  warn "El comando '${_compose_check[*]}' no soporta '--quiet-pull'; se omitirá"
+  warn "El comando '${COMPOSE_CMD[*]}' no soporta '--quiet-pull'; se omitirá"
 fi
-
-unset _compose_check
-
-read -r -a COMPOSE_CMD <<<"$COMPOSE_BIN"
 
 # Concurrencia de pulls
 if (( PARALLEL_PULL > 0 )); then

@@ -49,6 +49,13 @@ docker run --rm -p 8000:8000 ghcr.io/USER/pullpilot:latest
 - Para validación rápida: `python scripts/validate_config.py`
 - Los archivos auxiliares multilinea (p. ej. `COMPOSE_PROJECTS_FILE`) deben residir dentro del mismo directorio de configuración (por defecto `config/`). La API rechazará rutas fuera de ese árbol o que incluyan `..`.
 
+### `COMPOSE_BIN`
+
+- Solo se admiten comandos seguros: `docker compose`, `docker-compose` o rutas absolutas que apunten a los binarios `docker` (con subcomando `compose`) o `docker-compose`.
+- El valor se normaliza y se rechazan construcciones peligrosas (comillas desbalanceadas, `;`, `-c`, etc.).
+- Antes de ejecutar el comando se comprueba que el binario exista y sea ejecutable para evitar inyecciones en `updater.sh`.
+- Si dejas el campo vacío, el script autodetectará el mejor comando disponible.
+
 ### Autenticación de la API
 
 - **Credenciales obligatorias por defecto**: la API de configuración ahora exige un token bearer (`PULLPILOT_TOKEN` o `PULLPILOT_TOKEN_FILE`) o usuario/contraseña (`PULLPILOT_USERNAME`/`PULLPILOT_PASSWORD` o `PULLPILOT_CREDENTIALS_FILE`).

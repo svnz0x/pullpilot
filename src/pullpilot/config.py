@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
@@ -74,6 +75,8 @@ ParsedLine = Tuple[Any, int]
 _BOOL_TRUE = {"1", "true", "yes", "on"}
 _BOOL_FALSE = {"0", "false", "no", "off"}
 _MULTILINE_FIELDS = {"COMPOSE_PROJECTS_FILE"}
+_SAFE_COMPOSE_TOKEN = re.compile(r"^[A-Za-z0-9._/-]+$")
+_ALLOWED_COMPOSE_SHORTCUTS = {("docker", "compose"), ("docker-compose",)}
 
 
 class ConfigStore:
@@ -244,6 +247,8 @@ class ConfigStore:
                     return False
             raise ValueError("boolean expected")
         # string fallback
+        if variable.name == "COMPOSE_BIN":
+            return self._normalize_compose_bin(value)
         if value is None:
             return ""
         return str(value)
@@ -284,6 +289,37 @@ class ConfigStore:
                 if normalized not in allowed_values:
                     return "value must be one of: " + ", ".join(map(str, allowed_values))
         return None
+
+    def _normalize_compose_bin(self, value: Any) -> str:
+        """Normalize the compose command to a vetted, space separated string."""
+
+        if value is None:
+            return ""
+        text = str(value).strip()
+        if not text:
+            return ""
+        try:
+            tokens = shlex.split(text)
+        except ValueError as exc:  # pragma: no cover - defensive
+            raise ValueError(f"invalid compose command: {exc}")
+        if not tokens:
+            return ""
+        if any(not _SAFE_COMPOSE_TOKEN.fullmatch(token) for token in tokens):
+            raise ValueError("compose command contains invalid characters")
+        if tuple(tokens) in _ALLOWED_COMPOSE_SHORTCUTS:
+            return " ".join(tokens)
+        if len(tokens) == 1 and tokens[0].startswith("/"):
+            binary = tokens[0]
+            if binary.endswith("docker-compose"):
+                return binary
+        if (
+            len(tokens) == 2
+            and tokens[0].startswith("/")
+            and tokens[0].endswith("docker")
+            and tokens[1] == "compose"
+        ):
+            return " ".join(tokens)
+        raise ValueError("unsupported compose command")
 
     # ------------------------------------------------------------------
     # Document helpers
