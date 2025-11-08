@@ -21,7 +21,6 @@ RUN apt-get update \
         docker-compose-plugin \
         docker.io \
     && rm -rf /var/lib/apt/lists/* \
-    && set -euo pipefail \
     && case "${TARGETARCH}" in \
         amd64) SUPERCRONIC_ARTIFACT="supercronic-linux-amd64" ;; \
         arm64) SUPERCRONIC_ARTIFACT="supercronic-linux-arm64" ;; \
