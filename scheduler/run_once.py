@@ -13,7 +13,10 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Execute a command once at the desired datetime")
     parser.add_argument("--at", dest="when", required=True, help="ISO 8601 datetime (UTC or with offset)")
     parser.add_argument("command", nargs=argparse.REMAINDER, help="Command to execute")
-    return parser.parse_args(argv)
+    parsed = parser.parse_args(argv)
+    if parsed.command and parsed.command[0] == "--":
+        parsed.command = parsed.command[1:]
+    return parsed
 
 
 def parse_datetime(value: str) -> datetime:
