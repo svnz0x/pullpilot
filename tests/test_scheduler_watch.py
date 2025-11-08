@@ -13,8 +13,10 @@ from pullpilot.scheduler import (
     DEFAULT_SCHEDULE_FILE,
     DEFAULT_SCHEDULE_PATH,
     SchedulerWatcher,
+    build_watcher_from_env,
     resolve_default_updater_command,
 )
+from pullpilot.scheduler.watch import DEFAULT_INTERVAL
 
 
 class DummyProcess:
@@ -226,3 +228,13 @@ def test_run_respects_stop_event(tmp_path: Path) -> None:
     thread.join(timeout=1)
 
     assert not thread.is_alive()
+
+
+def test_build_watcher_from_env_invalid_interval_uses_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PULLPILOT_SCHEDULE_POLL_INTERVAL", "invalid")
+
+    watcher = build_watcher_from_env()
+
+    assert watcher.interval == DEFAULT_INTERVAL
