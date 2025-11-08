@@ -141,17 +141,39 @@ class SchedulerWatcher:
         self.cron_path.write_text(f"{expression} {self.updater_command}\n", encoding="utf-8")
 
     def _stop_process(self) -> None:
-        if not self.process:
+        process = self.process
+        if not process:
             return
+        self.process = None
+
+        poll_result = process.poll()
+        if poll_result is not None:
+            try:
+                process.wait()
+            except Exception:  # pragma: no cover - defensive
+                pass
+            return
+
         _log("Deteniendo proceso programador actual")
-        self.process.terminate()
         try:
-            self.process.wait(timeout=10)
+            process.terminate()
+        except ProcessLookupError:
+            try:
+                process.wait()
+            except Exception:  # pragma: no cover - defensive
+                pass
+            return
+
+        try:
+            process.wait(timeout=10)
         except subprocess.TimeoutExpired:
             _log("El proceso no respondió; enviando señal SIGKILL")
-            self.process.kill()
-        finally:
-            self.process = None
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
+            else:
+                process.wait()
 
 
 def _log(message: str) -> None:

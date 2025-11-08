@@ -30,6 +30,26 @@ class DummyProcess:
         return None
 
 
+class FinishedDummyProcess:
+    """Dummy process that has already exited."""
+
+    def __init__(self) -> None:
+        self.wait_calls: List[float | None] = []
+
+    def poll(self) -> int:
+        return 0
+
+    def wait(self, timeout: float | None = None) -> int:
+        self.wait_calls.append(timeout)
+        return 0
+
+    def terminate(self) -> None:  # pragma: no cover - defensive
+        raise AssertionError("terminate should not be called")
+
+    def kill(self) -> None:  # pragma: no cover - defensive
+        raise AssertionError("kill should not be called")
+
+
 def test_run_once_uses_split_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     calls: Dict[str, Any] = {}
 
@@ -350,3 +370,20 @@ def test_build_watcher_uses_defaults(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     assert watcher.cron_path == DEFAULT_CRON_FILE
     assert watcher.updater_command == expected_command
     assert watcher.interval == DEFAULT_INTERVAL
+
+
+def test_stop_process_handles_finished_process(tmp_path: Path) -> None:
+    watcher = SchedulerWatcher(
+        tmp_path / "schedule.json",
+        tmp_path / "schedule.cron",
+        "echo hi",
+        0.1,
+    )
+
+    finished = FinishedDummyProcess()
+    watcher.process = finished  # type: ignore[assignment]
+
+    watcher._stop_process()
+
+    assert watcher.process is None
+    assert finished.wait_calls == [None]
