@@ -160,7 +160,6 @@ def base_environment(tmp_path: Path, docker_path: Path) -> dict[str, str]:
             "PATH": f"{docker_path.parent}:{env.get('PATH', '')}",
             "CONF_FILE": str(conf_path),
             "NO_COLOR": "1",
-            "PULLPILOT_VALIDATE_COMPOSE_ONLY": "1",
         }
     )
     return env
@@ -178,7 +177,6 @@ def test_script_accepts_absolute_compose_path(tmp_path: Path, fake_docker: Path)
 
 def test_script_rejects_injected_compose_value(tmp_path: Path, fake_docker: Path) -> None:
     env = base_environment(tmp_path, fake_docker)
-    env.pop("PULLPILOT_VALIDATE_COMPOSE_ONLY", None)
     env["COMPOSE_BIN"] = "docker compose; rm -rf /"
 
     result = run_updater(env)
@@ -189,7 +187,6 @@ def test_script_rejects_injected_compose_value(tmp_path: Path, fake_docker: Path
 
 def test_script_requires_executable_path(tmp_path: Path, fake_docker: Path) -> None:
     env = base_environment(tmp_path, fake_docker)
-    env.pop("PULLPILOT_VALIDATE_COMPOSE_ONLY", None)
     missing_path = tmp_path / "missing" / "docker"
     env["COMPOSE_BIN"] = f"{missing_path} compose"
 
