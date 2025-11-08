@@ -45,7 +45,7 @@ docker run --rm -p 8000:8000 ghcr.io/svnz0x/pullpilot:latest
 - El esquema JSON en `config/schema.json` documenta cada opción.
 - Para validación rápida: `python scripts/validate_config.py`
 - Los archivos auxiliares multilinea (p. ej. `COMPOSE_PROJECTS_FILE`) deben residir dentro del mismo directorio de configuración (por defecto `/app/config/`). La API rechazará rutas fuera de ese árbol o que incluyan `..`.
-- Si prefieres rutas distintas, ajusta las variables `PULLPILOT_*` relevantes en un archivo `.env` de Compose.
+- Si prefieres rutas distintas, modifica directamente los montajes de volumen en tu `docker-compose.yml`.
 
 ### `COMPOSE_BIN`
 
@@ -56,8 +56,7 @@ docker run --rm -p 8000:8000 ghcr.io/svnz0x/pullpilot:latest
 
 ### Autenticación de la API
 
-- **Credenciales obligatorias por defecto**: la API de configuración requiere un token bearer establecido mediante `PULLPILOT_TOKEN`.
-- **Modo anónimo opcional**: para entornos de desarrollo, puedes permitir acceso sin autenticación estableciendo `PULLPILOT_ALLOW_ANONYMOUS=true`. Este modo no está habilitado por defecto y debe activarse explícitamente.
+- **Credenciales obligatorias**: la API de configuración requiere un token bearer establecido mediante `PULLPILOT_TOKEN`. Si no se define, la aplicación rechazará todas las peticiones protegidas.
 
 ## Desarrollo local
 
@@ -79,13 +78,12 @@ services:
     # build: .
     environment:
       PULLPILOT_TOKEN: ${PULLPILOT_TOKEN:-}
-      PULLPILOT_ALLOW_ANONYMOUS: ${PULLPILOT_ALLOW_ANONYMOUS:-false}
     ports:
-      - "${PULLPILOT_PORT:-8000}:8000"
+      - "8000:8000"
     volumes:
       - pullpilot_config:/app/config:rw
-      - ${PULLPILOT_LOG_DIR:-./logs}:/var/log/docker-updater:rw
-      - ${PULLPILOT_PROJECTS_DIR:-./compose-projects}:/srv/compose:rw
+      - ./logs:/var/log/docker-updater:rw
+      - ./compose-projects:/srv/compose:rw
       - /var/run/docker.sock:/var/run/docker.sock:rw
     restart: unless-stopped
 
@@ -93,7 +91,7 @@ volumes:
   pullpilot_config:
 ```
 
-> ℹ️ **¿Por qué los volúmenes son de lectura/escritura y se monta el socket de Docker?** La API expone endpoints para actualizar la configuración (`updater.conf`), por lo que necesita permisos de escritura sobre ese archivo y el directorio de proyectos. También genera registros bajo `logs/`. Además, la aplicación debe comunicarse con el daemon de Docker para recrear servicios y comprobar imágenes, de ahí el montaje del socket `/var/run/docker.sock`. Si prefieres gestionar tus propios secretos o rutas, ajusta las variables `PULLPILOT_*` del ejemplo anterior en un archivo `.env` compatible con Compose.
+> ℹ️ **¿Por qué los volúmenes son de lectura/escritura y se monta el socket de Docker?** La API expone endpoints para actualizar la configuración (`updater.conf`), por lo que necesita permisos de escritura sobre ese archivo y el directorio de proyectos. También genera registros bajo `logs/`. Además, la aplicación debe comunicarse con el daemon de Docker para recrear servicios y comprobar imágenes, de ahí el montaje del socket `/var/run/docker.sock`. Si prefieres gestionar tus propios secretos o rutas, edita los montajes del ejemplo anterior según tus necesidades.
 
 ## Licencia
 
