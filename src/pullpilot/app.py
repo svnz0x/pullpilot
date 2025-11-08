@@ -14,7 +14,6 @@ from .resources import get_resource_path
 from .schedule import DEFAULT_SCHEDULE_PATH, ScheduleStore, ScheduleValidationError
 
 TOKEN_ENV = "PULLPILOT_TOKEN"
-ALLOW_ANONYMOUS_ENV = "PULLPILOT_ALLOW_ANONYMOUS"
 
 
 class Authenticator:
@@ -24,25 +23,22 @@ class Authenticator:
         self.token = token
 
     @classmethod
-    def from_env(cls) -> Optional["Authenticator"]:
-        """Create an authenticator from environment variables, if enabled.
+    def from_env(cls) -> "Authenticator":
+        """Create an authenticator from environment variables.
 
         The handler supports bearer-token authentication using the
         ``PULLPILOT_TOKEN`` environment variable.
         """
 
-        allow_anonymous_raw = os.getenv(ALLOW_ANONYMOUS_ENV, "")
-        allow_anonymous = allow_anonymous_raw.strip().lower() in {"1", "true", "yes", "on"}
-
         token_raw = os.getenv(TOKEN_ENV, "")
         token = token_raw.strip() or None
-        if token:
-            return cls(token=token)
+        return cls(token=token)
 
-        if allow_anonymous:
-            return None
+    @property
+    def configured(self) -> bool:
+        """Return ``True`` when a token is available for authorization."""
 
-        return cls()
+        return self.token is not None
 
     def authorize(self, headers: Optional[Mapping[str, str]]) -> bool:
         if not headers:
@@ -100,8 +96,17 @@ class ConfigAPI:
     ) -> Tuple[int, Dict[str, Any]]:
         method = method.upper()
         requires_auth = path.startswith("/ui") or path in {"/config", "/schedule"}
-        if self.authenticator and requires_auth and not self.authenticator.authorize(headers):
-            return HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"}
+        if requires_auth:
+            if not self.authenticator or not self.authenticator.configured:
+                return (
+                    HTTPStatus.UNAUTHORIZED,
+                    {
+                        "error": "missing credentials",
+                        "details": f"Set the {TOKEN_ENV} environment variable and send an Authorization header.",
+                    },
+                )
+            if not self.authenticator.authorize(headers):
+                return HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"}
 
         if path.startswith("/ui"):
             return self._handle_ui_request(method, path, payload)
@@ -277,9 +282,16 @@ def create_app(
         ui_index_content = get_resource_path("ui/index.html").read_text(encoding="utf-8")
 
         async def _require_auth(request: Request) -> None:
-            if not api.authenticator:
-                return
-            if api.authenticator.authorize(request.headers):
+            authenticator = api.authenticator
+            if not authenticator or not authenticator.configured:
+                raise HTTPException(
+                    status_code=HTTPStatus.UNAUTHORIZED,
+                    detail={
+                        "error": "missing credentials",
+                        "details": f"Set the {TOKEN_ENV} environment variable and send an Authorization header.",
+                    },
+                )
+            if authenticator.authorize(request.headers):
                 return
             raise HTTPException(status_code=HTTPStatus.UNAUTHORIZED, detail={"error": "unauthorized"})
 

@@ -1,5 +1,6 @@
 from http import HTTPStatus
 from pathlib import Path
+from typing import Mapping
 
 
 import pytest
@@ -7,12 +8,6 @@ import pytest
 from pullpilot.config import ConfigStore
 from pullpilot.schedule import ScheduleStore
 from pullpilot.app import ConfigAPI, create_app
-
-
-@pytest.fixture()
-def allow_anonymous(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("PULLPILOT_ALLOW_ANONYMOUS", "1")
-
 
 @pytest.fixture()
 def store(tmp_path: Path) -> ConfigStore:
@@ -27,20 +22,27 @@ def schedule_store(tmp_path: Path) -> ScheduleStore:
     return ScheduleStore(schedule_path)
 
 
+@pytest.fixture()
+def auth_headers(monkeypatch: pytest.MonkeyPatch) -> Mapping[str, str]:
+    token = "test-token"
+    monkeypatch.setenv("PULLPILOT_TOKEN", token)
+    return {"Authorization": f"Bearer {token}"}
+
+
 def test_get_returns_defaults(
-    allow_anonymous: None, store: ConfigStore, schedule_store: ScheduleStore
+    auth_headers: Mapping[str, str], store: ConfigStore, schedule_store: ScheduleStore
 ) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("GET", "/config")
+    status, body = api.handle_request("GET", "/config", headers=auth_headers)
     assert status == HTTPStatus.OK
     assert body["values"]["BASE_DIR"] == "/srv/compose"
 
 
 def test_get_includes_schema_metadata(
-    allow_anonymous: None, store: ConfigStore, schedule_store: ScheduleStore
+    auth_headers: Mapping[str, str], store: ConfigStore, schedule_store: ScheduleStore
 ) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("GET", "/config")
+    status, body = api.handle_request("GET", "/config", headers=auth_headers)
     assert status == HTTPStatus.OK
     schema = body.get("schema", {})
     variables = {entry["name"]: entry for entry in schema.get("variables", [])}
@@ -50,13 +52,13 @@ def test_get_includes_schema_metadata(
 
 
 def test_put_updates_config_and_multiline(
-    allow_anonymous: None,
+    auth_headers: Mapping[str, str],
     tmp_path: Path,
     store: ConfigStore,
     schedule_store: ScheduleStore,
 ) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("GET", "/config")
+    status, body = api.handle_request("GET", "/config", headers=auth_headers)
     assert status == HTTPStatus.OK
 
     values = dict(body["values"])
@@ -68,7 +70,7 @@ def test_put_updates_config_and_multiline(
     multiline = {"COMPOSE_PROJECTS_FILE": "/tmp/alpha\n/tmp/beta\n"}
 
     status, response = api.handle_request(
-        "PUT", "/config", {"values": values, "multiline": multiline}
+        "PUT", "/config", {"values": values, "multiline": multiline}, headers=auth_headers
     )
     assert status == HTTPStatus.OK
     assert response["values"]["LOG_RETENTION_DAYS"] == 30
@@ -81,26 +83,27 @@ def test_put_updates_config_and_multiline(
 
 
 def test_put_returns_validation_errors(
-    allow_anonymous: None, store: ConfigStore, schedule_store: ScheduleStore
+    auth_headers: Mapping[str, str], store: ConfigStore, schedule_store: ScheduleStore
 ) -> None:
     api = ConfigAPI(store=store, schedule_store=schedule_store)
     status, body = api.handle_request(
         "PUT",
         "/config",
         {"values": {"BASE_DIR": "", "LOG_RETENTION_DAYS": 0}},
+        headers=auth_headers,
     )
     assert status == HTTPStatus.BAD_REQUEST
     assert any(error["field"] == "BASE_DIR" for error in body["details"])
 
 
 def test_put_rejects_multiline_paths_outside_allowed_directory(
-    allow_anonymous: None,
+    auth_headers: Mapping[str, str],
     tmp_path: Path,
     store: ConfigStore,
     schedule_store: ScheduleStore,
 ) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("GET", "/config")
+    status, body = api.handle_request("GET", "/config", headers=auth_headers)
     assert status == HTTPStatus.OK
 
     values = dict(body["values"])
@@ -108,7 +111,7 @@ def test_put_rejects_multiline_paths_outside_allowed_directory(
     multiline = {"COMPOSE_PROJECTS_FILE": "/tmp/app\n"}
 
     status, response = api.handle_request(
-        "PUT", "/config", {"values": values, "multiline": multiline}
+        "PUT", "/config", {"values": values, "multiline": multiline}, headers=auth_headers
     )
 
     assert status == HTTPStatus.BAD_REQUEST
@@ -116,17 +119,17 @@ def test_put_rejects_multiline_paths_outside_allowed_directory(
 
 
 def test_requests_rejected_without_credentials(monkeypatch, store: ConfigStore, schedule_store: ScheduleStore) -> None:
-    monkeypatch.delenv("PULLPILOT_ALLOW_ANONYMOUS", raising=False)
     monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
     api = ConfigAPI(store=store, schedule_store=schedule_store)
 
     status, body = api.handle_request("GET", "/config")
     assert status == HTTPStatus.UNAUTHORIZED
-    assert body["error"] == "unauthorized"
+    assert body["error"] == "missing credentials"
+    assert "PULLPILOT_TOKEN" in body.get("details", "")
 
     status, body = api.handle_request("PUT", "/config", {"values": {}})
     assert status == HTTPStatus.UNAUTHORIZED
-    assert body["error"] == "unauthorized"
+    assert body["error"] == "missing credentials"
 
 
 def test_token_auth_blocks_unauthenticated_access(
@@ -146,7 +149,6 @@ def test_token_auth_blocks_unauthenticated_access(
 def test_ui_endpoints_require_auth_when_token_set(
     monkeypatch: pytest.MonkeyPatch, store: ConfigStore, schedule_store: ScheduleStore
 ) -> None:
-    monkeypatch.delenv("PULLPILOT_ALLOW_ANONYMOUS", raising=False)
     monkeypatch.setenv("PULLPILOT_TOKEN", "secret")
     api = ConfigAPI(store=store, schedule_store=schedule_store)
 
@@ -166,20 +168,6 @@ def test_ui_endpoints_require_auth_when_token_set(
     assert status == HTTPStatus.OK
 
 
-def test_explicit_anonymous_mode_allows_requests(
-    monkeypatch: pytest.MonkeyPatch, store: ConfigStore, schedule_store: ScheduleStore
-) -> None:
-    monkeypatch.setenv("PULLPILOT_ALLOW_ANONYMOUS", "true")
-    api = ConfigAPI(store=store, schedule_store=schedule_store)
-
-    status, body = api.handle_request("GET", "/config")
-    assert status == HTTPStatus.OK
-
-    status, updated = api.handle_request("PUT", "/config", {"values": body["values"]})
-    assert status == HTTPStatus.OK
-    assert updated["values"] == body["values"]
-
-
 def test_token_env_whitespace_trimmed(
     monkeypatch: pytest.MonkeyPatch, store: ConfigStore, schedule_store: ScheduleStore
 ) -> None:
@@ -196,20 +184,22 @@ def test_token_env_whitespace_trimmed(
 
 
 def test_schedule_get_returns_defaults(
-    allow_anonymous: None, schedule_store: ScheduleStore, store: ConfigStore
+    auth_headers: Mapping[str, str], schedule_store: ScheduleStore, store: ConfigStore
 ) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("GET", "/schedule")
+    status, body = api.handle_request("GET", "/schedule", headers=auth_headers)
     assert status == HTTPStatus.OK
     assert body["mode"] == "cron"
     assert body["expression"] == "0 4 * * *"
 
 
 def test_schedule_put_accepts_valid_cron(
-    allow_anonymous: None, schedule_store: ScheduleStore, store: ConfigStore
+    auth_headers: Mapping[str, str], schedule_store: ScheduleStore, store: ConfigStore
 ) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("PUT", "/schedule", {"mode": "cron", "expression": "15 2 * * 1"})
+    status, body = api.handle_request(
+        "PUT", "/schedule", {"mode": "cron", "expression": "15 2 * * 1"}, headers=auth_headers
+    )
     assert status == HTTPStatus.OK
     assert body["expression"] == "15 2 * * 1"
     saved = schedule_store.load()
@@ -217,23 +207,26 @@ def test_schedule_put_accepts_valid_cron(
 
 
 def test_schedule_put_rejects_invalid_expression(
-    allow_anonymous: None, schedule_store: ScheduleStore, store: ConfigStore
+    auth_headers: Mapping[str, str], schedule_store: ScheduleStore, store: ConfigStore
 ) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("PUT", "/schedule", {"mode": "cron", "expression": "bad"})
+    status, body = api.handle_request(
+        "PUT", "/schedule", {"mode": "cron", "expression": "bad"}, headers=auth_headers
+    )
     assert status == HTTPStatus.BAD_REQUEST
     assert body["error"] == "validation failed"
     assert body["details"][0]["field"] == "expression"
 
 
 def test_schedule_put_accepts_datetime(
-    allow_anonymous: None, schedule_store: ScheduleStore, store: ConfigStore
+    auth_headers: Mapping[str, str], schedule_store: ScheduleStore, store: ConfigStore
 ) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
     status, body = api.handle_request(
         "PUT",
         "/schedule",
         {"mode": "once", "datetime": "2030-05-10T12:30:00+02:00"},
+        headers=auth_headers,
     )
     assert status == HTTPStatus.OK
     assert body["mode"] == "once"
@@ -241,7 +234,6 @@ def test_schedule_put_accepts_datetime(
 
 
 def test_fastapi_get_propagates_error(
-    allow_anonymous: None,
     monkeypatch: pytest.MonkeyPatch,
     store: ConfigStore,
     schedule_store: ScheduleStore,
@@ -265,10 +257,12 @@ def test_fastapi_get_propagates_error(
 
     monkeypatch.setattr(ConfigAPI, "handle_request", fake_handle_request)
 
+    monkeypatch.setenv("PULLPILOT_TOKEN", "fast-error")
     app = create_app(store=store, schedule_store=schedule_store)
     client = TestClient(app)
 
-    response = client.get("/config")
+    headers = {"Authorization": "Bearer fast-error"}
+    response = client.get("/config", headers=headers)
     assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
 
 
@@ -279,7 +273,6 @@ def test_fastapi_ui_routes_require_auth(
     pytest.importorskip("httpx")
     from fastapi.testclient import TestClient
 
-    monkeypatch.delenv("PULLPILOT_ALLOW_ANONYMOUS", raising=False)
     monkeypatch.setenv("PULLPILOT_TOKEN", "fast-secret")
 
     app = create_app(store=store, schedule_store=schedule_store)
@@ -296,8 +289,7 @@ def test_fastapi_ui_routes_require_auth(
     assert client.get("/ui/logs", headers=headers).status_code == HTTPStatus.OK
 
 
-def test_ui_config_accessible_without_auth(
-    allow_anonymous: None,
+def test_ui_config_rejected_without_credentials(
     monkeypatch: pytest.MonkeyPatch,
     store: ConfigStore,
     schedule_store: ScheduleStore,
@@ -307,21 +299,18 @@ def test_ui_config_accessible_without_auth(
     api = ConfigAPI(store=store, schedule_store=schedule_store)
 
     status, body = api.handle_request("GET", "/ui/config")
-    assert status == HTTPStatus.OK
-    assert "values" in body
+    assert status == HTTPStatus.UNAUTHORIZED
+    assert body["error"] == "missing credentials"
 
 
 def test_ui_config_put_updates_values(
-    allow_anonymous: None,
-    monkeypatch: pytest.MonkeyPatch,
+    auth_headers: Mapping[str, str],
     tmp_path: Path,
     store: ConfigStore,
     schedule_store: ScheduleStore,
 ) -> None:
-    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
-
     api = ConfigAPI(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("GET", "/ui/config")
+    status, body = api.handle_request("GET", "/ui/config", headers=auth_headers)
     assert status == HTTPStatus.OK
 
     values = dict(body["values"])
@@ -331,7 +320,7 @@ def test_ui_config_put_updates_values(
     multiline = {"COMPOSE_PROJECTS_FILE": "/data/app\n"}
 
     status, updated = api.handle_request(
-        "POST", "/ui/config", {"values": values, "multiline": multiline}
+        "POST", "/ui/config", {"values": values, "multiline": multiline}, headers=auth_headers
     )
     assert status == HTTPStatus.OK
     assert updated["values"]["LOG_RETENTION_DAYS"] == 7
@@ -339,21 +328,18 @@ def test_ui_config_put_updates_values(
 
 
 def test_ui_logs_listing_and_selection(
-    allow_anonymous: None,
-    monkeypatch: pytest.MonkeyPatch,
+    auth_headers: Mapping[str, str],
     tmp_path: Path,
     store: ConfigStore,
     schedule_store: ScheduleStore,
 ) -> None:
-    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
-
     api = ConfigAPI(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("GET", "/ui/config")
+    status, body = api.handle_request("GET", "/ui/config", headers=auth_headers)
     assert status == HTTPStatus.OK
 
     values = dict(body["values"])
     values["LOG_DIR"] = str(tmp_path)
-    status, _ = api.handle_request("POST", "/ui/config", {"values": values})
+    status, _ = api.handle_request("POST", "/ui/config", {"values": values}, headers=auth_headers)
     assert status == HTTPStatus.OK
 
     first_log = tmp_path / "uno.log"
@@ -361,16 +347,18 @@ def test_ui_logs_listing_and_selection(
     second_log = tmp_path / "dos.log"
     second_log.write_text("hola\n", encoding="utf-8")
 
-    status, logs = api.handle_request("GET", "/ui/logs")
+    status, logs = api.handle_request("GET", "/ui/logs", headers=auth_headers)
     assert status == HTTPStatus.OK
     assert {entry["name"] for entry in logs["files"]} == {"uno.log", "dos.log"}
     assert logs["selected"] is None or logs["selected"]["name"] in {"uno.log", "dos.log"}
 
-    status, selected = api.handle_request("GET", "/ui/logs", {"name": "uno.log"})
+    status, selected = api.handle_request(
+        "GET", "/ui/logs", {"name": "uno.log"}, headers=auth_headers
+    )
     assert status == HTTPStatus.OK
     assert selected["selected"]["name"] == "uno.log"
     assert "linea 1" in selected["selected"]["content"]
 
-    status, error = api.handle_request("POST", "/ui/logs", {"name": 123})
+    status, error = api.handle_request("POST", "/ui/logs", {"name": 123}, headers=auth_headers)
     assert status == HTTPStatus.BAD_REQUEST
     assert error["error"] == "'name' must be a string"
