@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import shutil
 import signal
 import sys
@@ -21,52 +20,28 @@ from .scheduler.watch import build_watcher
 
 LOGGER = logging.getLogger("pullpilot.runner")
 
-CONFIG_DIR_ENV = "PULLPILOT_CONFIG_DIR"
-DEFAULT_CONFIG_DIR_ENV = "PULLPILOT_DEFAULT_CONFIG_DIR"
-DISABLE_SCHEDULER_ENV = "PULLPILOT_DISABLE_SCHEDULER"
-HOST_ENV = "PULLPILOT_HOST"
-PORT_ENV = "PULLPILOT_PORT"
-LOG_LEVEL_ENV = "PULLPILOT_LOG_LEVEL"
 DEFAULT_CONFIG_TARGET = Path("/app/config")
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 8000
 DEFAULT_LOG_LEVEL = "info"
 
 
-def _resolve_port_default(raw_value: Optional[str]) -> int:
-    """Return a valid default port value from the environment."""
-
-    if not raw_value:
-        return DEFAULT_PORT
-    try:
-        return int(raw_value)
-    except ValueError:
-        LOGGER.warning(
-            "Valor de %s inválido (%r); usando el puerto por defecto %s",
-            PORT_ENV,
-            raw_value,
-            DEFAULT_PORT,
-        )
-        return DEFAULT_PORT
-
-
 def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Ejecuta la API y el scheduler de Pullpilot")
     parser.add_argument(
         "--host",
-        default=os.environ.get(HOST_ENV, DEFAULT_HOST),
+        default=DEFAULT_HOST,
         help="Dirección donde exponer la API (default: %(default)s)",
     )
-    default_port = _resolve_port_default(os.environ.get(PORT_ENV))
     parser.add_argument(
         "--port",
         type=int,
-        default=default_port,
+        default=DEFAULT_PORT,
         help="Puerto donde exponer la API (default: %(default)s)",
     )
     parser.add_argument(
         "--log-level",
-        default=os.environ.get(LOG_LEVEL_ENV, DEFAULT_LOG_LEVEL),
+        default=DEFAULT_LOG_LEVEL,
         help="Nivel de log para Uvicorn (default: %(default)s)",
     )
     parser.add_argument(
@@ -77,17 +52,7 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _env_flag(name: str) -> bool:
-    raw = os.environ.get(name)
-    if raw is None:
-        return False
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
 def _resolve_config_dir() -> Path:
-    env_value = os.environ.get(CONFIG_DIR_ENV)
-    if env_value:
-        return Path(env_value)
     project_config = Path(__file__).resolve().parents[2] / "config"
     if project_config.exists():
         return project_config
@@ -95,11 +60,6 @@ def _resolve_config_dir() -> Path:
 
 
 def _discover_default_config_dir() -> Optional[Path]:
-    env_value = os.environ.get(DEFAULT_CONFIG_DIR_ENV)
-    if env_value:
-        candidate = Path(env_value)
-        if candidate.exists():
-            return candidate
     project_root = Path(__file__).resolve().parents[2]
     for name in ("config.defaults", "config"):
         candidate = project_root / name
@@ -138,7 +98,6 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
     _configure_logging(args.log_level)
 
     config_dir = _resolve_config_dir()
-    os.environ.setdefault(CONFIG_DIR_ENV, str(config_dir))
     default_dir = _discover_default_config_dir()
     _copy_missing_config(config_dir, default_dir)
 
@@ -162,7 +121,7 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
 
     scheduler_stop = Event()
     scheduler_thread: Thread | None = None
-    should_run_scheduler = not args.no_scheduler and not _env_flag(DISABLE_SCHEDULER_ENV)
+    should_run_scheduler = not args.no_scheduler
 
     if should_run_scheduler:
         watcher = build_watcher(schedule_path=schedule_path)
