@@ -48,6 +48,12 @@ docker run --rm -p 8000:8000 ghcr.io/USER/pullpilot:latest
 - El esquema JSON en `config/schema.json` documenta cada opción.
 - Para validación rápida: `python scripts/validate_config.py`
 
+### Autenticación de la API
+
+- **Credenciales obligatorias por defecto**: la API de configuración ahora exige un token bearer (`PULLPILOT_TOKEN` o `PULLPILOT_TOKEN_FILE`) o usuario/contraseña (`PULLPILOT_USERNAME`/`PULLPILOT_PASSWORD` o `PULLPILOT_CREDENTIALS_FILE`).
+- **Modo anónimo opcional**: para entornos de desarrollo, puedes permitir acceso sin autenticación estableciendo `PULLPILOT_ALLOW_ANONYMOUS=true`. Este modo no está habilitado por defecto y debe activarse explícitamente.
+- Las variables heredadas `PULLPILOT_UI_*` siguen siendo aceptadas para compatibilidad con despliegues anteriores.
+
 ## Desarrollo local
 
 ```bash
