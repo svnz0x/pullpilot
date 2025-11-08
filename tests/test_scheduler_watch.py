@@ -161,3 +161,45 @@ def test_once_completion_keeps_signature(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert watcher.current_signature == signature
     assert watcher.process is None
     assert process.wait_calls == 1
+
+
+def test_run_handles_missing_subprocess(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    schedule_data = {"mode": "once", "datetime": "2023-09-01T10:00:00Z"}
+
+    watcher = SchedulerWatcher(
+        tmp_path / "schedule.json",
+        tmp_path / "schedule.cron",
+        "echo hi",
+        0.1,
+    )
+
+    class DummySchedule:
+        def to_dict(self) -> Dict[str, Any]:
+            return schedule_data
+
+    class DummyStore:
+        def load(self) -> DummySchedule:
+            return DummySchedule()
+
+    watcher.store = DummyStore()  # type: ignore[assignment]
+
+    def fake_popen(*_args: Any, **_kwargs: Any) -> None:
+        raise FileNotFoundError("missing binary")
+
+    monkeypatch.setattr("subprocess.Popen", fake_popen)
+
+    class StopLoop(RuntimeError):
+        pass
+
+    def fake_sleep(_: float) -> None:
+        raise StopLoop()
+
+    monkeypatch.setattr("pullpilot.scheduler.watch.time.sleep", fake_sleep)
+
+    with pytest.raises(StopLoop):
+        watcher.run()
+
+    captured = capsys.readouterr()
+    assert "No se pudo iniciar la ejecución única" in captured.out
+    assert watcher.process is None
+    assert watcher.current_signature is None
