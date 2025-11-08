@@ -45,7 +45,7 @@ docker run --rm -p 8000:8000 ghcr.io/svnz0x/pullpilot:latest
 - El esquema JSON en `config/schema.json` documenta cada opción.
 - Para validación rápida: `python scripts/validate_config.py`
 - Los archivos auxiliares multilinea (p. ej. `COMPOSE_PROJECTS_FILE`) deben residir dentro del mismo directorio de configuración (por defecto `/app/config/`). La API rechazará rutas fuera de ese árbol o que incluyan `..`.
-- Si prefieres rutas distintas, ajusta las variables `PULLPILOT_*` relevantes en un archivo `.env` de Compose (por ejemplo `PULLPILOT_SCHEDULE_FILE=/otra/ruta/pullpilot.schedule`).
+- Si prefieres rutas distintas, ajusta las variables `PULLPILOT_*` relevantes en un archivo `.env` de Compose.
 
 ### `COMPOSE_BIN`
 
@@ -56,9 +56,8 @@ docker run --rm -p 8000:8000 ghcr.io/svnz0x/pullpilot:latest
 
 ### Autenticación de la API
 
-- **Credenciales obligatorias por defecto**: la API de configuración ahora exige un token bearer (`PULLPILOT_TOKEN` o `PULLPILOT_TOKEN_FILE`) o usuario/contraseña (`PULLPILOT_USERNAME`/`PULLPILOT_PASSWORD` o `PULLPILOT_CREDENTIALS_FILE`).
+- **Credenciales obligatorias por defecto**: la API de configuración requiere un token bearer establecido mediante `PULLPILOT_TOKEN`.
 - **Modo anónimo opcional**: para entornos de desarrollo, puedes permitir acceso sin autenticación estableciendo `PULLPILOT_ALLOW_ANONYMOUS=true`. Este modo no está habilitado por defecto y debe activarse explícitamente.
-- Las variables heredadas `PULLPILOT_UI_*` siguen siendo aceptadas para compatibilidad con despliegues anteriores.
 
 ## Desarrollo local
 
@@ -80,14 +79,7 @@ services:
     # build: .
     environment:
       PULLPILOT_TOKEN: ${PULLPILOT_TOKEN:-}
-      PULLPILOT_TOKEN_FILE: ${PULLPILOT_TOKEN_FILE:-}
-      PULLPILOT_USERNAME: ${PULLPILOT_USERNAME:-}
-      PULLPILOT_PASSWORD: ${PULLPILOT_PASSWORD:-}
-      PULLPILOT_CREDENTIALS_FILE: ${PULLPILOT_CREDENTIALS_FILE:-}
-      PULLPILOT_SCHEDULE_FILE: ${PULLPILOT_SCHEDULE_FILE:-/app/config/pullpilot.schedule}
-      PULLPILOT_CRON_FILE: ${PULLPILOT_CRON_FILE:-/app/scheduler/pullpilot.cron}
-      PULLPILOT_UPDATER_COMMAND: ${PULLPILOT_UPDATER_COMMAND:-/app/updater.sh}
-      PULLPILOT_SCHEDULE_POLL_INTERVAL: ${PULLPILOT_SCHEDULE_POLL_INTERVAL:-2.5}
+      PULLPILOT_ALLOW_ANONYMOUS: ${PULLPILOT_ALLOW_ANONYMOUS:-false}
     ports:
       - "${PULLPILOT_PORT:-8000}:8000"
     volumes:
@@ -101,7 +93,7 @@ volumes:
   pullpilot_config:
 ```
 
-> ℹ️ **¿Por qué los volúmenes son de lectura/escritura y se monta el socket de Docker?** La API expone endpoints para actualizar tanto la configuración (`updater.conf`) como la programación (`pullpilot.schedule`), por lo que necesita permisos de escritura sobre esos archivos y el directorio de proyectos. También genera registros bajo `logs/`. Además, la aplicación debe comunicarse con el daemon de Docker para recrear servicios y comprobar imágenes, de ahí el montaje del socket `/var/run/docker.sock`. Si prefieres gestionar tus propios secretos o rutas, ajusta las variables `PULLPILOT_*` del ejemplo anterior en un archivo `.env` compatible con Compose. Puedes deshabilitar el scheduler embebido con `PULLPILOT_DISABLE_SCHEDULER=1` o pasando `--no-scheduler` en la línea de comandos cuando corresponda.
+> ℹ️ **¿Por qué los volúmenes son de lectura/escritura y se monta el socket de Docker?** La API expone endpoints para actualizar la configuración (`updater.conf`), por lo que necesita permisos de escritura sobre ese archivo y el directorio de proyectos. También genera registros bajo `logs/`. Además, la aplicación debe comunicarse con el daemon de Docker para recrear servicios y comprobar imágenes, de ahí el montaje del socket `/var/run/docker.sock`. Si prefieres gestionar tus propios secretos o rutas, ajusta las variables `PULLPILOT_*` del ejemplo anterior en un archivo `.env` compatible con Compose.
 
 ## Licencia
 
