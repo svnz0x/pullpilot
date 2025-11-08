@@ -146,6 +146,29 @@ def test_token_auth_blocks_unauthenticated_access(
     assert status == HTTPStatus.OK
 
 
+def test_ui_endpoints_require_auth_when_token_set(
+    monkeypatch: pytest.MonkeyPatch, store: ConfigStore, schedule_store: ScheduleStore
+) -> None:
+    monkeypatch.delenv("PULLPILOT_ALLOW_ANONYMOUS", raising=False)
+    monkeypatch.setenv("PULLPILOT_TOKEN", "secret")
+    api = ConfigAPI(store=store, schedule_store=schedule_store)
+
+    status, body = api.handle_request("GET", "/ui/config")
+    assert status == HTTPStatus.UNAUTHORIZED
+    assert body["error"] == "unauthorized"
+
+    status, body = api.handle_request("GET", "/ui/logs")
+    assert status == HTTPStatus.UNAUTHORIZED
+    assert body["error"] == "unauthorized"
+
+    headers = {"Authorization": "Bearer secret"}
+    status, body = api.handle_request("GET", "/ui/config", headers=headers)
+    assert status == HTTPStatus.OK
+
+    status, body = api.handle_request("GET", "/ui/logs", headers=headers)
+    assert status == HTTPStatus.OK
+
+
 def test_explicit_anonymous_mode_allows_requests(
     monkeypatch: pytest.MonkeyPatch, store: ConfigStore, schedule_store: ScheduleStore
 ) -> None:
@@ -268,10 +291,36 @@ def test_fastapi_get_propagates_error(
     assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
 
 
-def test_ui_config_accessible_without_auth(
+def test_fastapi_ui_routes_require_auth(
     monkeypatch: pytest.MonkeyPatch, store: ConfigStore, schedule_store: ScheduleStore
 ) -> None:
+    pytest.importorskip("fastapi")
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+
     monkeypatch.delenv("PULLPILOT_ALLOW_ANONYMOUS", raising=False)
+    monkeypatch.setenv("PULLPILOT_TOKEN", "fast-secret")
+
+    app = create_app(store=store, schedule_store=schedule_store)
+    client = TestClient(app)
+
+    response = client.get("/ui/config")
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+
+    response = client.get("/ui/logs")
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+
+    headers = {"Authorization": "Bearer fast-secret"}
+    assert client.get("/ui/config", headers=headers).status_code == HTTPStatus.OK
+    assert client.get("/ui/logs", headers=headers).status_code == HTTPStatus.OK
+
+
+def test_ui_config_accessible_without_auth(
+    allow_anonymous: None,
+    monkeypatch: pytest.MonkeyPatch,
+    store: ConfigStore,
+    schedule_store: ScheduleStore,
+) -> None:
     monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
     monkeypatch.delenv("PULLPILOT_USERNAME", raising=False)
     monkeypatch.delenv("PULLPILOT_PASSWORD", raising=False)
@@ -284,12 +333,12 @@ def test_ui_config_accessible_without_auth(
 
 
 def test_ui_config_put_updates_values(
+    allow_anonymous: None,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     store: ConfigStore,
     schedule_store: ScheduleStore,
 ) -> None:
-    monkeypatch.delenv("PULLPILOT_ALLOW_ANONYMOUS", raising=False)
     monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
     monkeypatch.delenv("PULLPILOT_USERNAME", raising=False)
     monkeypatch.delenv("PULLPILOT_PASSWORD", raising=False)
@@ -313,12 +362,12 @@ def test_ui_config_put_updates_values(
 
 
 def test_ui_logs_listing_and_selection(
+    allow_anonymous: None,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     store: ConfigStore,
     schedule_store: ScheduleStore,
 ) -> None:
-    monkeypatch.delenv("PULLPILOT_ALLOW_ANONYMOUS", raising=False)
     monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
     monkeypatch.delenv("PULLPILOT_USERNAME", raising=False)
     monkeypatch.delenv("PULLPILOT_PASSWORD", raising=False)
