@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -207,3 +208,21 @@ def test_run_handles_missing_subprocess(monkeypatch: pytest.MonkeyPatch, tmp_pat
     assert "No se pudo iniciar la ejecución única" in captured.out
     assert watcher.process is None
     assert watcher.current_signature is None
+
+
+def test_run_respects_stop_event(tmp_path: Path) -> None:
+    watcher = SchedulerWatcher(
+        tmp_path / "schedule.json",
+        tmp_path / "schedule.cron",
+        "echo hi",
+        0.01,
+    )
+
+    stop_event = threading.Event()
+
+    thread = threading.Thread(target=watcher.run, args=(stop_event,), daemon=True)
+    thread.start()
+    stop_event.set()
+    thread.join(timeout=1)
+
+    assert not thread.is_alive()

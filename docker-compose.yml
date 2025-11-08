@@ -10,25 +10,12 @@ services:
       PULLPILOT_USERNAME: ${PULLPILOT_USERNAME:-}
       PULLPILOT_PASSWORD: ${PULLPILOT_PASSWORD:-}
       PULLPILOT_CREDENTIALS_FILE: ${PULLPILOT_CREDENTIALS_FILE:-}
-    ports:
-      - "${PULLPILOT_PORT:-8000}:8000"
-    volumes:
-      - pullpilot_config:/app/config:rw
-      - ${PULLPILOT_LOG_DIR:-./logs}:/var/log/docker-updater:rw
-      - ${PULLPILOT_PROJECTS_DIR:-./compose-projects}:/srv/compose:rw
-      - /var/run/docker.sock:/var/run/docker.sock:rw
-    restart: unless-stopped
-
-  scheduler:
-    image: pullpilot
-    depends_on:
-      - pullpilot
-    command: python -m pullpilot.scheduler.watch
-    environment:
       PULLPILOT_SCHEDULE_FILE: ${PULLPILOT_SCHEDULE_FILE:-/app/config/pullpilot.schedule}
       PULLPILOT_CRON_FILE: ${PULLPILOT_CRON_FILE:-/app/scheduler/pullpilot.cron}
       PULLPILOT_UPDATER_COMMAND: ${PULLPILOT_UPDATER_COMMAND:-/app/updater.sh}
       PULLPILOT_SCHEDULE_POLL_INTERVAL: ${PULLPILOT_SCHEDULE_POLL_INTERVAL:-2.5}
+    ports:
+      - "${PULLPILOT_PORT:-8000}:8000"
     volumes:
       - pullpilot_config:/app/config:rw
       - ${PULLPILOT_LOG_DIR:-./logs}:/var/log/docker-updater:rw

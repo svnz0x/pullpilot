@@ -7,6 +7,7 @@ import shlex
 import subprocess
 import sys
 import time
+from threading import Event
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -37,9 +38,9 @@ class SchedulerWatcher:
         self.process: Optional[subprocess.Popen[bytes]] = None
 
     # ------------------------------------------------------------------
-    def run(self) -> None:
+    def run(self, stop_event: Event | None = None) -> None:
         try:
-            while True:
+            while not (stop_event and stop_event.is_set()):
                 try:
                     schedule = self.store.load().to_dict()
                     signature = json.dumps(schedule, sort_keys=True)
@@ -76,7 +77,11 @@ class SchedulerWatcher:
                             self.current_signature = None
                     else:
                         self.current_signature = None
-                time.sleep(self.interval)
+                if stop_event:
+                    if stop_event.wait(self.interval):
+                        break
+                else:
+                    time.sleep(self.interval)
         except KeyboardInterrupt:  # pragma: no cover - manual interruption
             _log("Interrumpido, deteniendo programador")
         finally:
@@ -176,7 +181,7 @@ def resolve_default_updater_command() -> str:
     return DEFAULT_COMMAND
 
 
-def main() -> None:
+def build_watcher_from_env() -> SchedulerWatcher:
     schedule_file_env = os.environ.get("PULLPILOT_SCHEDULE_FILE")
     schedule_file = (
         Path(schedule_file_env) if schedule_file_env else DEFAULT_SCHEDULE_FILE
@@ -188,7 +193,11 @@ def main() -> None:
     )
     interval = float(os.environ.get("PULLPILOT_SCHEDULE_POLL_INTERVAL", DEFAULT_INTERVAL))
 
-    watcher = SchedulerWatcher(schedule_file, cron_file, updater_command, interval)
+    return SchedulerWatcher(schedule_file, cron_file, updater_command, interval)
+
+
+def main() -> None:
+    watcher = build_watcher_from_env()
     watcher.run()
 
 
