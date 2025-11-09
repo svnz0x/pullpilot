@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shlex
 import subprocess
 import sys
@@ -17,8 +18,6 @@ DEFAULT_SCHEDULE_FILE = DEFAULT_SCHEDULE_PATH
 DEFAULT_CRON_FILE = Path("/tmp/pullpilot.cron")
 DEFAULT_COMMAND = "/app/updater.sh"
 DEFAULT_INTERVAL = 5.0
-
-
 class SchedulerWatcher:
     """Monitor the schedule file and spawn the right worker process."""
 
@@ -140,13 +139,21 @@ class SchedulerWatcher:
         _log(f"Modo desconocido '{mode}'; no se inicia ningún proceso")
         return True
 
+    _ASSIGNMENT_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+
     def _write_cron_file(self, expression: str) -> None:
         self.cron_path.parent.mkdir(parents=True, exist_ok=True)
         try:
             command_args = shlex.split(self.updater_command)
         except ValueError:
             command_args = [self.updater_command]
-        escaped_command = " ".join(shlex.quote(arg) for arg in command_args)
+        escaped_command_parts = []
+        for arg in command_args:
+            if self._ASSIGNMENT_PATTERN.match(arg):
+                escaped_command_parts.append(arg)
+            else:
+                escaped_command_parts.append(shlex.quote(arg))
+        escaped_command = " ".join(escaped_command_parts)
         self.cron_path.write_text(
             f"{expression} {escaped_command}\n", encoding="utf-8"
         )
