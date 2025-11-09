@@ -771,11 +771,16 @@
 
           inputContainer.appendChild(control);
 
+          const descriptionId = `field-${variable.name}-description`;
+
           if (multilineSet.has(variable.name)) {
             const area = document.createElement("textarea");
             area.className = "multiline-input";
+            area.id = `field-${variable.name}-content`;
             area.dataset.multiline = variable.name;
-            area.placeholder = "Contenido del archivo asociado";
+            area.placeholder =
+              variable.description || `Introduce el contenido asociado a ${variable.name}`;
+            area.setAttribute("aria-labelledby", descriptionId);
             area.value = multilineValues?.[variable.name] ?? "";
             inputContainer.appendChild(area);
           }
@@ -784,6 +789,7 @@
 
           const description = document.createElement("p");
           description.className = "field-description";
+          description.id = descriptionId;
           description.textContent = variable.description || "Sin descripción";
 
           if (variable.default !== undefined && variable.default !== null && String(variable.default).length) {
