@@ -1,11 +1,14 @@
 import logging
 import os
+from http import HTTPStatus
 from pathlib import Path
 
 
 import pytest
 
+from pullpilot.app import Authenticator, ConfigAPI
 from pullpilot.config import ConfigStore, ValidationError
+from pullpilot.schedule import ScheduleStore
 
 
 @pytest.fixture()
@@ -131,6 +134,49 @@ def test_multiline_load_handles_permission_error(
         )
     finally:
         os.chmod(projects_path, 0o600)
+
+
+def test_api_returns_bad_request_when_multiline_path_inaccessible(
+    tmp_path: Path,
+    schema_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ConfigStore(tmp_path / "updater.conf", schema_path)
+    data = store.load()
+    values = data.values.copy()
+    target_path = tmp_path / "restricted" / "projects.txt"
+    values["COMPOSE_PROJECTS_FILE"] = str(target_path)
+    multiline = data.multiline.copy()
+    multiline["COMPOSE_PROJECTS_FILE"] = "/srv/app\n"
+
+    original_resolve = Path.resolve
+
+    def guarded_resolve(self: Path, *args: object, **kwargs: object) -> Path:
+        if self == target_path:
+            raise PermissionError("permission denied")
+        return original_resolve(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", guarded_resolve)
+
+    api = ConfigAPI(
+        store=store,
+        schedule_store=ScheduleStore(tmp_path / "schedule.json"),
+        authenticator=Authenticator(token="secret-token"),
+    )
+    headers = {"Authorization": "Bearer secret-token"}
+
+    status, body = api.handle_request(
+        "POST",
+        "/ui/config",
+        {"values": values, "multiline": multiline},
+        headers=headers,
+    )
+
+    assert status == HTTPStatus.BAD_REQUEST
+    assert {
+        "field": "COMPOSE_PROJECTS_FILE",
+        "message": "path is not accessible",
+    } in body.get("details", [])
 
 
 def test_validation_error_collects_all_fields(tmp_path: Path, schema_path: Path) -> None:
