@@ -97,10 +97,14 @@ class ConfigAPI:
     ) -> Tuple[int, Dict[str, Any]]:
         method = method.upper()
         ui_public_paths = {"/", "/ui"}
+        ui_auth_only_paths = {"/ui/auth-check"}
         is_ui_request = path == "/" or path.startswith("/ui")
         requires_auth = (
-            path not in ui_public_paths
-            and (path.startswith("/ui") or path in {"/config", "/schedule"})
+            path in ui_auth_only_paths
+            or (
+                path not in ui_public_paths
+                and (path.startswith("/ui") or path in {"/config", "/schedule"})
+            )
         )
         if requires_auth:
             if not self.authenticator or not self.authenticator.configured:
@@ -149,9 +153,21 @@ class ConfigAPI:
     ) -> Tuple[int, Dict[str, Any]]:
         if path == "/ui/config":
             if method == "GET":
-                return HTTPStatus.OK, self._serialize(self.store.load())
+                try:
+                    data = self.store.load()
+                except Exception as exc:
+                    return HTTPStatus.INTERNAL_SERVER_ERROR, {
+                        "error": "failed to load configuration",
+                        "details": str(exc),
+                    }
+                return HTTPStatus.OK, self._serialize(data)
             if method in {"POST", "PUT"}:
                 return self._handle_put(payload)
+            return HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method not allowed"}
+
+        if path == "/ui/auth-check":
+            if method == "GET":
+                return HTTPStatus.NO_CONTENT, {}
             return HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method not allowed"}
 
         if path == "/ui/logs":
@@ -282,7 +298,7 @@ def create_app(
     api = ConfigAPI(store=store, schedule_store=schedule_store)
     try:  # pragma: no cover - exercised when FastAPI is available
         from fastapi import Depends, FastAPI, HTTPException, Request
-        from fastapi.responses import HTMLResponse, JSONResponse
+        from fastapi.responses import HTMLResponse, JSONResponse, Response
 
         app = FastAPI()
         ui_index_content = get_resource_path("ui/index.html").read_text(encoding="utf-8")
@@ -309,6 +325,15 @@ def create_app(
         @app.get("/ui/config", dependencies=[Depends(_require_auth)])
         def get_ui_config(request: Request):
             status, body = api.handle_request("GET", "/ui/config", headers=request.headers)
+            if status != HTTPStatus.OK:
+                raise HTTPException(status_code=status, detail=body)
+            return JSONResponse(body, status_code=status)
+
+        @app.get("/ui/auth-check", dependencies=[Depends(_require_auth)])
+        def get_ui_auth_check(request: Request):
+            status, body = api.handle_request("GET", "/ui/auth-check", headers=request.headers)
+            if status == HTTPStatus.NO_CONTENT:
+                return Response(status_code=status)
             if status != HTTPStatus.OK:
                 raise HTTPException(status_code=status, detail=body)
             return JSONResponse(body, status_code=status)
