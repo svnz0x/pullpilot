@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 
@@ -66,6 +67,47 @@ def test_multiline_file_roundtrip(tmp_path: Path, schema_path: Path) -> None:
 
     store.save(values, multiline)
     assert projects_path.read_text(encoding="utf-8") == "/srv/ui\n"
+
+
+def test_multiline_load_handles_permission_error(
+    tmp_path: Path,
+    schema_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    projects_path = tmp_path / "projects.txt"
+    projects_path.write_text("/srv/app\n", encoding="utf-8")
+    os.chmod(projects_path, 0)
+
+    config_path = tmp_path / "updater.conf"
+    config_path.write_text(
+        f'COMPOSE_PROJECTS_FILE="{projects_path}"\n',
+        encoding="utf-8",
+    )
+
+    store = ConfigStore(config_path, schema_path)
+
+    original_read_text = Path.read_text
+
+    def guarded_read_text(self: Path, *args: object, **kwargs: object) -> str:
+        if self == projects_path:
+            raise PermissionError("permission denied")
+        return original_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", guarded_read_text)
+
+    caplog.set_level(logging.WARNING, logger="pullpilot.config")
+
+    try:
+        data = store.load()
+
+        assert data.multiline["COMPOSE_PROJECTS_FILE"] == ""
+        assert any(
+            "No se pudo leer el contenido multilinea" in record.getMessage()
+            for record in caplog.records
+        )
+    finally:
+        os.chmod(projects_path, 0o600)
 
 
 def test_validation_error_collects_all_fields(tmp_path: Path, schema_path: Path) -> None:
