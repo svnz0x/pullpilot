@@ -22,9 +22,10 @@ def test_main_empty_args_does_not_consume_process_arguments(monkeypatch):
 def test_main_strips_command_separator(monkeypatch):
     called = {}
 
-    def fake_run(command, check):
+    def fake_run(command, check, env=None):
         called["command"] = command
         called["check"] = check
+        called["env"] = env
 
         class Result:
             returncode = 0
@@ -43,6 +44,36 @@ def test_main_strips_command_separator(monkeypatch):
     assert exit_code == 0
     assert called["command"] == ["echo", "hi"]
     assert called["check"] is True
+    assert called["env"] is not None
+
+
+def test_main_applies_inline_environment_variables(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        run_once_module,
+        "parse_datetime",
+        lambda value: run_once_module.datetime.now(run_once_module.timezone.utc),
+    )
+
+    output_file = tmp_path / "env_output.txt"
+    script = (
+        "import os, pathlib; "
+        f"pathlib.Path({repr(str(output_file))}).write_text(os.environ.get('INLINE_VAR', ''))"
+    )
+
+    exit_code = run_once_module.main(
+        [
+            "--at",
+            "2030-01-01T00:00:00Z",
+            "--",
+            "INLINE_VAR=expected",
+            sys.executable,
+            "-c",
+            script,
+        ]
+    )
+
+    assert exit_code == 0
+    assert output_file.read_text() == "expected"
 
 
 def test_main_with_invalid_datetime_returns_error_without_traceback(capsys):

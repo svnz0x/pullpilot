@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 import time
 from datetime import datetime, timezone
-from typing import List
+from typing import Dict, List, Tuple
 
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
@@ -35,9 +36,31 @@ def run_once(argv: List[str] | None = None) -> int:
     return main(argv)
 
 
+def _split_env_and_command(command: List[str]) -> Tuple[Dict[str, str], List[str]]:
+    env_overrides: Dict[str, str] = {}
+    remaining: List[str] = []
+
+    iterator = iter(command)
+    for token in iterator:
+        if "=" not in token or token.startswith("="):
+            remaining.append(token)
+            break
+        name, value = token.split("=", 1)
+        if not name:
+            remaining.append(token)
+            break
+        env_overrides[name] = value
+    else:
+        return env_overrides, remaining
+
+    remaining.extend(iterator)
+    return env_overrides, remaining
+
+
 def main(argv: List[str] | None = None) -> int:
     args = parse_args(argv if argv is not None else sys.argv[1:])
-    if not args.command:
+    env_overrides, command = _split_env_and_command(args.command)
+    if not command:
         print("No command provided to run once", file=sys.stderr)
         return 2
 
@@ -57,8 +80,11 @@ def main(argv: List[str] | None = None) -> int:
         now = datetime.now(timezone.utc)
         seconds = (target - now).total_seconds()
 
+    merged_env = os.environ.copy()
+    merged_env.update(env_overrides)
+
     try:
-        result = subprocess.run(args.command, check=True)
+        result = subprocess.run(command, check=True, env=merged_env)
     except KeyboardInterrupt:
         return 130
     except subprocess.CalledProcessError as exc:
