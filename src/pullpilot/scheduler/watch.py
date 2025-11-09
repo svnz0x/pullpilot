@@ -138,7 +138,14 @@ class SchedulerWatcher:
 
     def _write_cron_file(self, expression: str) -> None:
         self.cron_path.parent.mkdir(parents=True, exist_ok=True)
-        self.cron_path.write_text(f"{expression} {self.updater_command}\n", encoding="utf-8")
+        try:
+            command_args = shlex.split(self.updater_command)
+        except ValueError:
+            command_args = [self.updater_command]
+        escaped_command = " ".join(shlex.quote(arg) for arg in command_args)
+        self.cron_path.write_text(
+            f"{expression} {escaped_command}\n", encoding="utf-8"
+        )
 
     def _stop_process(self) -> None:
         process = self.process
