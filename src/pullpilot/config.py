@@ -540,9 +540,16 @@ class ConfigStore:
                 continue
             file_path = Path(str(path_value)).expanduser()
             try:
-                resolved = file_path.resolve()
-            except FileNotFoundError:
-                resolved = file_path.resolve(strict=False)
+                try:
+                    resolved = file_path.resolve()
+                except FileNotFoundError:
+                    resolved = file_path.resolve(strict=False)
+            except OSError as exc:
+                LOGGER.warning(
+                    "No se pudo resolver la ruta multilinea %s: %s", file_path, exc
+                )
+                multiline[key] = ""
+                continue
             if not self._is_path_allowed(resolved):
                 multiline[key] = ""
                 continue
@@ -611,9 +618,24 @@ class ConfigStore:
                 [{"field": key, "message": "path must be absolute"}]
             )
         try:
-            resolved = normalized.resolve()
-        except FileNotFoundError:
-            resolved = normalized.resolve(strict=False)
+            try:
+                resolved = normalized.resolve()
+            except FileNotFoundError:
+                try:
+                    resolved = normalized.resolve(strict=False)
+                except OSError as exc:
+                    raise ValidationError(
+                        [
+                            {
+                                "field": key,
+                                "message": "path is not accessible",
+                            }
+                        ]
+                    ) from exc
+        except OSError as exc:
+            raise ValidationError(
+                [{"field": key, "message": "path is not accessible"}]
+            ) from exc
         if not self._is_path_allowed(resolved):
             allowed = ", ".join(str(directory) for directory in self.allowed_multiline_dirs)
             raise ValidationError(
