@@ -101,6 +101,30 @@ def test_save_does_not_touch_config_when_multiline_fails(
     assert config_path.read_text(encoding="utf-8") == original_content
 
 
+def test_save_does_not_truncate_config_when_write_fails(
+    tmp_path: Path, schema_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_path = tmp_path / "updater.conf"
+    original_content = 'BASE_DIR="/srv/compose"\n'
+    config_path.write_text(original_content, encoding="utf-8")
+
+    store = ConfigStore(config_path, schema_path)
+    data = store.load()
+    values = data.values.copy()
+    values["BASE_DIR"] = "/srv/other"
+
+    def fail_replace(src: str, dst: str) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr("pullpilot.config.os.replace", fail_replace)
+
+    with pytest.raises(OSError):
+        store.save(values, data.multiline)
+
+    assert config_path.read_text(encoding="utf-8") == original_content
+    assert {path.name for path in tmp_path.iterdir()} == {"updater.conf"}
+
+
 def test_multiline_path_must_reside_in_allowed_directory(
     tmp_path: Path, schema_path: Path
 ) -> None:

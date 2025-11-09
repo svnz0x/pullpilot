@@ -9,8 +9,10 @@ multi line data such as ``COMPOSE_PROJECTS_FILE``.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shlex
+import tempfile
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
@@ -478,8 +480,26 @@ class ConfigStore:
         text = "\n".join(lines)
         if text and not text.endswith("\n"):
             text += "\n"
-        self.config_path.parent.mkdir(parents=True, exist_ok=True)
-        self.config_path.write_text(text, encoding="utf-8")
+        directory = self.config_path.parent
+        directory.mkdir(parents=True, exist_ok=True)
+        fd, tmp_name = tempfile.mkstemp(
+            dir=directory,
+            prefix=f".{self.config_path.name}.",
+            suffix=".tmp",
+        )
+        tmp_path = Path(tmp_name)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(text)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(tmp_path, self.config_path)
+        except Exception:
+            try:
+                tmp_path.unlink()
+            except FileNotFoundError:
+                pass
+            raise
 
     def _format_value(self, line: AssignmentLine) -> str:
         variable = self.schema_map.get(line.key)
