@@ -570,7 +570,7 @@
 
           let response;
           try {
-            response = await fetch("/ui/config", {
+            response = await fetch("/ui/auth-check", {
               headers: { Authorization: `Bearer ${token}` },
             });
           } catch (error) {
@@ -581,14 +581,25 @@
 
           let payload = null;
           let payloadError = null;
-          try {
-            payload = await response.json();
-          } catch (error) {
-            payloadError = error;
+          if (response.status !== 204) {
+            try {
+              payload = await response.json();
+            } catch (error) {
+              payloadError = error;
+            }
+          }
+
+          if (response.status === 401) {
+            const error = new Error("UNAUTHORIZED");
+            error.status = response.status;
+            if (!payloadError) {
+              error.payload = payload;
+            }
+            throw error;
           }
 
           if (!response.ok) {
-            const error = new Error(response.status === 401 ? "UNAUTHORIZED" : "REQUEST_FAILED");
+            const error = new Error("REQUEST_FAILED");
             error.status = response.status;
             if (!payloadError) {
               error.payload = payload;
@@ -602,9 +613,8 @@
             throw invalidResponseError;
           }
 
-          const data = payload;
           auth.setToken(token, { persist });
-          return data;
+          return true;
         };
 
         const createUnauthorizedError = () => {
@@ -1036,6 +1046,7 @@
             populateConfig(data);
             showStatus(configStatus, "Configuración cargada correctamente.", "success");
             setTimeout(() => hideStatus(configStatus), 2500);
+            return true;
           } catch (error) {
             console.error(error);
             if (error?.message === "UNAUTHORIZED") {
@@ -1045,8 +1056,13 @@
                 "error",
               );
             } else {
-              showStatus(configStatus, "No se pudo cargar la configuración.", "error");
+              showStatus(
+                configStatus,
+                "Token válido, pero el backend no devolvió la configuración. Revisa el servicio e inténtalo de nuevo.",
+                "error",
+              );
             }
+            return false;
           }
         };
 
@@ -1116,6 +1132,7 @@
             }
             const data = await response.json();
             renderLogs(data);
+            return true;
           } catch (error) {
             console.error(error);
             if (error?.message === "UNAUTHORIZED") {
@@ -1125,6 +1142,7 @@
               showStatus(logsStatus, "No se pudieron cargar los logs.", "error");
               logContent.textContent = "Sin datos disponibles.";
             }
+            return false;
           }
         };
 
@@ -1175,24 +1193,25 @@
           }${size ? ` · Tamaño: ${size} bytes` : ""}`;
         };
 
-        const handleSuccessfulLogin = (configData, { showSuccessMessage = true } = {}) => {
+        const handleSuccessfulLogin = async ({ showSuccessMessage = true } = {}) => {
           setAuthState(true);
           hideStatus(configStatus);
           hideStatus(logsStatus);
-          if (showSuccessMessage) {
+          if (loginForm) {
+            loginForm.reset();
+          }
+          const configLoaded = await fetchConfig();
+          await fetchLogs();
+          if (!configLoaded) {
+            showLoginMessage(
+              "Token validado, pero no se pudo cargar la configuración. Revisa el servicio e inténtalo de nuevo.",
+              "error",
+            );
+          } else if (showSuccessMessage) {
             showLoginMessage("Token validado. Puedes usar la interfaz con normalidad.", "success");
           } else {
             showLoginMessage("", "info");
           }
-          if (loginForm) {
-            loginForm.reset();
-          }
-          if (configData) {
-            populateConfig(configData);
-          } else {
-            fetchConfig();
-          }
-          fetchLogs();
         };
 
         const showLoginPrompt = (
@@ -1215,8 +1234,8 @@
           showLoginMessage("Verificando token…", "info");
           try {
             const shouldPersist = rememberCheckbox?.checked ?? false;
-            const configData = await verifyToken(value, { persist: shouldPersist });
-            handleSuccessfulLogin(configData);
+            await verifyToken(value, { persist: shouldPersist });
+            await handleSuccessfulLogin();
           } catch (error) {
             console.error(error);
             if (error?.message === "UNAUTHORIZED" || error?.status === 401) {
@@ -1267,9 +1286,7 @@
         if (storedToken) {
           showLoginMessage("Verificando token guardado…", "info");
           verifyToken(storedToken, { persist: true })
-            .then((configData) => {
-              handleSuccessfulLogin(configData, { showSuccessMessage: false });
-            })
+            .then(() => handleSuccessfulLogin({ showSuccessMessage: false }))
             .catch((error) => {
               console.error(error);
               const isUnauthorized = error?.message === "UNAUTHORIZED" || error?.status === 401;

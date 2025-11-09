@@ -193,6 +193,34 @@ def test_ui_endpoints_require_auth_when_token_set(
     assert status == HTTPStatus.OK
 
 
+def test_ui_auth_check_allows_token_validation_when_config_fails(
+    auth_headers: Mapping[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    store: ConfigStore,
+    schedule_store: ScheduleStore,
+) -> None:
+    api = ConfigAPI(store=store, schedule_store=schedule_store)
+
+    calls = {"count": 0}
+
+    def failing_load() -> None:
+        calls["count"] += 1
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(api.store, "load", failing_load)
+
+    status, body = api.handle_request("GET", "/ui/auth-check", headers=auth_headers)
+    assert status in {HTTPStatus.NO_CONTENT, HTTPStatus.OK}
+    assert body == {}
+    assert calls["count"] == 0
+
+    status, body = api.handle_request("GET", "/ui/config", headers=auth_headers)
+    assert status == HTTPStatus.INTERNAL_SERVER_ERROR
+    assert calls["count"] == 1
+    assert body["error"] == "failed to load configuration"
+    assert "boom" in body.get("details", "")
+
+
 def test_ui_root_allows_anonymous_access(
     monkeypatch: pytest.MonkeyPatch, store: ConfigStore, schedule_store: ScheduleStore
 ) -> None:
