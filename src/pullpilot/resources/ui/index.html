@@ -1272,17 +1272,25 @@
             })
             .catch((error) => {
               console.error(error);
-              auth.clearToken();
-              if (error?.message === "UNAUTHORIZED" || error?.status === 401) {
+              const isUnauthorized = error?.message === "UNAUTHORIZED" || error?.status === 401;
+              if (isUnauthorized) {
+                auth.clearToken();
+              }
+              if (isUnauthorized) {
                 const message = resolveUnauthorizedMessage(
                   error,
                   "El token guardado no es válido. Introduce uno nuevo.",
                 );
                 showLoginPrompt("error", message);
+              } else if (error?.message === "NETWORK_ERROR") {
+                showLoginPrompt(
+                  "error",
+                  "No se pudo verificar el token guardado por un problema de red. Revisa la conexión e inténtalo de nuevo; el token seguirá guardado.",
+                );
               } else {
                 showLoginPrompt(
                   "error",
-                  "No se pudo verificar el token guardado. Introduce uno nuevo.",
+                  "No se pudo verificar el token guardado. Inténtalo de nuevo o introduce uno nuevo.",
                 );
               }
             });
