@@ -485,19 +485,74 @@
         let memoryToken = null;
         let storedToken = null;
 
-        try {
-          storedToken = window.localStorage.getItem(TOKEN_STORAGE_KEY) || null;
-        } catch (error) {
-          console.warn("No se pudo leer el token almacenado", error);
-          storedToken = null;
-        }
-
         const showLoginMessage = (message, tone = "info") => {
           if (!loginStatus) return;
           loginStatus.textContent = message;
           loginStatus.classList.toggle("is-success", tone === "success");
           loginStatus.classList.toggle("is-error", tone === "error");
         };
+
+        const STORAGE_FAILURE_MESSAGES = {
+          read:
+            "No se pudo acceder al almacenamiento local en este navegador. El token no se recordará automáticamente.",
+          write:
+            "No se pudo recordar el token en este navegador. El token solo estará disponible en esta sesión.",
+          remove:
+            "No se pudo actualizar el token almacenado en este navegador. El token podría seguir guardado.",
+          clear:
+            "No se pudo olvidar el token almacenado en este navegador. Es posible que debas borrarlo manualmente.",
+          generic: "No se pudo acceder al almacenamiento local en este navegador.",
+        };
+
+        const disableRememberTokenOption = () => {
+          if (!rememberCheckbox) return;
+          rememberCheckbox.checked = false;
+          rememberCheckbox.disabled = true;
+          rememberCheckbox.setAttribute("data-storage-unavailable", "true");
+        };
+
+        const processStorageStatus = (
+          status,
+          { message, tone = "error", silent = false } = {},
+        ) => {
+          if (!status) {
+            return { handled: false };
+          }
+
+          if (status.ok === false) {
+            disableRememberTokenOption();
+            const resolvedMessage =
+              message ||
+              STORAGE_FAILURE_MESSAGES[status.operation] ||
+              STORAGE_FAILURE_MESSAGES.generic;
+            if (!silent) {
+              showLoginMessage(resolvedMessage, tone);
+            }
+            return {
+              handled: true,
+              message: resolvedMessage,
+              tone,
+              status,
+            };
+          }
+
+          return { handled: false, status };
+        };
+
+        const readStoredTokenStatus = () => {
+          try {
+            const token = window.localStorage.getItem(TOKEN_STORAGE_KEY) || null;
+            return { ok: true, operation: "read", token };
+          } catch (error) {
+            return { ok: false, operation: "read", error };
+          }
+        };
+
+        const storedTokenStatus = readStoredTokenStatus();
+        storedToken = storedTokenStatus.ok ? storedTokenStatus.token : null;
+        const initialStorageOutcome = processStorageStatus(storedTokenStatus, {
+          silent: true,
+        });
 
         const resetPortalState = () => {
           if (fieldsContainer) {
@@ -539,23 +594,39 @@
           setToken: (token, { persist = false } = {}) => {
             const trimmed = typeof token === "string" ? token.trim() : "";
             memoryToken = trimmed || null;
-            try {
-              if (persist && memoryToken) {
-                window.localStorage.setItem(TOKEN_STORAGE_KEY, memoryToken);
-              } else {
+
+            if (!memoryToken) {
+              try {
                 window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+                return { ok: true, operation: "remove", persisted: false };
+              } catch (error) {
+                return { ok: false, operation: "remove", error };
               }
-            } catch (error) {
-              console.warn("No se pudo gestionar el token almacenado", error);
             }
-            return memoryToken;
+
+            if (persist) {
+              try {
+                window.localStorage.setItem(TOKEN_STORAGE_KEY, memoryToken);
+                return { ok: true, operation: "write", persisted: true };
+              } catch (error) {
+                return { ok: false, operation: "write", error };
+              }
+            }
+
+            try {
+              window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+              return { ok: true, operation: "remove", persisted: false };
+            } catch (error) {
+              return { ok: false, operation: "remove", error };
+            }
           },
           clearToken: () => {
             memoryToken = null;
             try {
               window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+              return { ok: true, operation: "clear" };
             } catch (error) {
-              console.warn("No se pudo limpiar el token almacenado", error);
+              return { ok: false, operation: "clear", error };
             }
           },
         };
@@ -613,8 +684,8 @@
             throw invalidResponseError;
           }
 
-          auth.setToken(token, { persist });
-          return true;
+          const storageStatus = auth.setToken(token, { persist });
+          return { success: true, storageStatus };
         };
 
         const createUnauthorizedError = () => {
@@ -676,9 +747,13 @@
           fallbackMessage = "El token ha caducado o es incorrecto. Introduce uno nuevo.",
         ) => {
           const message = resolveUnauthorizedMessage(error, fallbackMessage);
-          auth.clearToken();
+          const clearStatus = auth.clearToken();
+          const storageOutcome = processStorageStatus(clearStatus, { silent: true });
           loginForm?.reset();
-          showLoginPrompt("error", message);
+          const finalMessage = storageOutcome.handled
+            ? `${message} ${storageOutcome.message}`
+            : message;
+          showLoginPrompt("error", finalMessage);
         };
 
         const authorizedFetch = async (url, options = {}) => {
@@ -1193,7 +1268,10 @@
           }${size ? ` · Tamaño: ${size} bytes` : ""}`;
         };
 
-        const handleSuccessfulLogin = async ({ showSuccessMessage = true } = {}) => {
+        const handleSuccessfulLogin = async ({
+          showSuccessMessage = true,
+          storageStatus = null,
+        } = {}) => {
           setAuthState(true);
           hideStatus(configStatus);
           hideStatus(logsStatus);
@@ -1202,11 +1280,17 @@
           }
           const configLoaded = await fetchConfig();
           await fetchLogs();
+          const storageOutcome = processStorageStatus(storageStatus, { silent: true });
+          const storageMessage = storageOutcome.handled ? storageOutcome.message : "";
           if (!configLoaded) {
-            showLoginMessage(
-              "Token validado, pero no se pudo cargar la configuración. Revisa el servicio e inténtalo de nuevo.",
-              "error",
-            );
+            const baseMessage =
+              "Token validado, pero no se pudo cargar la configuración. Revisa el servicio e inténtalo de nuevo.";
+            const combinedMessage = storageMessage
+              ? `${baseMessage} ${storageMessage}`
+              : baseMessage;
+            showLoginMessage(combinedMessage, "error");
+          } else if (storageOutcome.handled) {
+            showLoginMessage(storageMessage, storageOutcome.tone || "error");
           } else if (showSuccessMessage) {
             showLoginMessage("Token validado. Puedes usar la interfaz con normalidad.", "success");
           } else {
@@ -1234,8 +1318,8 @@
           showLoginMessage("Verificando token…", "info");
           try {
             const shouldPersist = rememberCheckbox?.checked ?? false;
-            await verifyToken(value, { persist: shouldPersist });
-            await handleSuccessfulLogin();
+            const verification = await verifyToken(value, { persist: shouldPersist });
+            await handleSuccessfulLogin({ storageStatus: verification?.storageStatus });
           } catch (error) {
             console.error(error);
             if (error?.message === "UNAUTHORIZED" || error?.status === 401) {
@@ -1257,9 +1341,17 @@
           }
         });
 
-        const clearSession = (message = "Introduce el token bearer para continuar.", tone = "info") => {
-          auth.clearToken();
+        const clearSession = (
+          message = "Introduce el token bearer para continuar.",
+          tone = "info",
+        ) => {
+          const clearStatus = auth.clearToken();
+          const storageOutcome = processStorageStatus(clearStatus, { silent: true });
           loginForm?.reset();
+          if (storageOutcome.handled) {
+            showLoginPrompt("error", storageOutcome.message);
+            return;
+          }
           showLoginPrompt(tone, message);
         };
 
@@ -1286,19 +1378,26 @@
         if (storedToken) {
           showLoginMessage("Verificando token guardado…", "info");
           verifyToken(storedToken, { persist: true })
-            .then(() => handleSuccessfulLogin({ showSuccessMessage: false }))
+            .then((verification) =>
+              handleSuccessfulLogin({
+                showSuccessMessage: false,
+                storageStatus: verification?.storageStatus,
+              }),
+            )
             .catch((error) => {
               console.error(error);
               const isUnauthorized = error?.message === "UNAUTHORIZED" || error?.status === 401;
-              if (isUnauthorized) {
-                auth.clearToken();
-              }
               if (isUnauthorized) {
                 const message = resolveUnauthorizedMessage(
                   error,
                   "El token guardado no es válido. Introduce uno nuevo.",
                 );
-                showLoginPrompt("error", message);
+                const clearStatus = auth.clearToken();
+                const storageOutcome = processStorageStatus(clearStatus, { silent: true });
+                const finalMessage = storageOutcome.handled
+                  ? `${message} ${storageOutcome.message}`
+                  : message;
+                showLoginPrompt("error", finalMessage);
               } else if (error?.message === "NETWORK_ERROR") {
                 showLoginPrompt(
                   "error",
@@ -1312,7 +1411,11 @@
               }
             });
         } else {
-          showLoginPrompt();
+          if (initialStorageOutcome.handled) {
+            showLoginPrompt("error", initialStorageOutcome.message);
+          } else {
+            showLoginPrompt();
+          }
         }
       })();
     </script>
