@@ -58,7 +58,7 @@ docker run --rm -p 8000:8000 ghcr.io/svnz0x/pullpilot:latest
 ### Autenticación de la API
 
 - **Credenciales obligatorias**: la API de configuración requiere un token bearer establecido mediante `PULLPILOT_TOKEN`. Si no se define, la aplicación rechazará todas las peticiones protegidas.
-- La interfaz web local muestra un banner para introducir ese token y lo guarda de forma segura en `localStorage` (con respaldo en memoria si el navegador lo impide). Mientras no se valide el token, la UI permanece deshabilitada y cualquier petición 401 solicitará nuevamente las credenciales antes de reintentarse automáticamente.
+- La interfaz web local muestra un banner para introducir ese token. Por defecto solo se conserva en memoria, pero puedes marcar «Recordar token» para guardarlo en `localStorage` y reutilizarlo en ese navegador. Evita recordar el token en equipos compartidos o públicos. Mientras no se valide el token, la UI permanece deshabilitada y cualquier petición 401 solicitará nuevamente las credenciales antes de reintentarse automáticamente.
 
 ## Desarrollo local
 
