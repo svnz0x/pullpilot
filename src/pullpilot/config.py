@@ -420,7 +420,7 @@ class ConfigStore:
             consumed += 1
             current = lines[line_index]
             value_chars.append("\n")
-        value_text = "".join(value_chars).rstrip(" \t")
+        value_text = "".join(value_chars).rstrip("\r \t")
         return value_text, inline_comment, consumed
 
     def _detect_quote(self, value_text: str) -> Optional[str]:

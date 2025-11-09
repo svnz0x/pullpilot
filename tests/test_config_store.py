@@ -47,6 +47,29 @@ def test_roundtrip_preserves_comments_and_quotes(tmp_path: Path, schema_path: Pa
     assert rendered.splitlines()[0] == "# sample configuration"
 
 
+def test_load_handles_crlf_line_endings(tmp_path: Path, schema_path: Path) -> None:
+    config_text = (
+        "# windows style configuration\r\n"
+        "SMTP_CMD=\"msmtp\"\r\n"
+        "BASE_DIR=\"/srv/compose\"\r\n"
+        "SMTP_READ_ENVELOPE=false\r\n"
+    )
+    config_path = tmp_path / "updater.conf"
+    config_path.write_text(config_text, encoding="utf-8")
+
+    store = ConfigStore(config_path, schema_path)
+    data = store.load()
+
+    assert data.values["SMTP_CMD"] == "msmtp"
+    assert "\r" not in data.values["SMTP_CMD"]
+    assert data.values["BASE_DIR"] == "/srv/compose"
+    assert "\r" not in data.values["BASE_DIR"]
+    assert data.values["SMTP_READ_ENVELOPE"] is False
+
+    # ensure saving does not raise validation errors after normalization
+    store.save(data.values, data.multiline)
+
+
 def test_multiline_file_roundtrip(tmp_path: Path, schema_path: Path) -> None:
     projects_path = tmp_path / "projects.txt"
     projects_path.write_text("/srv/app\n/srv/api\n", encoding="utf-8")
