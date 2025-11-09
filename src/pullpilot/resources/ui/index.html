@@ -694,9 +694,11 @@
           return error;
         };
 
-        const resolveUnauthorizedMessage = (error, fallbackMessage) => {
+        const resolveUnauthorizedDetails = (error, fallbackMessage) => {
           const payload = error?.payload;
+          const fallback = typeof fallbackMessage === "string" ? fallbackMessage : "";
           const ignoredMessages = new Set(["missing credentials", "unauthorized"]);
+          const defaultResult = { message: fallback, reason: "unknown" };
 
           const gatherMessages = (...sources) => {
             const results = [];
@@ -781,15 +783,22 @@
               if (missingMessages.length > 0) {
                 const message = missingMessages[0];
                 if (/faltan credenciales/i.test(message)) {
-                  return message;
+                  return { message, reason: "missing-credentials" };
                 }
                 if (/PULLPILOT_TOKEN/i.test(message)) {
-                  return `Faltan credenciales. ${message}`;
+                  return {
+                    message: `Faltan credenciales. ${message}`,
+                    reason: "missing-credentials",
+                  };
                 }
-                return message;
+                return { message, reason: "missing-credentials" };
               }
 
-              return "Faltan credenciales. Introduce el token proporcionado para continuar.";
+              return {
+                message:
+                  "Faltan credenciales. Introduce el token proporcionado para continuar.",
+                reason: "missing-credentials",
+              };
             }
 
             const genericMessages = gatherMessages(
@@ -800,20 +809,55 @@
               payload.error,
             );
             if (genericMessages.length > 0) {
-              return genericMessages[0];
+              return {
+                message: genericMessages[0],
+                reason: normalizedErrorCode || "generic",
+              };
+            }
+
+            if (normalizedErrorCode) {
+              return { ...defaultResult, reason: normalizedErrorCode };
             }
           } else if (typeof payload === "string" && payload.trim()) {
-            return payload.trim();
+            return { message: payload.trim(), reason: "string-payload" };
           }
 
-          return fallbackMessage;
+          return defaultResult;
+        };
+
+        const resolveUnauthorizedMessage = (error, fallbackMessage) =>
+          resolveUnauthorizedDetails(error, fallbackMessage).message;
+
+        const buildMissingCredentialsMessage = (message) => {
+          const trimmed = typeof message === "string" ? message.trim() : "";
+          const parts = [];
+          if (trimmed) {
+            parts.push(trimmed);
+          }
+          if (!/PULLPILOT_TOKEN/i.test(trimmed)) {
+            parts.push(
+              "Configura la variable de entorno PULLPILOT_TOKEN en el servidor y reinícialo.",
+            );
+          } else {
+            parts.push("Reinicia el servidor después de actualizar PULLPILOT_TOKEN.");
+          }
+          parts.push(
+            "El token introducido se conservará y se reutilizará automáticamente cuando el backend acepte credenciales.",
+          );
+          return parts.join(" ").trim();
         };
 
         const handleUnauthorized = (
           error,
           fallbackMessage = "El token ha caducado o es incorrecto. Introduce uno nuevo.",
         ) => {
-          const message = resolveUnauthorizedMessage(error, fallbackMessage);
+          const { message, reason } = resolveUnauthorizedDetails(error, fallbackMessage);
+          if (reason === "missing-credentials") {
+            const finalMessage = buildMissingCredentialsMessage(message);
+            showLoginPrompt("error", finalMessage);
+            return;
+          }
+
           const clearStatus = auth.clearToken();
           const storageOutcome = processStorageStatus(clearStatus, { silent: true });
           loginForm?.reset();
@@ -1455,10 +1499,16 @@
               console.error(error);
               const isUnauthorized = error?.message === "UNAUTHORIZED" || error?.status === 401;
               if (isUnauthorized) {
-                const message = resolveUnauthorizedMessage(
+                const { message, reason } = resolveUnauthorizedDetails(
                   error,
                   "El token guardado no es válido. Introduce uno nuevo.",
                 );
+                if (reason === "missing-credentials") {
+                  const finalMessage = buildMissingCredentialsMessage(message);
+                  showLoginPrompt("error", finalMessage);
+                  return;
+                }
+
                 const clearStatus = auth.clearToken();
                 const storageOutcome = processStorageStatus(clearStatus, { silent: true });
                 const finalMessage = storageOutcome.handled
