@@ -579,13 +579,30 @@
             throw networkError;
           }
 
+          let payload = null;
+          let payloadError = null;
+          try {
+            payload = await response.json();
+          } catch (error) {
+            payloadError = error;
+          }
+
           if (!response.ok) {
             const error = new Error(response.status === 401 ? "UNAUTHORIZED" : "REQUEST_FAILED");
             error.status = response.status;
+            if (!payloadError) {
+              error.payload = payload;
+            }
             throw error;
           }
 
-          const data = await response.json();
+          if (payloadError) {
+            const invalidResponseError = new Error("INVALID_RESPONSE");
+            invalidResponseError.cause = payloadError;
+            throw invalidResponseError;
+          }
+
+          const data = payload;
           auth.setToken(token, { persist });
           return data;
         };
@@ -596,7 +613,59 @@
           return error;
         };
 
-        const handleUnauthorized = (message) => {
+        const resolveUnauthorizedMessage = (error, fallbackMessage) => {
+          const payload = error?.payload;
+
+          if (payload && typeof payload === "object") {
+            if (payload.error === "missing credentials") {
+              const details =
+                typeof payload.details === "string" && payload.details.trim()
+                  ? payload.details.trim()
+                  : null;
+              const message =
+                typeof payload.message === "string" && payload.message.trim()
+                  ? payload.message.trim()
+                  : null;
+              return (
+                details ||
+                message ||
+                "Faltan credenciales. Introduce el token proporcionado para continuar."
+              );
+            }
+
+            const detail =
+              typeof payload.detail === "string" && payload.detail.trim()
+                ? payload.detail.trim()
+                : null;
+            const description =
+              typeof payload.description === "string" && payload.description.trim()
+                ? payload.description.trim()
+                : null;
+            const message =
+              typeof payload.message === "string" && payload.message.trim()
+                ? payload.message.trim()
+                : null;
+            const details =
+              typeof payload.details === "string" && payload.details.trim()
+                ? payload.details.trim()
+                : null;
+
+            if (detail) return detail;
+            if (description) return description;
+            if (message) return message;
+            if (details) return details;
+          } else if (typeof payload === "string" && payload.trim()) {
+            return payload.trim();
+          }
+
+          return fallbackMessage;
+        };
+
+        const handleUnauthorized = (
+          error,
+          fallbackMessage = "El token ha caducado o es incorrecto. Introduce uno nuevo.",
+        ) => {
+          const message = resolveUnauthorizedMessage(error, fallbackMessage);
           auth.clearToken();
           loginForm?.reset();
           showLoginPrompt("error", message);
@@ -621,8 +690,17 @@
           }
 
           if (response.status === 401) {
-            handleUnauthorized("El token ha caducado o es incorrecto. Introduce uno nuevo.");
-            throw createUnauthorizedError();
+            const unauthorizedError = createUnauthorizedError();
+            try {
+              unauthorizedError.payload = await response.clone().json();
+            } catch (error) {
+              // Ignorar si la respuesta no contiene JSON.
+            }
+            handleUnauthorized(
+              unauthorizedError,
+              "El token ha caducado o es incorrecto. Introduce uno nuevo.",
+            );
+            throw unauthorizedError;
           }
 
           return response;
@@ -1142,10 +1220,11 @@
           } catch (error) {
             console.error(error);
             if (error?.message === "UNAUTHORIZED" || error?.status === 401) {
-              showLoginMessage(
+              const message = resolveUnauthorizedMessage(
+                error,
                 "El token proporcionado no está autorizado. Vuelve a intentarlo.",
-                "error",
               );
+              showLoginMessage(message, "error");
             } else if (error?.message === "NETWORK_ERROR") {
               showLoginMessage(
                 "No se pudo verificar el token. Revisa la conexión e inténtalo de nuevo.",
@@ -1195,7 +1274,11 @@
               console.error(error);
               auth.clearToken();
               if (error?.message === "UNAUTHORIZED" || error?.status === 401) {
-                showLoginPrompt("error", "El token guardado no es válido. Introduce uno nuevo.");
+                const message = resolveUnauthorizedMessage(
+                  error,
+                  "El token guardado no es válido. Introduce uno nuevo.",
+                );
+                showLoginPrompt("error", message);
               } else {
                 showLoginPrompt(
                   "error",
