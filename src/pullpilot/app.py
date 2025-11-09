@@ -1,6 +1,7 @@
 """Minimal API surface for exposing updater configuration endpoints."""
 from __future__ import annotations
 
+import hmac
 import json
 import os
 from collections import deque
@@ -60,7 +61,7 @@ def _match_token(expected: str, header: str) -> bool:
     if not value:
         return False
     if scheme.lower() in {"bearer", "token"}:
-        return value == expected
+        return hmac.compare_digest(value, expected)
     return False
 
 
