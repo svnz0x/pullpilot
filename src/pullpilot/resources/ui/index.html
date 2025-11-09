@@ -485,6 +485,74 @@
         let memoryToken = null;
         let storedToken = null;
 
+        const buildApiUrl = (() => {
+          let cachedBase = null;
+
+          const hasProtocol = (value) => /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(value);
+
+          const resolveBase = () => {
+            if (cachedBase) {
+              return cachedBase;
+            }
+
+            const baseElement = document.querySelector("base[href]");
+            if (baseElement) {
+              const href = baseElement.getAttribute("href");
+              if (href) {
+                try {
+                  cachedBase = new URL(href, window.location.href);
+                  return cachedBase;
+                } catch (error) {
+                  console.warn("Base href inválido; se ignorará.", error);
+                }
+              }
+            }
+
+            const { origin, pathname } = window.location;
+            const marker = "/ui/";
+            let basePath = "/";
+
+            if (pathname.endsWith("/ui")) {
+              basePath = `${pathname}/`;
+            } else if (pathname.includes(marker)) {
+              basePath = pathname.slice(0, pathname.indexOf(marker) + marker.length);
+            } else if (pathname.endsWith("/")) {
+              basePath = pathname;
+            } else {
+              const lastSlashIndex = pathname.lastIndexOf("/");
+              basePath = lastSlashIndex >= 0 ? pathname.slice(0, lastSlashIndex + 1) : "/";
+            }
+
+            try {
+              cachedBase = new URL(basePath, origin);
+            } catch (error) {
+              console.warn("No se pudo resolver la base a partir de window.location.", error);
+              cachedBase = new URL("/", origin);
+            }
+            return cachedBase;
+          };
+
+          return (path = "") => {
+            if (path instanceof URL) {
+              return path.toString();
+            }
+
+            const normalized = typeof path === "string" ? path.trim() : "";
+            if (!normalized) {
+              return resolveBase().toString();
+            }
+
+            if (hasProtocol(normalized)) {
+              return normalized;
+            }
+
+            const relative = normalized.startsWith("/")
+              ? normalized.slice(1)
+              : normalized;
+            return new URL(relative, resolveBase()).toString();
+          };
+        })();
+
         const showLoginMessage = (message, tone = "info") => {
           if (!loginStatus) return;
           loginStatus.textContent = message;
@@ -641,7 +709,7 @@
 
           let response;
           try {
-            response = await fetch("/ui/auth-check", {
+            response = await fetch(buildApiUrl("auth-check"), {
               headers: { Authorization: `Bearer ${token}` },
             });
           } catch (error) {
@@ -867,7 +935,7 @@
           showLoginPrompt("error", finalMessage);
         };
 
-        const authorizedFetch = async (url, options = {}) => {
+        const authorizedFetch = async (input, options = {}) => {
           const token = auth.getToken();
           if (!token) {
             throw createUnauthorizedError();
@@ -878,9 +946,16 @@
             headers.set("Authorization", `Bearer ${token}`);
           }
 
+          let requestInput = input;
+          if (requestInput instanceof Request) {
+            requestInput = new Request(buildApiUrl(requestInput.url), requestInput);
+          } else if (requestInput instanceof URL || typeof requestInput === "string") {
+            requestInput = buildApiUrl(requestInput);
+          }
+
           let response;
           try {
-            response = await fetch(url, { ...options, headers });
+            response = await fetch(requestInput, { ...options, headers });
           } catch (error) {
             throw error;
           }
@@ -1224,7 +1299,7 @@
         const fetchConfig = async () => {
           hideStatus(configStatus);
           try {
-            const response = await authorizedFetch("/ui/config");
+            const response = await authorizedFetch(buildApiUrl("config"));
             if (!response.ok) {
               throw new Error(`Error HTTP ${response.status}`);
             }
@@ -1258,7 +1333,7 @@
           clearFieldErrors();
           const payload = readFormValues();
           try {
-            const response = await authorizedFetch("/ui/config", {
+            const response = await authorizedFetch(buildApiUrl("config"), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payload),
@@ -1306,11 +1381,11 @@
 
         const fetchLogs = async (selectedName = null) => {
           hideStatus(logsStatus);
-          const params = new URLSearchParams();
+          const logsUrl = new URL(buildApiUrl("logs"));
           if (selectedName) {
-            params.set("name", selectedName);
+            logsUrl.searchParams.set("name", selectedName);
           }
-          const url = params.toString() ? `/ui/logs?${params}` : "/ui/logs";
+          const url = logsUrl.toString();
           try {
             const response = await authorizedFetch(url);
             if (!response.ok) {
