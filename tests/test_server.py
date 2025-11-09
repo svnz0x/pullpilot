@@ -168,6 +168,25 @@ def test_ui_endpoints_require_auth_when_token_set(
     assert status == HTTPStatus.OK
 
 
+def test_ui_root_allows_anonymous_access(
+    monkeypatch: pytest.MonkeyPatch, store: ConfigStore, schedule_store: ScheduleStore
+) -> None:
+    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
+    api = ConfigAPI(store=store, schedule_store=schedule_store)
+
+    status, body = api.handle_request("GET", "/")
+    assert status == HTTPStatus.OK
+    assert body == {"message": "ui"}
+
+    status, body = api.handle_request("GET", "/ui")
+    assert status == HTTPStatus.OK
+    assert body == {"message": "ui"}
+
+    status, body = api.handle_request("GET", "/ui/config")
+    assert status == HTTPStatus.UNAUTHORIZED
+    assert body["error"] == "missing credentials"
+
+
 def test_token_env_whitespace_trimmed(
     monkeypatch: pytest.MonkeyPatch, store: ConfigStore, schedule_store: ScheduleStore
 ) -> None:

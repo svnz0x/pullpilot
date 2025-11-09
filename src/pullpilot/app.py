@@ -95,7 +95,12 @@ class ConfigAPI:
         headers: Optional[Mapping[str, str]] = None,
     ) -> Tuple[int, Dict[str, Any]]:
         method = method.upper()
-        requires_auth = path.startswith("/ui") or path in {"/config", "/schedule"}
+        ui_public_paths = {"/", "/ui"}
+        is_ui_request = path == "/" or path.startswith("/ui")
+        requires_auth = (
+            path not in ui_public_paths
+            and (path.startswith("/ui") or path in {"/config", "/schedule"})
+        )
         if requires_auth:
             if not self.authenticator or not self.authenticator.configured:
                 return (
@@ -108,7 +113,7 @@ class ConfigAPI:
             if not self.authenticator.authorize(headers):
                 return HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"}
 
-        if path.startswith("/ui"):
+        if is_ui_request:
             return self._handle_ui_request(method, path, payload)
         if path not in {"/config", "/schedule"}:
             return HTTPStatus.NOT_FOUND, {"error": "not found"}
