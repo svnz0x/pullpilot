@@ -1,9 +1,7 @@
-version: "3.9"
-
 services:
   pullpilot:
-    build: .
-    image: pullpilot
+    image: ghcr.io/svnz0x/pullpilot:latest
+    # Usa "build: ." si prefieres construir la imagen localmente
     environment:
       PULLPILOT_TOKEN: ${PULLPILOT_TOKEN:-}
     ports:
