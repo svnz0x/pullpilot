@@ -97,7 +97,11 @@ class SchedulerWatcher:
             if not isinstance(expression, str):
                 _log("Expresión cron inválida; omitiendo")
                 return True
-            self._write_cron_file(expression)
+            try:
+                self._write_cron_file(expression)
+            except OSError as exc:
+                _log(f"No se pudo preparar el archivo cron: {exc}")
+                return False
             _log(f"Iniciando supercronic con expresión '{expression}'")
             try:
                 self.process = subprocess.Popen(["supercronic", "-quiet", str(self.cron_path)])
