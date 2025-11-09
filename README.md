@@ -42,6 +42,7 @@ docker run --rm -p 8000:8000 ghcr.io/svnz0x/pullpilot:latest
 ## Variables y configuración
 
 - La imagen monta por defecto un volumen nombrado `pullpilot_config` en `/app/config`. En el primer arranque se copian automáticamente los archivos por defecto y, a partir de ahí, se preservan los cambios que hagas desde la API o editando el volumen.
+- El único ajuste mediante variables de entorno es `PULLPILOT_TOKEN`. El resto de opciones se controlan desde la interfaz de usuario o modificando directamente los archivos persistidos en el volumen.
 - El esquema JSON en `config/schema.json` documenta cada opción.
 - Para validación rápida: `python scripts/validate_config.py`
 - Los archivos auxiliares multilinea (p. ej. `COMPOSE_PROJECTS_FILE`) deben residir dentro del mismo directorio de configuración (por defecto `/app/config/`). La API rechazará rutas fuera de ese árbol o que incluyan `..`.
