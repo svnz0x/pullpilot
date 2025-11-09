@@ -107,6 +107,20 @@ def test_write_cron_file_quotes_command_with_spaces(tmp_path: Path) -> None:
     assert cron_path.read_text(encoding="utf-8") == expected
 
 
+def test_write_cron_file_preserves_environment_assignments(tmp_path: Path) -> None:
+    schedule_path = tmp_path / "schedule.json"
+    schedule_path.write_text("{}", encoding="utf-8")
+
+    cron_path = tmp_path / "pullpilot.cron"
+    updater_command = "FOO=bar '/path/with space/updater.sh' --flag value"
+    watcher = SchedulerWatcher(schedule_path, cron_path, updater_command, 1.0)
+
+    watcher._write_cron_file("15 4 * * *")
+
+    expected = "15 4 * * * FOO=bar '/path/with space/updater.sh' --flag value\n"
+    assert cron_path.read_text(encoding="utf-8") == expected
+
+
 def test_watcher_default_schedule_path_matches_store_default() -> None:
     assert DEFAULT_SCHEDULE_FILE == DEFAULT_SCHEDULE_PATH
 
