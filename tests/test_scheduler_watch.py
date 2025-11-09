@@ -144,6 +144,56 @@ def test_scheduler_package_reexports_watcher() -> None:
     assert scheduler_pkg.DEFAULT_SCHEDULE_FILE == DEFAULT_SCHEDULE_FILE
 
 
+def test_cron_write_error_is_logged_and_loop_continues(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    schedule_path = tmp_path / "schedule.json"
+    cron_path = tmp_path / "cron" / "pullpilot.cron"
+    watcher = SchedulerWatcher(schedule_path, cron_path, "echo hi", DEFAULT_INTERVAL)
+
+    schedule_data = {"mode": "cron", "expression": "* * * * *"}
+
+    class DummySchedule:
+        def to_dict(self) -> Dict[str, Any]:
+            return schedule_data
+
+    class DummyStore:
+        def load(self) -> DummySchedule:
+            return DummySchedule()
+
+    watcher.store = DummyStore()  # type: ignore[assignment]
+
+    logs: List[str] = []
+
+    def capture_log(message: str) -> None:
+        logs.append(message)
+
+    monkeypatch.setattr("pullpilot.scheduler.watch._log", capture_log)
+
+    original_write_text = Path.write_text
+
+    def failing_write_text(self: Path, *args: Any, **kwargs: Any) -> int:
+        if self == cron_path:
+            raise OSError("disk full")
+        return original_write_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", failing_write_text)
+
+    class SingleLoopEvent:
+        def is_set(self) -> bool:
+            return False
+
+        def wait(self, interval: float) -> bool:
+            return True
+
+    watcher.run(stop_event=SingleLoopEvent())
+
+    assert watcher.current_signature is None
+    assert watcher.process is None
+    assert any("No se pudo preparar el archivo cron" in entry for entry in logs)
+    assert all("Iniciando supercronic" not in entry for entry in logs)
+
+
 def test_once_completion_keeps_signature(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     schedule_data = {"mode": "once", "datetime": "2023-09-01T10:00:00Z"}
     signature = json.dumps(schedule_data, sort_keys=True)
