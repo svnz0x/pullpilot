@@ -9,6 +9,7 @@ multi line data such as ``COMPOSE_PROJECTS_FILE``.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import shlex
@@ -79,6 +80,8 @@ _BOOL_FALSE = {"0", "false", "no", "off"}
 _MULTILINE_FIELDS = {"COMPOSE_PROJECTS_FILE"}
 _SAFE_COMPOSE_TOKEN = re.compile(r"^[A-Za-z0-9._/-]+$")
 _ALLOWED_COMPOSE_SHORTCUTS = {("docker", "compose"), ("docker-compose",)}
+
+LOGGER = logging.getLogger("pullpilot.config")
 
 
 class ConfigStore:
@@ -546,6 +549,11 @@ class ConfigStore:
             try:
                 multiline[key] = resolved.read_text(encoding="utf-8")
             except FileNotFoundError:
+                multiline[key] = ""
+            except OSError as exc:
+                LOGGER.warning(
+                    "No se pudo leer el contenido multilinea desde %s: %s", resolved, exc
+                )
                 multiline[key] = ""
         return multiline
 
