@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1
-FROM python:3.11-slim AS pullpilot
+# Fijo a bookworm para evitar que el tag "slim" salte a trixie y rompa APT
+FROM python:3.11-slim-bookworm AS pullpilot
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -11,38 +12,38 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Install system dependencies and supercronic
-ARG SUPERCRONIC_VERSION=0.2.24
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        bash \
-        ca-certificates \
-        curl \
-        gnupg \
-    && install -m 0755 -d /etc/apt/keyrings \
-    && curl -fsSL https://download.docker.com/linux/debian/gpg \
-        | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
-    && chmod a+r /etc/apt/keyrings/docker.gpg \
-    && echo "deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \$(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" \
-        > /etc/apt/sources.list.d/docker.list \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends \
-        docker-ce-cli \
-        docker-compose-plugin \
-    && rm -rf /var/lib/apt/lists/* \
-    && case "${TARGETARCH}" in \
-        amd64) SUPERCRONIC_ARTIFACT="supercronic-linux-amd64" ;; \
-        arm64) SUPERCRONIC_ARTIFACT="supercronic-linux-arm64" ;; \
-        *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
-    esac \
-    && curl -fsSL "https://github.com/aptible/supercronic/releases/download/v${SUPERCRONIC_VERSION}/${SUPERCRONIC_ARTIFACT}" \
-        -o /usr/local/bin/supercronic \
-    && chmod +x /usr/local/bin/supercronic
+# ---- System deps + Docker CLI + Compose v2 + Supercronic (multi-arch) ----
+# NOTA: evitamos 'docker.io' y usamos el repo oficial de Docker
+ARG SUPERCRONIC_VERSION=0.2.38
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends bash ca-certificates curl gnupg; \
+    # Repo oficial de Docker (para docker-ce-cli y docker-compose-plugin)
+    install -m 0755 -d /etc/apt/keyrings; \
+    curl -fsSL https://download.docker.com/linux/debian/gpg \
+      | gpg --dearmor -o /etc/apt/keyrings/docker.gpg; \
+    chmod a+r /etc/apt/keyrings/docker.gpg; \
+    . /etc/os-release; \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian ${VERSION_CODENAME} stable" \
+      > /etc/apt/sources.list.d/docker.list; \
+    apt-get update -o Acquire::Retries=3; \
+    apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin; \
+    rm -rf /var/lib/apt/lists/*; \
+    # Supercronic según arquitectura
+    case "${TARGETARCH}" in \
+      amd64) SUPERCRONIC_ARTIFACT="supercronic-linux-amd64" ;; \
+      arm64) SUPERCRONIC_ARTIFACT="supercronic-linux-arm64" ;; \
+      arm)   SUPERCRONIC_ARTIFACT="supercronic-linux-arm" ;; \
+      *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://github.com/aptible/supercronic/releases/download/v${SUPERCRONIC_VERSION}/${SUPERCRONIC_ARTIFACT}" \
+      -o /usr/local/bin/supercronic; \
+    chmod +x /usr/local/bin/supercronic
 
-# Python dependencies for the FastAPI backend
+# ---- Python deps que ya tenías ----
 RUN pip install --no-cache-dir fastapi "uvicorn[standard]"
 
-# Application files
+# ---- Archivos de la app (igual que tu Dockerfile original) ----
 COPY config ./config.defaults
 RUN cp -r ./config.defaults ./config
 COPY scripts/updater.sh ./updater.sh
