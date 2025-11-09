@@ -696,45 +696,112 @@
 
         const resolveUnauthorizedMessage = (error, fallbackMessage) => {
           const payload = error?.payload;
+          const ignoredMessages = new Set(["missing credentials", "unauthorized"]);
+
+          const gatherMessages = (...sources) => {
+            const results = [];
+            const visitedObjects =
+              typeof WeakSet === "function" ? new WeakSet() : new Set();
+
+            const pushMessage = (value) => {
+              const trimmed = value.trim();
+              if (!trimmed) return;
+              const normalized = trimmed.toLowerCase();
+              if (ignoredMessages.has(normalized)) return;
+              if (!results.includes(trimmed)) {
+                results.push(trimmed);
+              }
+            };
+
+            const visit = (value) => {
+              if (value == null) {
+                return;
+              }
+              if (typeof value === "string") {
+                pushMessage(value);
+                return;
+              }
+              if (Array.isArray(value)) {
+                value.forEach(visit);
+                return;
+              }
+              if (typeof value === "object") {
+                if (visitedObjects.has(value)) return;
+                visitedObjects.add(value);
+                const prioritizedKeys = [
+                  "detail",
+                  "details",
+                  "description",
+                  "message",
+                  "error",
+                  "msg",
+                  "hint",
+                  "title",
+                ];
+                prioritizedKeys.forEach((key) => {
+                  if (key in value) {
+                    visit(value[key]);
+                  }
+                });
+                Object.keys(value).forEach((key) => {
+                  if (!prioritizedKeys.includes(key)) {
+                    visit(value[key]);
+                  }
+                });
+              }
+            };
+
+            sources.forEach(visit);
+            return results;
+          };
 
           if (payload && typeof payload === "object") {
-            if (payload.error === "missing credentials") {
-              const details =
-                typeof payload.details === "string" && payload.details.trim()
-                  ? payload.details.trim()
-                  : null;
-              const message =
-                typeof payload.message === "string" && payload.message.trim()
-                  ? payload.message.trim()
-                  : null;
-              return (
-                details ||
-                message ||
-                "Faltan credenciales. Introduce el token proporcionado para continuar."
+            const detailPayload =
+              payload.detail && typeof payload.detail === "object"
+                ? payload.detail
+                : null;
+            const errorCode =
+              typeof payload.error === "string" && payload.error
+                ? payload.error
+                : typeof detailPayload?.error === "string"
+                ? detailPayload.error
+                : null;
+            const normalizedErrorCode = errorCode?.toLowerCase() ?? null;
+
+            if (normalizedErrorCode === "missing credentials") {
+              const missingMessages = gatherMessages(
+                payload.details,
+                payload.message,
+                payload.detail,
+                detailPayload?.details,
+                detailPayload?.message,
+                detailPayload,
               );
+
+              if (missingMessages.length > 0) {
+                const message = missingMessages[0];
+                if (/faltan credenciales/i.test(message)) {
+                  return message;
+                }
+                if (/PULLPILOT_TOKEN/i.test(message)) {
+                  return `Faltan credenciales. ${message}`;
+                }
+                return message;
+              }
+
+              return "Faltan credenciales. Introduce el token proporcionado para continuar.";
             }
 
-            const detail =
-              typeof payload.detail === "string" && payload.detail.trim()
-                ? payload.detail.trim()
-                : null;
-            const description =
-              typeof payload.description === "string" && payload.description.trim()
-                ? payload.description.trim()
-                : null;
-            const message =
-              typeof payload.message === "string" && payload.message.trim()
-                ? payload.message.trim()
-                : null;
-            const details =
-              typeof payload.details === "string" && payload.details.trim()
-                ? payload.details.trim()
-                : null;
-
-            if (detail) return detail;
-            if (description) return description;
-            if (message) return message;
-            if (details) return details;
+            const genericMessages = gatherMessages(
+              payload.detail,
+              payload.description,
+              payload.message,
+              payload.details,
+              payload.error,
+            );
+            if (genericMessages.length > 0) {
+              return genericMessages[0];
+            }
           } else if (typeof payload === "string" && payload.trim()) {
             return payload.trim();
           }
