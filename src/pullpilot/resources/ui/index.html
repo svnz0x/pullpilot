@@ -46,6 +46,92 @@
         line-height: 1.5;
       }
 
+      .token-banner {
+        margin: 1.75rem auto 0;
+        max-width: min(42rem, 92vw);
+        background: rgba(15, 23, 42, 0.55);
+        border-radius: 1rem;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        padding: 1rem 1.25rem;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .token-banner.token-required {
+        border-color: rgba(248, 113, 113, 0.45);
+        box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.25);
+      }
+
+      .token-form {
+        display: contents;
+      }
+
+      .token-form label {
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .token-form input[type="password"] {
+        flex: 1 1 16rem;
+        min-width: 12rem;
+        padding: 0.6rem 0.75rem;
+        border-radius: 0.75rem;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        background: rgba(15, 23, 42, 0.35);
+        color: inherit;
+        font: inherit;
+      }
+
+      .token-form input[type="password"]:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+      }
+
+      .token-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .token-actions button {
+        padding: 0.55rem 1.25rem;
+        font-size: 0.95rem;
+      }
+
+      .token-status {
+        flex: 1 1 100%;
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+      }
+
+      .token-status.is-error {
+        color: #fecaca;
+      }
+
+      .token-status.is-success {
+        color: #bef264;
+      }
+
+      .token-status.is-info {
+        color: var(--text-secondary);
+      }
+
+      body.requires-auth main {
+        pointer-events: none;
+        filter: grayscale(0.7);
+        opacity: 0.55;
+      }
+
+      body.requires-auth main::after {
+        content: "";
+        display: none;
+      }
+
       main {
         flex: 1 0 auto;
         width: min(1100px, 92vw);
@@ -258,8 +344,29 @@
       <h1>PullPilot</h1>
       <p>
         Administra los parámetros del script de actualización y revisa los últimos logs directamente desde
-        tu navegador. Esta interfaz está pensada para uso local, sin autenticación.
+        tu navegador. Introduce el token bearer que protege la API para habilitar la interfaz.
       </p>
+      <div class="token-banner" id="token-banner">
+        <form id="token-form" class="token-form" autocomplete="off">
+          <label for="token-input">Token bearer</label>
+          <input
+            id="token-input"
+            name="token"
+            type="password"
+            placeholder="Introduce tu token"
+            aria-describedby="token-status"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+            required
+          />
+          <div class="token-actions">
+            <button type="submit" class="primary">Guardar token</button>
+            <button type="button" class="secondary" id="clear-token">Olvidar</button>
+          </div>
+          <span class="token-status" id="token-status" role="status" aria-live="polite"></span>
+        </form>
+      </div>
     </header>
     <main>
       <section id="config-section">
@@ -288,6 +395,12 @@
     </main>
     <script>
       (() => {
+        const mainContent = document.querySelector("main");
+        const tokenForm = document.getElementById("token-form");
+        const tokenInput = document.getElementById("token-input");
+        const tokenStatus = document.getElementById("token-status");
+        const clearTokenButton = document.getElementById("clear-token");
+        const tokenBanner = document.getElementById("token-banner");
         const form = document.getElementById("config-form");
         const fieldsContainer = document.getElementById("config-fields");
         const resetButton = document.getElementById("reset-config");
@@ -298,7 +411,139 @@
         const logsStatus = document.getElementById("logs-status");
         const refreshLogs = document.getElementById("refresh-logs");
 
+        const TOKEN_STORAGE_KEY = "pullpilot.bearerToken";
         let lastConfigSnapshot = null;
+        let credentialsValid = false;
+        let memoryToken = null;
+        const tokenWaiters = [];
+
+        try {
+          memoryToken = window.localStorage.getItem(TOKEN_STORAGE_KEY) || null;
+        } catch (error) {
+          console.warn("No se pudo leer el token almacenado", error);
+          memoryToken = null;
+        }
+
+        const resolveTokenWaiters = (value) => {
+          if (!value) return;
+          while (tokenWaiters.length) {
+            const resolve = tokenWaiters.shift();
+            if (typeof resolve === "function") {
+              resolve(value);
+            }
+          }
+        };
+
+        const updateTokenStatus = (message, tone = "info") => {
+          if (!tokenStatus) return;
+          tokenStatus.textContent = message;
+          tokenStatus.classList.toggle("is-success", tone === "success");
+          tokenStatus.classList.toggle("is-error", tone === "error");
+          tokenStatus.classList.toggle("is-info", tone === "info");
+        };
+
+        const setCredentialsState = (isValid, { message, tone } = {}) => {
+          const changed = credentialsValid !== isValid;
+          credentialsValid = isValid;
+          document.body.classList.toggle("requires-auth", !isValid);
+          tokenBanner?.classList.toggle("token-required", !isValid);
+          if (!isValid) {
+            mainContent?.setAttribute("aria-disabled", "true");
+          } else {
+            mainContent?.removeAttribute("aria-disabled");
+          }
+          if (message || changed) {
+            updateTokenStatus(
+              message ||
+                (isValid
+                  ? "Token validado. Puedes usar la interfaz con normalidad."
+                  : "Introduce el token bearer para continuar."),
+              tone || (isValid ? "success" : "error"),
+            );
+          }
+        };
+
+        const auth = {
+          getToken: () => memoryToken,
+          setToken: (token) => {
+            const trimmed = typeof token === "string" ? token.trim() : "";
+            memoryToken = trimmed || null;
+            try {
+              if (trimmed) {
+                window.localStorage.setItem(TOKEN_STORAGE_KEY, trimmed);
+              } else {
+                window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+              }
+            } catch (error) {
+              console.warn("No se pudo persistir el token", error);
+            }
+            if (memoryToken) {
+              resolveTokenWaiters(memoryToken);
+            }
+            return memoryToken;
+          },
+          clearToken: () => {
+            memoryToken = null;
+            try {
+              window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+            } catch (error) {
+              console.warn("No se pudo limpiar el token almacenado", error);
+            }
+          },
+          waitForToken: () => {
+            if (memoryToken) {
+              return Promise.resolve(memoryToken);
+            }
+            return new Promise((resolve) => {
+              tokenWaiters.push(resolve);
+            });
+          },
+        };
+
+        const showTokenPrompt = (message) => {
+          setCredentialsState(false, { message, tone: "error" });
+          tokenInput?.focus();
+        };
+
+        const authorizedFetch = async (url, options = {}, attempt = 0) => {
+          let token = auth.getToken();
+          if (!token) {
+            showTokenPrompt("Introduce tu token bearer para continuar.");
+            token = await auth.waitForToken();
+          }
+
+          const buildInit = (currentToken) => {
+            const headers = new Headers(options.headers || {});
+            if (!headers.has("Authorization")) {
+              headers.set("Authorization", `Bearer ${currentToken}`);
+            }
+            return { ...options, headers };
+          };
+
+          const response = await fetch(url, buildInit(token));
+
+          if (response.status === 401) {
+            if (attempt >= 1) {
+              setCredentialsState(false, {
+                message: "El token proporcionado no está autorizado. Vuelve a intentarlo.",
+                tone: "error",
+              });
+              throw new Error("UNAUTHORIZED");
+            }
+            auth.clearToken();
+            showTokenPrompt("El token ha caducado o es incorrecto. Introduce uno nuevo.");
+            const newToken = await auth.waitForToken();
+            return authorizedFetch(url, options, attempt + 1);
+          }
+
+          const wasValid = credentialsValid;
+          setCredentialsState(true, {
+            message: wasValid ? undefined : "Token validado. Puedes usar la interfaz con normalidad.",
+            tone: "success",
+          });
+
+          return response;
+        };
 
         const showStatus = (element, message, kind = "info") => {
           element.textContent = message;
@@ -445,7 +690,7 @@
         const fetchConfig = async () => {
           hideStatus(configStatus);
           try {
-            const response = await fetch("/ui/config");
+            const response = await authorizedFetch("/ui/config");
             if (!response.ok) {
               throw new Error(`Error HTTP ${response.status}`);
             }
@@ -455,7 +700,15 @@
             setTimeout(() => hideStatus(configStatus), 2500);
           } catch (error) {
             console.error(error);
-            showStatus(configStatus, "No se pudo cargar la configuración.", "error");
+            if (error?.message === "UNAUTHORIZED") {
+              showStatus(
+                configStatus,
+                "No se pudo cargar la configuración: introduce un token válido.",
+                "error",
+              );
+            } else {
+              showStatus(configStatus, "No se pudo cargar la configuración.", "error");
+            }
           }
         };
 
@@ -464,7 +717,7 @@
           hideStatus(configStatus);
           const payload = readFormValues();
           try {
-            const response = await fetch("/ui/config", {
+            const response = await authorizedFetch("/ui/config", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payload),
@@ -482,7 +735,19 @@
             showStatus(configStatus, "Cambios guardados.", "success");
           } catch (error) {
             console.error(error);
-            showStatus(configStatus, "No se pudo guardar la configuración. Revisa los datos e inténtalo de nuevo.", "error");
+            if (error?.message === "UNAUTHORIZED") {
+              showStatus(
+                configStatus,
+                "No se pudo guardar la configuración porque falta un token válido.",
+                "error",
+              );
+            } else {
+              showStatus(
+                configStatus,
+                "No se pudo guardar la configuración. Revisa los datos e inténtalo de nuevo.",
+                "error",
+              );
+            }
           }
         };
 
@@ -501,7 +766,7 @@
           }
           const url = params.toString() ? `/ui/logs?${params}` : "/ui/logs";
           try {
-            const response = await fetch(url);
+            const response = await authorizedFetch(url);
             if (!response.ok) {
               throw new Error(`Error HTTP ${response.status}`);
             }
@@ -509,8 +774,13 @@
             renderLogs(data);
           } catch (error) {
             console.error(error);
-            showStatus(logsStatus, "No se pudieron cargar los logs.", "error");
-            logContent.textContent = "Sin datos disponibles.";
+            if (error?.message === "UNAUTHORIZED") {
+              showStatus(logsStatus, "Introduce un token válido para consultar los logs.", "error");
+              logContent.textContent = "Introduce un token válido para ver los logs.";
+            } else {
+              showStatus(logsStatus, "No se pudieron cargar los logs.", "error");
+              logContent.textContent = "Sin datos disponibles.";
+            }
           }
         };
 
@@ -560,6 +830,59 @@
             modified ? ` · Última modificación: ${modified}` : ""
           }${size ? ` · Tamaño: ${size} bytes` : ""}`;
         };
+
+        if (memoryToken) {
+          setCredentialsState(false, {
+            message: "Verificando token guardado…",
+            tone: "info",
+          });
+        } else {
+          setCredentialsState(false, {
+            message: "Introduce el token bearer para continuar.",
+            tone: "error",
+          });
+          logContent.textContent = "Introduce un token válido para ver los logs.";
+        }
+
+        tokenForm?.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const value = tokenInput?.value?.trim() ?? "";
+          if (!value) {
+            auth.clearToken();
+            setCredentialsState(false, {
+              message: "Debes introducir un token para continuar.",
+              tone: "error",
+            });
+            return;
+          }
+          auth.setToken(value);
+          if (tokenInput) {
+            tokenInput.value = "";
+          }
+          hideStatus(configStatus);
+          hideStatus(logsStatus);
+          setCredentialsState(false, {
+            message: "Token guardado. Verificando credenciales…",
+            tone: "info",
+          });
+          fetchConfig();
+          fetchLogs();
+        });
+
+        clearTokenButton?.addEventListener("click", () => {
+          auth.clearToken();
+          if (tokenInput) {
+            tokenInput.value = "";
+          }
+          hideStatus(configStatus);
+          hideStatus(logsStatus);
+          logContent.textContent = "Introduce un token válido para ver los logs.";
+          setCredentialsState(false, {
+            message: "Se olvidó el token guardado. Introduce uno nuevo.",
+            tone: "error",
+          });
+          tokenInput?.focus();
+        });
 
         form.addEventListener("submit", submitConfig);
         resetButton.addEventListener("click", resetConfig);
