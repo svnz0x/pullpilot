@@ -314,7 +314,8 @@ def create_app(
             return JSONResponse(body, status_code=status)
 
         @app.post("/ui/config", dependencies=[Depends(_require_auth)])
-        def post_ui_config(payload: Dict[str, Any], request: Request):
+        async def post_ui_config(request: Request):
+            payload = await request.json()
             status, body = api.handle_request(
                 "POST", "/ui/config", payload, request.headers
             )
@@ -323,7 +324,8 @@ def create_app(
             return JSONResponse(body, status_code=status)
 
         @app.get("/ui/logs", dependencies=[Depends(_require_auth)])
-        def get_ui_logs(request: Request, name: Optional[str] = None):
+        def get_ui_logs(request: Request):
+            name = request.query_params.get("name")
             payload = {"name": name} if name is not None else None
             status, body = api.handle_request(
                 "GET", "/ui/logs", payload, request.headers
@@ -333,7 +335,8 @@ def create_app(
             return JSONResponse(body, status_code=status)
 
         @app.post("/ui/logs", dependencies=[Depends(_require_auth)])
-        def post_ui_logs(payload: Dict[str, Any], request: Request):
+        async def post_ui_logs(request: Request):
+            payload = await request.json()
             status, body = api.handle_request(
                 "POST", "/ui/logs", payload, request.headers
             )
@@ -341,29 +344,31 @@ def create_app(
                 raise HTTPException(status_code=status, detail=body)
             return JSONResponse(body, status_code=status)
 
-        @app.get("/config")
-        def get_config(request: Request, _: None = Depends(_require_auth)):
+        @app.get("/config", dependencies=[Depends(_require_auth)])
+        def get_config(request: Request):
             status, body = api.handle_request("GET", "/config", headers=request.headers)
             if status != HTTPStatus.OK:
                 raise HTTPException(status_code=status, detail=body)
             return JSONResponse(body, status_code=status)
 
-        @app.put("/config")
-        def put_config(payload: Dict[str, Any], request: Request, _: None = Depends(_require_auth)):
+        @app.put("/config", dependencies=[Depends(_require_auth)])
+        async def put_config(request: Request):
+            payload = await request.json()
             status, body = api.handle_request("PUT", "/config", payload, request.headers)
             if status != HTTPStatus.OK:
                 raise HTTPException(status_code=status, detail=body)
             return JSONResponse(body)
 
-        @app.get("/schedule")
-        def get_schedule(request: Request, _: None = Depends(_require_auth)):
+        @app.get("/schedule", dependencies=[Depends(_require_auth)])
+        def get_schedule(request: Request):
             status, body = api.handle_request("GET", "/schedule", headers=request.headers)
             if status != HTTPStatus.OK:
                 raise HTTPException(status_code=status, detail=body)
             return JSONResponse(body, status_code=status)
 
-        @app.put("/schedule")
-        def put_schedule(payload: Dict[str, Any], request: Request, _: None = Depends(_require_auth)):
+        @app.put("/schedule", dependencies=[Depends(_require_auth)])
+        async def put_schedule(request: Request):
+            payload = await request.json()
             status, body = api.handle_request("PUT", "/schedule", payload, request.headers)
             if status != HTTPStatus.OK:
                 raise HTTPException(status_code=status, detail=body)
