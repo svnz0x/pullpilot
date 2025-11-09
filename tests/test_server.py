@@ -146,6 +146,31 @@ def test_token_auth_blocks_unauthenticated_access(
     assert status == HTTPStatus.OK
 
 
+def test_token_auth_rejects_invalid_token(
+    monkeypatch: pytest.MonkeyPatch, store: ConfigStore, schedule_store: ScheduleStore
+) -> None:
+    monkeypatch.setenv("PULLPILOT_TOKEN", "another-secret")
+    api = ConfigAPI(store=store, schedule_store=schedule_store)
+
+    status, body = api.handle_request(
+        "GET", "/config", headers={"Authorization": "Bearer wrong-secret"}
+    )
+    assert status == HTTPStatus.UNAUTHORIZED
+    assert body["error"] == "unauthorized"
+
+
+def test_token_auth_allows_token_scheme(
+    monkeypatch: pytest.MonkeyPatch, store: ConfigStore, schedule_store: ScheduleStore
+) -> None:
+    monkeypatch.setenv("PULLPILOT_TOKEN", "token-scheme")
+    api = ConfigAPI(store=store, schedule_store=schedule_store)
+
+    status, body = api.handle_request(
+        "GET", "/config", headers={"Authorization": "Token token-scheme"}
+    )
+    assert status == HTTPStatus.OK
+
+
 def test_ui_endpoints_require_auth_when_token_set(
     monkeypatch: pytest.MonkeyPatch, store: ConfigStore, schedule_store: ScheduleStore
 ) -> None:
