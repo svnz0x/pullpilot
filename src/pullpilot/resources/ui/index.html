@@ -46,90 +46,94 @@
         line-height: 1.5;
       }
 
-      .token-banner {
-        margin: 1.75rem auto 0;
-        max-width: min(42rem, 92vw);
+      body.requires-auth main {
+        display: none;
+      }
+
+      body.authenticated main {
+        display: grid;
+      }
+
+      body.requires-auth #login-screen {
+        display: block;
+      }
+
+      body.authenticated #login-screen {
+        display: none;
+      }
+
+      #login-screen {
+        margin: 2rem auto 0;
+        width: min(32rem, 92vw);
         background: rgba(15, 23, 42, 0.55);
-        border-radius: 1rem;
+        border-radius: 1.25rem;
         border: 1px solid rgba(148, 163, 184, 0.35);
-        padding: 1rem 1.25rem;
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 0.75rem;
+        padding: clamp(1.5rem, 4vw, 2rem);
+        box-shadow: 0 20px 35px rgba(15, 23, 42, 0.35);
+        display: none;
       }
 
-      .token-banner.token-required {
-        border-color: rgba(248, 113, 113, 0.45);
-        box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.25);
+      #login-screen form {
+        display: grid;
+        gap: 1rem;
       }
 
-      .token-form {
-        display: contents;
-      }
-
-      .token-form label {
+      #login-screen label {
         font-weight: 600;
         display: flex;
-        align-items: center;
-        gap: 0.4rem;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
       }
 
-      .token-form input[type="password"] {
-        flex: 1 1 16rem;
-        min-width: 12rem;
-        padding: 0.6rem 0.75rem;
-        border-radius: 0.75rem;
+      #login-screen input[type="password"] {
+        width: 100%;
+        padding: 0.7rem 0.85rem;
+        border-radius: 0.9rem;
         border: 1px solid rgba(148, 163, 184, 0.4);
         background: rgba(15, 23, 42, 0.35);
         color: inherit;
         font: inherit;
       }
 
-      .token-form input[type="password"]:focus {
+      #login-screen input[type="password"]:focus {
         outline: none;
         border-color: var(--accent);
         box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
       }
 
-      .token-actions {
+      .login-actions {
         display: flex;
-        gap: 0.5rem;
+        gap: 0.75rem;
         flex-wrap: wrap;
       }
 
-      .token-actions button {
-        padding: 0.55rem 1.25rem;
+      .login-actions button {
+        flex: 1 1 auto;
+        min-width: 8rem;
+      }
+
+      .login-status {
         font-size: 0.95rem;
-      }
-
-      .token-status {
-        flex: 1 1 100%;
-        font-size: 0.9rem;
         color: var(--text-secondary);
+        min-height: 1.35em;
       }
 
-      .token-status.is-error {
-        color: #fecaca;
-      }
-
-      .token-status.is-success {
+      .login-status.is-success {
         color: #bef264;
       }
 
-      .token-status.is-info {
-        color: var(--text-secondary);
+      .login-status.is-error {
+        color: #fecaca;
       }
 
-      body.requires-auth main {
-        pointer-events: none;
-        filter: grayscale(0.7);
-        opacity: 0.55;
-      }
-
-      body.requires-auth main::after {
-        content: "";
+      .logout-button {
         display: none;
+        margin: 1.5rem auto 0;
+      }
+
+      body.authenticated .logout-button {
+        display: inline-flex;
       }
 
       main {
@@ -362,35 +366,38 @@
       }
     </style>
   </head>
-  <body>
+  <body class="requires-auth">
     <header>
       <h1>PullPilot</h1>
       <p>
         Administra los parámetros del script de actualización y revisa los últimos logs directamente desde
         tu navegador. Introduce el token bearer que protege la API para habilitar la interfaz.
       </p>
-      <div class="token-banner" id="token-banner">
-        <form id="token-form" class="token-form" autocomplete="off">
-          <label for="token-input">Token bearer</label>
+      <button type="button" class="secondary logout-button" id="logout-button">Olvidar token</button>
+    </header>
+    <section id="login-screen">
+      <form id="token-form" autocomplete="off">
+        <label for="token-input">
+          Token bearer
           <input
             id="token-input"
             name="token"
             type="password"
             placeholder="Introduce tu token"
-            aria-describedby="token-status"
+            aria-describedby="login-status"
             autocomplete="off"
             autocapitalize="off"
             spellcheck="false"
             required
           />
-          <div class="token-actions">
-            <button type="submit" class="primary">Guardar token</button>
-            <button type="button" class="secondary" id="clear-token">Olvidar</button>
-          </div>
-          <span class="token-status" id="token-status" role="status" aria-live="polite"></span>
-        </form>
-      </div>
-    </header>
+        </label>
+        <div class="login-actions">
+          <button type="submit" class="primary">Iniciar sesión</button>
+          <button type="button" class="secondary" id="clear-token">Olvidar</button>
+        </div>
+        <span class="login-status" id="login-status" role="status" aria-live="polite"></span>
+      </form>
+    </section>
     <main>
       <section id="config-section">
         <h2>Configuración del updater</h2>
@@ -418,12 +425,12 @@
     </main>
     <script>
       (() => {
-        const mainContent = document.querySelector("main");
-        const tokenForm = document.getElementById("token-form");
+        const body = document.body;
+        const loginForm = document.getElementById("token-form");
         const tokenInput = document.getElementById("token-input");
-        const tokenStatus = document.getElementById("token-status");
+        const loginStatus = document.getElementById("login-status");
         const clearTokenButton = document.getElementById("clear-token");
-        const tokenBanner = document.getElementById("token-banner");
+        const logoutButton = document.getElementById("logout-button");
         const form = document.getElementById("config-form");
         const fieldsContainer = document.getElementById("config-fields");
         const resetButton = document.getElementById("reset-config");
@@ -436,72 +443,73 @@
 
         const TOKEN_STORAGE_KEY = "pullpilot.bearerToken";
         let lastConfigSnapshot = null;
-        let credentialsValid = false;
         let memoryToken = null;
-        const tokenWaiters = [];
+        let storedToken = null;
 
         try {
-          memoryToken = window.localStorage.getItem(TOKEN_STORAGE_KEY) || null;
+          storedToken = window.localStorage.getItem(TOKEN_STORAGE_KEY) || null;
         } catch (error) {
           console.warn("No se pudo leer el token almacenado", error);
-          memoryToken = null;
+          storedToken = null;
         }
 
-        const resolveTokenWaiters = (value) => {
-          if (!value) return;
-          while (tokenWaiters.length) {
-            const resolve = tokenWaiters.shift();
-            if (typeof resolve === "function") {
-              resolve(value);
-            }
+        const showLoginMessage = (message, tone = "info") => {
+          if (!loginStatus) return;
+          loginStatus.textContent = message;
+          loginStatus.classList.toggle("is-success", tone === "success");
+          loginStatus.classList.toggle("is-error", tone === "error");
+        };
+
+        const resetPortalState = () => {
+          if (fieldsContainer) {
+            fieldsContainer.innerHTML = "";
+          }
+          lastConfigSnapshot = null;
+          if (configStatus) {
+            configStatus.hidden = true;
+            configStatus.classList.remove("success", "error");
+            configStatus.textContent = "";
+          }
+          if (logsStatus) {
+            logsStatus.hidden = true;
+            logsStatus.classList.remove("success", "error");
+            logsStatus.textContent = "";
+          }
+          if (logSelect) {
+            logSelect.innerHTML = "";
+            logSelect.disabled = true;
+          }
+          if (logContent) {
+            logContent.textContent = "Introduce un token válido para ver los logs.";
+          }
+          if (logMeta) {
+            logMeta.textContent = "";
           }
         };
 
-        const updateTokenStatus = (message, tone = "info") => {
-          if (!tokenStatus) return;
-          tokenStatus.textContent = message;
-          tokenStatus.classList.toggle("is-success", tone === "success");
-          tokenStatus.classList.toggle("is-error", tone === "error");
-          tokenStatus.classList.toggle("is-info", tone === "info");
-        };
-
-        const setCredentialsState = (isValid, { message, tone } = {}) => {
-          const changed = credentialsValid !== isValid;
-          credentialsValid = isValid;
-          document.body.classList.toggle("requires-auth", !isValid);
-          tokenBanner?.classList.toggle("token-required", !isValid);
-          if (!isValid) {
-            mainContent?.setAttribute("aria-disabled", "true");
-          } else {
-            mainContent?.removeAttribute("aria-disabled");
-          }
-          if (message || changed) {
-            updateTokenStatus(
-              message ||
-                (isValid
-                  ? "Token validado. Puedes usar la interfaz con normalidad."
-                  : "Introduce el token bearer para continuar."),
-              tone || (isValid ? "success" : "error"),
-            );
+        const setAuthState = (isAuthenticated) => {
+          body.classList.toggle("authenticated", isAuthenticated);
+          body.classList.toggle("requires-auth", !isAuthenticated);
+          if (!isAuthenticated) {
+            resetPortalState();
           }
         };
 
         const auth = {
           getToken: () => memoryToken,
-          setToken: (token) => {
+          setToken: (token, { persist = true } = {}) => {
             const trimmed = typeof token === "string" ? token.trim() : "";
             memoryToken = trimmed || null;
-            try {
-              if (trimmed) {
-                window.localStorage.setItem(TOKEN_STORAGE_KEY, trimmed);
-              } else {
-                window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+            if (persist) {
+              try {
+                if (memoryToken) {
+                  window.localStorage.setItem(TOKEN_STORAGE_KEY, memoryToken);
+                } else {
+                  window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+                }
+              } catch (error) {
+                console.warn("No se pudo persistir el token", error);
               }
-            } catch (error) {
-              console.warn("No se pudo persistir el token", error);
-            }
-            if (memoryToken) {
-              resolveTokenWaiters(memoryToken);
             }
             return memoryToken;
           },
@@ -513,57 +521,72 @@
               console.warn("No se pudo limpiar el token almacenado", error);
             }
           },
-          waitForToken: () => {
-            if (memoryToken) {
-              return Promise.resolve(memoryToken);
-            }
-            return new Promise((resolve) => {
-              tokenWaiters.push(resolve);
-            });
-          },
         };
 
-        const showTokenPrompt = (message) => {
-          setCredentialsState(false, { message, tone: "error" });
-          tokenInput?.focus();
-        };
-
-        const authorizedFetch = async (url, options = {}, attempt = 0) => {
-          let token = auth.getToken();
+        const verifyToken = async (candidate, { persist = true } = {}) => {
+          const token = typeof candidate === "string" ? candidate.trim() : "";
           if (!token) {
-            showTokenPrompt("Introduce tu token bearer para continuar.");
-            token = await auth.waitForToken();
+            const error = new Error("TOKEN_REQUIRED");
+            error.code = "TOKEN_REQUIRED";
+            throw error;
           }
 
-          const buildInit = (currentToken) => {
-            const headers = new Headers(options.headers || {});
-            if (!headers.has("Authorization")) {
-              headers.set("Authorization", `Bearer ${currentToken}`);
-            }
-            return { ...options, headers };
-          };
+          let response;
+          try {
+            response = await fetch("/ui/config", {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+          } catch (error) {
+            const networkError = new Error("NETWORK_ERROR");
+            networkError.cause = error;
+            throw networkError;
+          }
 
-          const response = await fetch(url, buildInit(token));
+          if (!response.ok) {
+            const error = new Error(response.status === 401 ? "UNAUTHORIZED" : "REQUEST_FAILED");
+            error.status = response.status;
+            throw error;
+          }
+
+          const data = await response.json();
+          auth.setToken(token, { persist });
+          return data;
+        };
+
+        const createUnauthorizedError = () => {
+          const error = new Error("UNAUTHORIZED");
+          error.status = 401;
+          return error;
+        };
+
+        const handleUnauthorized = (message) => {
+          auth.clearToken();
+          loginForm?.reset();
+          showLoginPrompt("error", message);
+        };
+
+        const authorizedFetch = async (url, options = {}) => {
+          const token = auth.getToken();
+          if (!token) {
+            throw createUnauthorizedError();
+          }
+
+          const headers = new Headers(options.headers || {});
+          if (!headers.has("Authorization")) {
+            headers.set("Authorization", `Bearer ${token}`);
+          }
+
+          let response;
+          try {
+            response = await fetch(url, { ...options, headers });
+          } catch (error) {
+            throw error;
+          }
 
           if (response.status === 401) {
-            if (attempt >= 1) {
-              setCredentialsState(false, {
-                message: "El token proporcionado no está autorizado. Vuelve a intentarlo.",
-                tone: "error",
-              });
-              throw new Error("UNAUTHORIZED");
-            }
-            auth.clearToken();
-            showTokenPrompt("El token ha caducado o es incorrecto. Introduce uno nuevo.");
-            const newToken = await auth.waitForToken();
-            return authorizedFetch(url, options, attempt + 1);
+            handleUnauthorized("El token ha caducado o es incorrecto. Introduce uno nuevo.");
+            throw createUnauthorizedError();
           }
-
-          const wasValid = credentialsValid;
-          setCredentialsState(true, {
-            message: wasValid ? undefined : "Token validado. Puedes usar la interfaz con normalidad.",
-            tone: "success",
-          });
 
           return response;
         };
@@ -991,57 +1014,79 @@
           }${size ? ` · Tamaño: ${size} bytes` : ""}`;
         };
 
-        if (memoryToken) {
-          setCredentialsState(false, {
-            message: "Verificando token guardado…",
-            tone: "info",
-          });
-        } else {
-          setCredentialsState(false, {
-            message: "Introduce el token bearer para continuar.",
-            tone: "error",
-          });
-          logContent.textContent = "Introduce un token válido para ver los logs.";
-        }
+        const handleSuccessfulLogin = (configData, { showSuccessMessage = true } = {}) => {
+          setAuthState(true);
+          hideStatus(configStatus);
+          hideStatus(logsStatus);
+          if (showSuccessMessage) {
+            showLoginMessage("Token validado. Puedes usar la interfaz con normalidad.", "success");
+          } else {
+            showLoginMessage("", "info");
+          }
+          if (loginForm) {
+            loginForm.reset();
+          }
+          if (configData) {
+            populateConfig(configData);
+          } else {
+            fetchConfig();
+          }
+          fetchLogs();
+        };
 
-        tokenForm?.addEventListener("submit", (event) => {
+        const showLoginPrompt = (
+          tone = "info",
+          message = "Introduce el token bearer para continuar.",
+        ) => {
+          setAuthState(false);
+          showLoginMessage(message, tone);
+          tokenInput?.focus();
+        };
+
+        loginForm?.addEventListener("submit", async (event) => {
           event.preventDefault();
           const value = tokenInput?.value?.trim() ?? "";
           if (!value) {
-            auth.clearToken();
-            setCredentialsState(false, {
-              message: "Debes introducir un token para continuar.",
-              tone: "error",
-            });
+            showLoginMessage("Debes introducir un token para continuar.", "error");
+            tokenInput?.focus();
             return;
           }
-          auth.setToken(value);
-          if (tokenInput) {
-            tokenInput.value = "";
+          showLoginMessage("Verificando token…", "info");
+          try {
+            const configData = await verifyToken(value, { persist: true });
+            handleSuccessfulLogin(configData);
+          } catch (error) {
+            console.error(error);
+            if (error?.message === "UNAUTHORIZED" || error?.status === 401) {
+              showLoginMessage(
+                "El token proporcionado no está autorizado. Vuelve a intentarlo.",
+                "error",
+              );
+            } else if (error?.message === "NETWORK_ERROR") {
+              showLoginMessage(
+                "No se pudo verificar el token. Revisa la conexión e inténtalo de nuevo.",
+                "error",
+              );
+            } else if (error?.message === "TOKEN_REQUIRED") {
+              showLoginMessage("Debes introducir un token para continuar.", "error");
+            } else {
+              showLoginMessage("No se pudo verificar el token. Inténtalo de nuevo.", "error");
+            }
           }
-          hideStatus(configStatus);
-          hideStatus(logsStatus);
-          setCredentialsState(false, {
-            message: "Token guardado. Verificando credenciales…",
-            tone: "info",
-          });
-          fetchConfig();
-          fetchLogs();
         });
 
-        clearTokenButton?.addEventListener("click", () => {
+        const clearSession = (message = "Introduce el token bearer para continuar.", tone = "info") => {
           auth.clearToken();
-          if (tokenInput) {
-            tokenInput.value = "";
-          }
-          hideStatus(configStatus);
-          hideStatus(logsStatus);
-          logContent.textContent = "Introduce un token válido para ver los logs.";
-          setCredentialsState(false, {
-            message: "Se olvidó el token guardado. Introduce uno nuevo.",
-            tone: "error",
-          });
-          tokenInput?.focus();
+          loginForm?.reset();
+          showLoginPrompt(tone, message);
+        };
+
+        clearTokenButton?.addEventListener("click", () => {
+          clearSession("Se olvidó el token guardado. Introduce uno nuevo.");
+        });
+
+        logoutButton?.addEventListener("click", () => {
+          clearSession("Sesión cerrada. Introduce un token válido para continuar.");
         });
 
         form.addEventListener("submit", submitConfig);
@@ -1056,8 +1101,27 @@
           fetchLogs(selected || null);
         });
 
-        fetchConfig();
-        fetchLogs();
+        if (storedToken) {
+          showLoginMessage("Verificando token guardado…", "info");
+          verifyToken(storedToken, { persist: false })
+            .then((configData) => {
+              handleSuccessfulLogin(configData, { showSuccessMessage: false });
+            })
+            .catch((error) => {
+              console.error(error);
+              auth.clearToken();
+              if (error?.message === "UNAUTHORIZED" || error?.status === 401) {
+                showLoginPrompt("error", "El token guardado no es válido. Introduce uno nuevo.");
+              } else {
+                showLoginPrompt(
+                  "error",
+                  "No se pudo verificar el token guardado. Introduce uno nuevo.",
+                );
+              }
+            });
+        } else {
+          showLoginPrompt();
+        }
       })();
     </script>
   </body>
