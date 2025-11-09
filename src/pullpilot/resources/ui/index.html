@@ -86,6 +86,36 @@
         gap: 0.5rem;
       }
 
+      #login-screen label.remember-token {
+        flex-direction: row;
+        align-items: center;
+        gap: 0.75rem;
+        font-weight: 500;
+      }
+
+      #login-screen label.remember-token input[type="checkbox"] {
+        width: 1.15rem;
+        height: 1.15rem;
+        margin: 0;
+        accent-color: var(--accent);
+      }
+
+      #login-screen label.remember-token .remember-token-text {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+      }
+
+      #login-screen label.remember-token .remember-token-text strong {
+        font-weight: 600;
+      }
+
+      #login-screen label.remember-token .remember-token-text span {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        font-weight: 400;
+      }
+
       #login-screen input[type="password"] {
         width: 100%;
         padding: 0.7rem 0.85rem;
@@ -371,9 +401,10 @@
       <h1>PullPilot</h1>
       <p>
         Administra los parámetros del script de actualización y revisa los últimos logs directamente desde
-        tu navegador. Introduce el token bearer que protege la API para habilitar la interfaz.
+        tu navegador. Introduce el token bearer que protege la API para habilitar la interfaz y recuerda el
+        token solo en dispositivos de confianza.
       </p>
-      <button type="button" class="secondary logout-button" id="logout-button">Olvidar token</button>
+      <button type="button" class="secondary logout-button" id="logout-button">Olvidar token actual</button>
     </header>
     <section id="login-screen">
       <form id="token-form" autocomplete="off">
@@ -391,9 +422,16 @@
             required
           />
         </label>
+        <label for="remember-token" class="remember-token">
+          <input type="checkbox" id="remember-token" name="remember-token" />
+          <span class="remember-token-text">
+            <strong>Recordar token en este navegador</strong>
+            <span>Evita marcar esta opción en equipos compartidos o públicos.</span>
+          </span>
+        </label>
         <div class="login-actions">
           <button type="submit" class="primary">Iniciar sesión</button>
-          <button type="button" class="secondary" id="clear-token">Olvidar</button>
+          <button type="button" class="secondary" id="clear-token">Olvidar token</button>
         </div>
         <span class="login-status" id="login-status" role="status" aria-live="polite"></span>
       </form>
@@ -430,6 +468,7 @@
         const tokenInput = document.getElementById("token-input");
         const loginStatus = document.getElementById("login-status");
         const clearTokenButton = document.getElementById("clear-token");
+        const rememberCheckbox = document.getElementById("remember-token");
         const logoutButton = document.getElementById("logout-button");
         const form = document.getElementById("config-form");
         const fieldsContainer = document.getElementById("config-fields");
@@ -497,19 +536,17 @@
 
         const auth = {
           getToken: () => memoryToken,
-          setToken: (token, { persist = true } = {}) => {
+          setToken: (token, { persist = false } = {}) => {
             const trimmed = typeof token === "string" ? token.trim() : "";
             memoryToken = trimmed || null;
-            if (persist) {
-              try {
-                if (memoryToken) {
-                  window.localStorage.setItem(TOKEN_STORAGE_KEY, memoryToken);
-                } else {
-                  window.localStorage.removeItem(TOKEN_STORAGE_KEY);
-                }
-              } catch (error) {
-                console.warn("No se pudo persistir el token", error);
+            try {
+              if (persist && memoryToken) {
+                window.localStorage.setItem(TOKEN_STORAGE_KEY, memoryToken);
+              } else {
+                window.localStorage.removeItem(TOKEN_STORAGE_KEY);
               }
+            } catch (error) {
+              console.warn("No se pudo gestionar el token almacenado", error);
             }
             return memoryToken;
           },
@@ -523,7 +560,7 @@
           },
         };
 
-        const verifyToken = async (candidate, { persist = true } = {}) => {
+        const verifyToken = async (candidate, { persist = false } = {}) => {
           const token = typeof candidate === "string" ? candidate.trim() : "";
           if (!token) {
             const error = new Error("TOKEN_REQUIRED");
@@ -1082,7 +1119,7 @@
 
         const showLoginPrompt = (
           tone = "info",
-          message = "Introduce el token bearer para continuar.",
+          message = "Introduce el token bearer para continuar. Marca «Recordar token» solo si el equipo es de confianza.",
         ) => {
           setAuthState(false);
           showLoginMessage(message, tone);
@@ -1099,7 +1136,8 @@
           }
           showLoginMessage("Verificando token…", "info");
           try {
-            const configData = await verifyToken(value, { persist: true });
+            const shouldPersist = rememberCheckbox?.checked ?? false;
+            const configData = await verifyToken(value, { persist: shouldPersist });
             handleSuccessfulLogin(configData);
           } catch (error) {
             console.error(error);
@@ -1149,7 +1187,7 @@
 
         if (storedToken) {
           showLoginMessage("Verificando token guardado…", "info");
-          verifyToken(storedToken, { persist: false })
+          verifyToken(storedToken, { persist: true })
             .then((configData) => {
               handleSuccessfulLogin(configData, { showSuccessMessage: false });
             })
