@@ -77,15 +77,25 @@ def _copy_missing_config(config_dir: Path, default_dir: Optional[Path]) -> None:
     if not default_dir or not default_dir.exists():
         LOGGER.debug("No default config directory found; skipping bootstrap")
         return
+    def _copy_entry(source: Path, destination: Path) -> None:
+        if source.is_dir():
+            if not destination.exists():
+                destination.mkdir(parents=True, exist_ok=True)
+                LOGGER.info(
+                    "Copiado recurso de configuración por defecto: %s", destination
+                )
+            for child in source.iterdir():
+                _copy_entry(child, destination / child.name)
+            return
+
+        if destination.exists():
+            return
+
+        shutil.copy2(source, destination)
+        LOGGER.info("Copiado recurso de configuración por defecto: %s", destination)
+
     for entry in default_dir.iterdir():
-        target = config_dir / entry.name
-        if target.exists():
-            continue
-        if entry.is_dir():
-            shutil.copytree(entry, target)
-        else:
-            shutil.copy2(entry, target)
-        LOGGER.info("Copiado archivo de configuración por defecto: %s", target)
+        _copy_entry(entry, config_dir / entry.name)
 
 
 def _configure_logging(level: str) -> None:
