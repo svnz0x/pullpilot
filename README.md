@@ -71,13 +71,10 @@ uvicorn pullpilot.app:create_app --host 0.0.0.0 --port 8000 --reload
 ## Extra: docker‑compose (ejemplo)
 
 ```yaml
-version: "3.9"
-
 services:
   pullpilot:
     image: ghcr.io/svnz0x/pullpilot:latest
     # Usa "build: ." si prefieres construir la imagen localmente
-    # build: .
     environment:
       PULLPILOT_TOKEN: ${PULLPILOT_TOKEN:-}
     ports:
