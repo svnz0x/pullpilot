@@ -741,16 +741,39 @@
 
           const label = document.createElement("label");
           label.htmlFor = `field-${variable.name}`;
-          label.textContent = variable.name;
+
+          const isBaseDirField = variable.name === "BASE_DIR";
+          if (isBaseDirField) {
+            label.textContent = "Carpeta de proyectos docker-compose";
+          } else {
+            label.textContent = variable.name;
+          }
           wrapper.appendChild(label);
 
           const inputContainer = document.createElement("div");
           inputContainer.className = "field-input";
 
-          const defaultValue = values[variable.name];
+          const hasValue =
+            values && Object.prototype.hasOwnProperty.call(values, variable.name);
+          const defaultValue = hasValue ? values[variable.name] : variable.default;
           let control;
 
-          if (variable.type === "boolean") {
+          if (isBaseDirField) {
+            control = document.createElement("input");
+            control.type = "text";
+            control.id = `field-${variable.name}`;
+            control.classList.add("value-input", "base-dir-input");
+            control.dataset.type = variable.type;
+            control.placeholder =
+              variable.default && String(variable.default).trim().length
+                ? variable.default
+                : "/srv/compose";
+            control.spellcheck = false;
+            if (variable.constraints?.pattern) {
+              control.pattern = variable.constraints.pattern;
+            }
+            control.value = defaultValue ?? "";
+          } else if (variable.type === "boolean") {
             control = document.createElement("input");
             control.type = "checkbox";
             control.id = `field-${variable.name}`;
@@ -792,6 +815,9 @@
             control.value = defaultValue ?? "";
           }
 
+          if (control) {
+            control.setAttribute("aria-describedby", `field-${variable.name}-description`);
+          }
           inputContainer.appendChild(control);
 
           const descriptionId = `field-${variable.name}-description`;
@@ -813,7 +839,26 @@
           const description = document.createElement("p");
           description.className = "field-description";
           description.id = descriptionId;
-          description.textContent = variable.description || "Sin descripción";
+          if (isBaseDirField) {
+            const helpLines = [
+              "Ruta absoluta de la carpeta donde se buscarán los proyectos Docker Compose.",
+              "Debe contener los archivos docker-compose.yml en sus subdirectorios para que el escaneo funcione.",
+            ];
+            if (variable.description) {
+              helpLines.unshift(variable.description);
+            }
+            if (helpLines.length) {
+              description.textContent = helpLines[0];
+              helpLines.slice(1).forEach((line) => {
+                description.appendChild(document.createElement("br"));
+                const span = document.createElement("span");
+                span.textContent = line;
+                description.appendChild(span);
+              });
+            }
+          } else {
+            description.textContent = variable.description || "Sin descripción";
+          }
 
           if (variable.default !== undefined && variable.default !== null && String(variable.default).length) {
             const defaultTag = document.createElement("span");
@@ -851,7 +896,8 @@
             } else if (type === "integer") {
               payload.values[name] = control.value === "" ? null : Number(control.value);
             } else {
-              payload.values[name] = control.value;
+              const rawValue = control.value;
+              payload.values[name] = name === "BASE_DIR" ? rawValue.trim() : rawValue;
             }
             const multilineControl = field.querySelector("textarea[data-multiline]");
             if (multilineControl) {
