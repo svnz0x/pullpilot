@@ -903,21 +903,13 @@
             parts.push(trimmed);
           }
 
-          const mentionsToken = /PULLPILOT_TOKEN(?!_FILE)/i.test(trimmed);
-          const mentionsTokenFile = /PULLPILOT_TOKEN_FILE/i.test(trimmed);
-          if (!mentionsTokenFile || !mentionsToken) {
+          const mentionsToken = /PULLPILOT_TOKEN/i.test(trimmed);
+          if (!mentionsToken) {
             parts.push(
-              "Configura la variable de entorno PULLPILOT_TOKEN_FILE (preferida) o PULLPILOT_TOKEN en el servidor.",
+              "Configura la variable de entorno PULLPILOT_TOKEN en el servidor.",
             );
           }
-          if (!/tiene prioridad/i.test(trimmed)) {
-            parts.push(
-              "Si defines ambas variables, PULLPILOT_TOKEN_FILE tiene prioridad sobre PULLPILOT_TOKEN.",
-            );
-          }
-          parts.push(
-            "Reinicia el servidor después de modificar PULLPILOT_TOKEN_FILE o PULLPILOT_TOKEN.",
-          );
+          parts.push("Reinicia el servidor después de modificar PULLPILOT_TOKEN.");
           parts.push(
             "El token introducido se conservará y se reutilizará automáticamente cuando el backend acepte credenciales.",
           );
