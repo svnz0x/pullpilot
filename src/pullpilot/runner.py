@@ -84,14 +84,29 @@ def _copy_missing_config(config_dir: Path, default_dir: Optional[Path]) -> None:
                 LOGGER.info(
                     "Copiado recurso de configuración por defecto: %s", destination
                 )
-            for child in source.iterdir():
+            try:
+                children = list(source.iterdir())
+            except OSError as exc:
+                LOGGER.warning(
+                    "No se pudo listar el directorio de configuración por defecto %s", source,
+                    exc_info=exc,
+                )
+                return
+            for child in children:
                 _copy_entry(child, destination / child.name)
             return
 
         if destination.exists():
             return
 
-        shutil.copy2(source, destination)
+        try:
+            shutil.copy2(source, destination)
+        except OSError as exc:
+            LOGGER.warning(
+                "No se pudo copiar el recurso de configuración por defecto %s", source,
+                exc_info=exc,
+            )
+            return
         LOGGER.info("Copiado recurso de configuración por defecto: %s", destination)
 
     for entry in default_dir.iterdir():

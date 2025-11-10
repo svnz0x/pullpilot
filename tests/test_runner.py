@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 
 from pullpilot.runner import DEFAULT_PORT, _copy_missing_config, parse_args
@@ -46,3 +48,25 @@ def test_copy_missing_config_merges_subdirectories(tmp_path):
     assert (config_dir / "global.yaml").read_text() == "global value"
     assert (existing_dir / "new.yaml").read_text() == "new value"
     assert (existing_dir / "deep" / "nested.yaml").read_text() == "nested value"
+
+
+def test_copy_missing_config_logs_warning_on_copy_failure(tmp_path, monkeypatch, caplog):
+    config_dir = tmp_path / "config"
+    defaults_dir = tmp_path / "config.defaults"
+    defaults_dir.mkdir()
+    default_file = defaults_dir / "global.yaml"
+    default_file.write_text("global value")
+
+    def _failing_copy2(*args, **kwargs):
+        raise OSError("permission denied")
+
+    monkeypatch.setattr("pullpilot.runner.shutil.copy2", _failing_copy2)
+
+    caplog.set_level(logging.WARNING, logger="pullpilot.runner")
+
+    _copy_missing_config(config_dir, defaults_dir)
+
+    assert any(
+        "No se pudo copiar el recurso de configuración por defecto" in message
+        for message in caplog.messages
+    )
