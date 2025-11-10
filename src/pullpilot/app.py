@@ -21,6 +21,19 @@ TOKEN_FILE_ENV = "PULLPILOT_TOKEN_FILE"
 LOGGER = logging.getLogger("pullpilot.app")
 
 
+def _normalize_env_value(value: Optional[str]) -> Optional[str]:
+    """Normalize environment variables used for authentication."""
+
+    if value is None:
+        return None
+    normalized = value.strip()
+    if len(normalized) >= 2 and normalized[0] == normalized[-1] and normalized[0] in {"'", '"'}:
+        normalized = normalized[1:-1].strip()
+    if not normalized:
+        return None
+    return normalized
+
+
 class Authenticator:
     """Simple helper that validates Authorization headers when configured."""
 
@@ -37,7 +50,7 @@ class Authenticator:
         ``PULLPILOT_TOKEN`` is used instead.
         """
 
-        token_file = os.getenv(TOKEN_FILE_ENV)
+        token_file = _normalize_env_value(os.getenv(TOKEN_FILE_ENV))
         if token_file:
             expanded_token_file = os.path.expandvars(token_file)
             path = Path(expanded_token_file).expanduser()
@@ -50,8 +63,7 @@ class Authenticator:
                 if token:
                     return cls(token=token)
 
-        token_raw = os.getenv(TOKEN_ENV, "")
-        token = token_raw.strip() or None
+        token = _normalize_env_value(os.getenv(TOKEN_ENV))
         return cls(token=token)
 
     @property

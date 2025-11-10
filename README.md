@@ -59,6 +59,7 @@ docker run --rm -p 8000:8000 ghcr.io/svnz0x/pullpilot:latest
 
 - **Credenciales obligatorias**: la API de configuración requiere un token bearer establecido mediante `PULLPILOT_TOKEN` o un archivo referenciado desde `PULLPILOT_TOKEN_FILE`. Si no se define ninguno, la aplicación rechazará todas las peticiones protegidas.
 - **Orden de precedencia**: cuando ambas variables están presentes, `PULLPILOT_TOKEN_FILE` tiene prioridad y su contenido (recortado) se utiliza como token. Si la ruta no existe o no puede leerse, se registrará un error y se retrocederá al valor de `PULLPILOT_TOKEN`.
+- **Comillas opcionales**: no es necesario envolver las variables con comillas, pero si lo haces (por ejemplo en un fichero `.env`), el backend las descartará automáticamente antes de validar el token o resolver la ruta del fichero.
 - **Expansión de rutas**: la ruta indicada en `PULLPILOT_TOKEN_FILE` admite `~` y variables de entorno (por ejemplo `"$HOME/token.txt"`). El registro de errores reflejará la ruta tras expandirla para facilitar el diagnóstico.
 - La interfaz web local muestra un banner para introducir ese token. Por defecto solo se conserva en memoria, pero puedes marcar «Recordar token» para guardarlo en `localStorage` y reutilizarlo en ese navegador. Evita recordar el token en equipos compartidos o públicos. Mientras no se valide el token, la UI permanece deshabilitada y cualquier petición 401 solicitará nuevamente las credenciales antes de reintentarse automáticamente.
 
