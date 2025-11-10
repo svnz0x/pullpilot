@@ -136,7 +136,11 @@ class ConfigAPI:
                     HTTPStatus.UNAUTHORIZED,
                     {
                         "error": "missing credentials",
-                        "details": f"Set the {TOKEN_ENV} environment variable and send an Authorization header.",
+                        "details": (
+                            "Set the "
+                            f"{TOKEN_FILE_ENV} (preferred) or {TOKEN_ENV} environment variable "
+                            f"(values from {TOKEN_FILE_ENV} take precedence) and send an Authorization header."
+                        ),
                     },
                 )
             if not self.authenticator.authorize(headers):

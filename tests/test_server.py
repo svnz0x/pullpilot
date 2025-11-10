@@ -122,12 +122,16 @@ def test_put_rejects_multiline_paths_outside_allowed_directory(
 
 def test_requests_rejected_without_credentials(monkeypatch, store: ConfigStore, schedule_store: ScheduleStore) -> None:
     monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
+    monkeypatch.delenv("PULLPILOT_TOKEN_FILE", raising=False)
     api = ConfigAPI(store=store, schedule_store=schedule_store)
 
     status, body = api.handle_request("GET", "/config")
     assert status == HTTPStatus.UNAUTHORIZED
     assert body["error"] == "missing credentials"
-    assert "PULLPILOT_TOKEN" in body.get("details", "")
+    details = body.get("details", "")
+    assert "PULLPILOT_TOKEN_FILE" in details
+    assert "PULLPILOT_TOKEN" in details
+    assert "precedence" in details
 
     status, body = api.handle_request("PUT", "/config", {"values": {}})
     assert status == HTTPStatus.UNAUTHORIZED
