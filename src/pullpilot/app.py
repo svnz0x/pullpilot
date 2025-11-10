@@ -39,7 +39,8 @@ class Authenticator:
 
         token_file = os.getenv(TOKEN_FILE_ENV)
         if token_file:
-            path = Path(token_file)
+            expanded_token_file = os.path.expandvars(token_file)
+            path = Path(expanded_token_file).expanduser()
             try:
                 token_raw = path.read_text(encoding="utf-8")
             except OSError as exc:
