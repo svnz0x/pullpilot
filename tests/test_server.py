@@ -1,5 +1,3 @@
-import logging
-import os
 from http import HTTPStatus
 from pathlib import Path
 from typing import Mapping
@@ -120,18 +118,19 @@ def test_put_rejects_multiline_paths_outside_allowed_directory(
     assert any(error["field"] == "COMPOSE_PROJECTS_FILE" for error in response["details"])
 
 
-def test_requests_rejected_without_credentials(monkeypatch, store: ConfigStore, schedule_store: ScheduleStore) -> None:
+def test_requests_rejected_without_credentials(
+    monkeypatch, store: ConfigStore, schedule_store: ScheduleStore
+) -> None:
     monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
-    monkeypatch.delenv("PULLPILOT_TOKEN_FILE", raising=False)
     api = ConfigAPI(store=store, schedule_store=schedule_store)
 
     status, body = api.handle_request("GET", "/config")
     assert status == HTTPStatus.UNAUTHORIZED
     assert body["error"] == "missing credentials"
-    details = body.get("details", "")
-    assert "PULLPILOT_TOKEN_FILE" in details
-    assert "PULLPILOT_TOKEN" in details
-    assert "precedence" in details
+    assert (
+        body["details"]
+        == "Set the PULLPILOT_TOKEN environment variable and send an Authorization header."
+    )
 
     status, body = api.handle_request("PUT", "/config", {"values": {}})
     assert status == HTTPStatus.UNAUTHORIZED
@@ -163,54 +162,6 @@ def test_token_auth_rejects_invalid_token(
     )
     assert status == HTTPStatus.UNAUTHORIZED
     assert body["error"] == "unauthorized"
-
-
-def test_authenticator_loads_token_from_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    token_file = tmp_path / "token.txt"
-    token_file.write_text("  file-token \n", encoding="utf-8")
-    monkeypatch.setenv("PULLPILOT_TOKEN_FILE", str(token_file))
-    monkeypatch.setenv("PULLPILOT_TOKEN", "env-token")
-
-    authenticator = Authenticator.from_env()
-
-    assert authenticator.token == "file-token"
-
-
-def test_authenticator_logs_error_when_token_file_missing(
-    caplog: pytest.LogCaptureFixture,
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    missing_file = tmp_path / "no-token.txt"
-    monkeypatch.setenv("PULLPILOT_TOKEN_FILE", str(missing_file))
-    monkeypatch.setenv("PULLPILOT_TOKEN", "fallback-token")
-    caplog.set_level(logging.ERROR, logger="pullpilot.app")
-
-    authenticator = Authenticator.from_env()
-
-    assert authenticator.token == "fallback-token"
-    expanded_path = Path(os.path.expandvars(str(missing_file))).expanduser()
-    assert any(
-        "Failed to read token file" in record.getMessage() and str(expanded_path) in record.getMessage()
-        for record in caplog.records
-    )
-
-
-@pytest.mark.parametrize("token_file", ["~/token.txt", "$HOME/token.txt"])
-def test_authenticator_expands_token_file_path(
-    token_file: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    resolved_home = tmp_path / "home"
-    resolved_home.mkdir()
-    token_path = resolved_home / "token.txt"
-    token_path.write_text("  expanded-token  \n", encoding="utf-8")
-    monkeypatch.setenv("HOME", str(resolved_home))
-    monkeypatch.setenv("PULLPILOT_TOKEN_FILE", token_file)
-    monkeypatch.setenv("PULLPILOT_TOKEN", "fallback-token")
-
-    authenticator = Authenticator.from_env()
-
-    assert authenticator.token == "expanded-token"
 
 
 def test_token_auth_allows_token_scheme(
@@ -273,42 +224,11 @@ def test_ui_endpoints_require_auth_when_token_set(
 def test_authenticator_ignores_wrapping_quotes_in_token(
     raw_token: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.delenv("PULLPILOT_TOKEN_FILE", raising=False)
     monkeypatch.setenv("PULLPILOT_TOKEN", raw_token)
 
     authenticator = Authenticator.from_env()
 
     assert authenticator.token == "secreto"
-
-
-def test_authenticator_reads_token_file_with_wrapped_path(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    home_dir = tmp_path / "home"
-    home_dir.mkdir()
-    token_dir = home_dir / "tokens"
-    token_dir.mkdir()
-    token_path = token_dir / "token.txt"
-    token_path.write_text("wrapped-token\n", encoding="utf-8")
-
-    monkeypatch.setenv("HOME", str(home_dir))
-    monkeypatch.setenv("PULLPILOT_TOKEN_FILE", "  '~/tokens/token.txt'  ")
-    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
-
-    authenticator = Authenticator.from_env()
-
-    assert authenticator.token == "wrapped-token"
-
-
-def test_authenticator_skips_empty_token_file_after_normalization(
-    monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("PULLPILOT_TOKEN_FILE", '  ""  ')
-    monkeypatch.setenv("PULLPILOT_TOKEN", "fallback-token")
-
-    authenticator = Authenticator.from_env()
-
-    assert authenticator.token == "fallback-token"
 
 
 def test_ui_logs_returns_internal_error_when_store_fails(
