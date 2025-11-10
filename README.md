@@ -42,7 +42,7 @@ docker run --rm -p 8000:8000 ghcr.io/svnz0x/pullpilot:latest
 ## Variables y configuración
 
 - La imagen monta por defecto un volumen nombrado `pullpilot_config` en `/app/config`. En el primer arranque se copian automáticamente los archivos por defecto y, a partir de ahí, se preservan los cambios que hagas desde la API o editando el volumen. Los nuevos archivos añadidos a `config.defaults` (incluidos los subdirectorios) se sincronizan en arranques posteriores sin sobrescribir tus personalizaciones existentes.
-- Los ajustes relacionados con credenciales pueden definirse mediante `PULLPILOT_TOKEN` o `PULLPILOT_TOKEN_FILE` (ver detalles más adelante). El resto de opciones se controlan desde la interfaz de usuario o modificando directamente los archivos persistidos en el volumen.
+- Los ajustes relacionados con credenciales se definen mediante `PULLPILOT_TOKEN` (ver detalles más adelante). El resto de opciones se controlan desde la interfaz de usuario o modificando directamente los archivos persistidos en el volumen.
 - El esquema JSON en `config/schema.json` documenta cada opción.
 - Para validación rápida: `python scripts/validate_config.py`
 - Los archivos auxiliares multilinea (p. ej. `COMPOSE_PROJECTS_FILE`) deben residir dentro del mismo directorio de configuración (por defecto `/app/config/`). La API rechazará rutas fuera de ese árbol o que incluyan `..`.
@@ -57,10 +57,8 @@ docker run --rm -p 8000:8000 ghcr.io/svnz0x/pullpilot:latest
 
 ### Autenticación de la API
 
-- **Credenciales obligatorias**: la API de configuración requiere un token bearer establecido mediante `PULLPILOT_TOKEN` o un archivo referenciado desde `PULLPILOT_TOKEN_FILE`. Si no se define ninguno, la aplicación rechazará todas las peticiones protegidas.
-- **Orden de precedencia**: cuando ambas variables están presentes, `PULLPILOT_TOKEN_FILE` tiene prioridad y su contenido (recortado) se utiliza como token. Si la ruta no existe o no puede leerse, se registrará un error y se retrocederá al valor de `PULLPILOT_TOKEN`.
-- **Comillas opcionales**: no es necesario envolver las variables con comillas, pero si lo haces (por ejemplo en un fichero `.env`), el backend las descartará automáticamente antes de validar el token o resolver la ruta del fichero.
-- **Expansión de rutas**: la ruta indicada en `PULLPILOT_TOKEN_FILE` admite `~` y variables de entorno (por ejemplo `"$HOME/token.txt"`). El registro de errores reflejará la ruta tras expandirla para facilitar el diagnóstico.
+- **Credenciales obligatorias**: la API de configuración requiere un token bearer establecido mediante la variable de entorno `PULLPILOT_TOKEN`. Si no se define, la aplicación rechazará todas las peticiones protegidas.
+- **Carga desde `.env`**: puedes declarar `PULLPILOT_TOKEN=...` en un fichero `.env` y referenciarlo desde `docker-compose` u otros gestores. Las comillas simples o dobles son opcionales; si las incluyes, el backend las eliminará automáticamente antes de validar el token.
 - La interfaz web local muestra un banner para introducir ese token. Por defecto solo se conserva en memoria, pero puedes marcar «Recordar token» para guardarlo en `localStorage` y reutilizarlo en ese navegador. Evita recordar el token en equipos compartidos o públicos. Mientras no se valide el token, la UI permanece deshabilitada y cualquier petición 401 solicitará nuevamente las credenciales antes de reintentarse automáticamente.
 
 ## Desarrollo local
@@ -93,7 +91,7 @@ volumes:
   pullpilot_config:
 ```
 
-> ℹ️ **¿Por qué los volúmenes son de lectura/escritura y se monta el socket de Docker?** La API expone endpoints para actualizar la configuración (`updater.conf`), por lo que necesita permisos de escritura sobre ese archivo y el directorio de proyectos. También genera registros bajo `logs/`. Además, la aplicación debe comunicarse con el daemon de Docker para recrear servicios y comprobar imágenes, de ahí el montaje del socket `/var/run/docker.sock`. Si prefieres gestionar tus propios secretos o rutas, edita los montajes del ejemplo anterior según tus necesidades.
+> ℹ️ **¿Por qué los volúmenes son de lectura/escritura y se monta el socket de Docker?** La API expone endpoints para actualizar la configuración (`updater.conf`), por lo que necesita permisos de escritura sobre ese archivo y el directorio de proyectos. También genera registros bajo `logs/`. Además, la aplicación debe comunicarse con el daemon de Docker para recrear servicios y comprobar imágenes, de ahí el montaje del socket `/var/run/docker.sock`. Si prefieres gestionar tus propios secretos o rutas (incluido el uso de un `.env` con `PULLPILOT_TOKEN`), edita los montajes del ejemplo anterior según tus necesidades.
 
 ## Licencia
 
