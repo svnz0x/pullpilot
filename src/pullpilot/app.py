@@ -58,7 +58,13 @@ class Authenticator:
 
 
 def _match_token(expected: str, header: str) -> bool:
-    scheme, _, value = header.partition(" ")
+    normalized = header.strip()
+    if not normalized:
+        return False
+    parts = normalized.split(None, 1)
+    if len(parts) != 2:
+        return False
+    scheme, value = parts
     if not value:
         return False
     if scheme.lower() in {"bearer", "token"}:
