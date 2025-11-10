@@ -76,8 +76,9 @@ services:
   pullpilot:
     image: ghcr.io/svnz0x/pullpilot:latest
     # Usa "build: ." si prefieres construir la imagen localmente
+    env_file: .env
     environment:
-      PULLPILOT_TOKEN: ${PULLPILOT_TOKEN:-}
+      PULLPILOT_TOKEN: ${PULLPILOT_TOKEN:?Define PULLPILOT_TOKEN en .env}
     ports:
       - "8000:8000"
     volumes:
@@ -92,6 +93,7 @@ volumes:
 ```
 
 > ℹ️ **¿Por qué los volúmenes son de lectura/escritura y se monta el socket de Docker?** La API expone endpoints para actualizar la configuración (`updater.conf`), por lo que necesita permisos de escritura sobre ese archivo y el directorio de proyectos. También genera registros bajo `logs/`. Además, la aplicación debe comunicarse con el daemon de Docker para recrear servicios y comprobar imágenes, de ahí el montaje del socket `/var/run/docker.sock`. Si prefieres gestionar tus propios secretos o rutas (incluido el uso de un `.env` con `PULLPILOT_TOKEN`), edita los montajes del ejemplo anterior según tus necesidades.
+> Compose tomará automáticamente el valor de `PULLPILOT_TOKEN` del fichero `.env` especificado en `env_file`.
 
 ## Licencia
 
