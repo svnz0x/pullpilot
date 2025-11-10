@@ -52,6 +52,13 @@ def test_save_rejects_invalid_cron(schedule_path: Path) -> None:
         store.save({"mode": "cron", "expression": "bad"})
 
 
+def test_save_rejects_datetime_when_cron(schedule_path: Path) -> None:
+    store = ScheduleStore(schedule_path)
+    with pytest.raises(ScheduleValidationError) as excinfo:
+        store.save({"mode": "cron", "expression": "5 4 * * *", "datetime": "2030-01-01T00:00:00Z"})
+    assert excinfo.value.field == "datetime"
+
+
 def test_save_rejects_every_without_interval(schedule_path: Path) -> None:
     store = ScheduleStore(schedule_path)
     with pytest.raises(ScheduleValidationError):
@@ -91,6 +98,13 @@ def test_save_normalizes_datetime(schedule_path: Path) -> None:
     saved = store.save({"mode": "once", "datetime": "2035-12-01T23:15:00+02:00"})
     assert saved.mode == "once"
     assert saved.datetime.endswith("+00:00")
+
+
+def test_save_rejects_expression_when_once(schedule_path: Path) -> None:
+    store = ScheduleStore(schedule_path)
+    with pytest.raises(ScheduleValidationError) as excinfo:
+        store.save({"mode": "once", "datetime": "2035-12-01T23:15:00+02:00", "expression": "@daily"})
+    assert excinfo.value.field == "expression"
 
 
 def test_default_path_uses_config_location(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

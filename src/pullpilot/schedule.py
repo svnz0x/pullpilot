@@ -96,6 +96,11 @@ class ScheduleStore:
             raise ScheduleValidationError("Selecciona un modo válido.", field="mode")
 
         if mode == "cron":
+            if "datetime" in payload and payload.get("datetime") not in (None, ""):
+                raise ScheduleValidationError(
+                    "El campo datetime no es compatible con el modo cron.",
+                    field="datetime",
+                )
             expression = payload.get("expression")
             if not isinstance(expression, str) or not expression.strip():
                 raise ScheduleValidationError("Indica una expresión cron.", field="expression")
@@ -105,6 +110,11 @@ class ScheduleStore:
             return ScheduleData(mode=mode, expression=expression)
 
         datetime_value = payload.get("datetime")
+        if "expression" in payload and payload.get("expression") not in (None, ""):
+            raise ScheduleValidationError(
+                "El campo expression no es compatible con el modo once.",
+                field="expression",
+            )
         if not isinstance(datetime_value, str) or not datetime_value.strip():
             raise ScheduleValidationError("Indica una fecha y hora válidas.", field="datetime")
         normalized = _normalize_datetime(datetime_value)
