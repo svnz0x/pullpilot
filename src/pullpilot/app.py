@@ -8,6 +8,7 @@ import os
 from collections import deque
 from datetime import datetime, timezone
 from http import HTTPStatus
+from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Tuple
 
 from .config import ConfigData, ConfigError, ConfigStore, ValidationError
