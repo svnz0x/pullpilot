@@ -1,3 +1,4 @@
+import logging
 from http import HTTPStatus
 from pathlib import Path
 from typing import Mapping
@@ -7,7 +8,7 @@ import pytest
 
 from pullpilot.config import ConfigError, ConfigStore
 from pullpilot.schedule import ScheduleStore
-from pullpilot.app import ConfigAPI, create_app
+from pullpilot.app import Authenticator, ConfigAPI, create_app
 
 @pytest.fixture()
 def store(tmp_path: Path) -> ConfigStore:
@@ -157,6 +158,33 @@ def test_token_auth_rejects_invalid_token(
     )
     assert status == HTTPStatus.UNAUTHORIZED
     assert body["error"] == "unauthorized"
+
+
+def test_authenticator_loads_token_from_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    token_file = tmp_path / "token.txt"
+    token_file.write_text("  file-token \n", encoding="utf-8")
+    monkeypatch.setenv("PULLPILOT_TOKEN_FILE", str(token_file))
+    monkeypatch.setenv("PULLPILOT_TOKEN", "env-token")
+
+    authenticator = Authenticator.from_env()
+
+    assert authenticator.token == "file-token"
+
+
+def test_authenticator_logs_error_when_token_file_missing(
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    missing_file = tmp_path / "no-token.txt"
+    monkeypatch.setenv("PULLPILOT_TOKEN_FILE", str(missing_file))
+    monkeypatch.setenv("PULLPILOT_TOKEN", "fallback-token")
+    caplog.set_level(logging.ERROR, logger="pullpilot.app")
+
+    authenticator = Authenticator.from_env()
+
+    assert authenticator.token == "fallback-token"
+    assert any("Failed to read token file" in record.getMessage() for record in caplog.records)
 
 
 def test_token_auth_allows_token_scheme(

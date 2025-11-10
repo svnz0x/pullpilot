@@ -16,6 +16,9 @@ from .resources import get_resource_path
 from .schedule import DEFAULT_SCHEDULE_PATH, ScheduleStore, ScheduleValidationError
 
 TOKEN_ENV = "PULLPILOT_TOKEN"
+TOKEN_FILE_ENV = "PULLPILOT_TOKEN_FILE"
+
+LOGGER = logging.getLogger("pullpilot.app")
 
 
 class Authenticator:
@@ -28,9 +31,23 @@ class Authenticator:
     def from_env(cls) -> "Authenticator":
         """Create an authenticator from environment variables.
 
-        The handler supports bearer-token authentication using the
-        ``PULLPILOT_TOKEN`` environment variable.
+        The handler supports bearer-token authentication using either the
+        ``PULLPILOT_TOKEN_FILE`` (preferred) or ``PULLPILOT_TOKEN`` environment
+        variables. If the token file cannot be read the value from
+        ``PULLPILOT_TOKEN`` is used instead.
         """
+
+        token_file = os.getenv(TOKEN_FILE_ENV)
+        if token_file:
+            path = Path(token_file)
+            try:
+                token_raw = path.read_text(encoding="utf-8")
+            except OSError as exc:
+                LOGGER.error("Failed to read token file '%s': %s", path, exc)
+            else:
+                token = token_raw.strip()
+                if token:
+                    return cls(token=token)
 
         token_raw = os.getenv(TOKEN_ENV, "")
         token = token_raw.strip() or None
@@ -75,9 +92,6 @@ def _match_token(expected: str, header: str) -> bool:
 DEFAULT_CONFIG_PATH = get_resource_path("config/updater.conf")
 DEFAULT_SCHEMA_PATH = get_resource_path("config/schema.json")
 MAX_UI_LOG_LINES = 400
-
-LOGGER = logging.getLogger("pullpilot.app")
-
 
 class ConfigAPI:
     """Lightweight request handler used both for tests and WSGI bridges."""
