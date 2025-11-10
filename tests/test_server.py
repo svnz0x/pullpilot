@@ -269,6 +269,48 @@ def test_ui_endpoints_require_auth_when_token_set(
     assert status == HTTPStatus.OK
 
 
+@pytest.mark.parametrize("raw_token", ['"secreto"', "'secreto'"])
+def test_authenticator_ignores_wrapping_quotes_in_token(
+    raw_token: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("PULLPILOT_TOKEN_FILE", raising=False)
+    monkeypatch.setenv("PULLPILOT_TOKEN", raw_token)
+
+    authenticator = Authenticator.from_env()
+
+    assert authenticator.token == "secreto"
+
+
+def test_authenticator_reads_token_file_with_wrapped_path(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    home_dir = tmp_path / "home"
+    home_dir.mkdir()
+    token_dir = home_dir / "tokens"
+    token_dir.mkdir()
+    token_path = token_dir / "token.txt"
+    token_path.write_text("wrapped-token\n", encoding="utf-8")
+
+    monkeypatch.setenv("HOME", str(home_dir))
+    monkeypatch.setenv("PULLPILOT_TOKEN_FILE", "  '~/tokens/token.txt'  ")
+    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
+
+    authenticator = Authenticator.from_env()
+
+    assert authenticator.token == "wrapped-token"
+
+
+def test_authenticator_skips_empty_token_file_after_normalization(
+    monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PULLPILOT_TOKEN_FILE", '  ""  ')
+    monkeypatch.setenv("PULLPILOT_TOKEN", "fallback-token")
+
+    authenticator = Authenticator.from_env()
+
+    assert authenticator.token == "fallback-token"
+
+
 def test_ui_logs_returns_internal_error_when_store_fails(
     auth_headers: Mapping[str, str],
     monkeypatch: pytest.MonkeyPatch,
