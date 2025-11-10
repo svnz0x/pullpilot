@@ -8,7 +8,6 @@ import os
 from collections import deque
 from datetime import datetime, timezone
 from http import HTTPStatus
-from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Tuple
 
 from .config import ConfigData, ConfigError, ConfigStore, ValidationError
@@ -16,7 +15,6 @@ from .resources import get_resource_path
 from .schedule import DEFAULT_SCHEDULE_PATH, ScheduleStore, ScheduleValidationError
 
 TOKEN_ENV = "PULLPILOT_TOKEN"
-TOKEN_FILE_ENV = "PULLPILOT_TOKEN_FILE"
 
 LOGGER = logging.getLogger("pullpilot.app")
 
@@ -44,24 +42,9 @@ class Authenticator:
     def from_env(cls) -> "Authenticator":
         """Create an authenticator from environment variables.
 
-        The handler supports bearer-token authentication using either the
-        ``PULLPILOT_TOKEN_FILE`` (preferred) or ``PULLPILOT_TOKEN`` environment
-        variables. If the token file cannot be read the value from
-        ``PULLPILOT_TOKEN`` is used instead.
+        The handler supports bearer-token authentication using the
+        ``PULLPILOT_TOKEN`` environment variable.
         """
-
-        token_file = _normalize_env_value(os.getenv(TOKEN_FILE_ENV))
-        if token_file:
-            expanded_token_file = os.path.expandvars(token_file)
-            path = Path(expanded_token_file).expanduser()
-            try:
-                token_raw = path.read_text(encoding="utf-8")
-            except OSError as exc:
-                LOGGER.error("Failed to read token file '%s': %s", path, exc)
-            else:
-                token = token_raw.strip()
-                if token:
-                    return cls(token=token)
 
         token = _normalize_env_value(os.getenv(TOKEN_ENV))
         return cls(token=token)
@@ -150,8 +133,7 @@ class ConfigAPI:
                         "error": "missing credentials",
                         "details": (
                             "Set the "
-                            f"{TOKEN_FILE_ENV} (preferred) or {TOKEN_ENV} environment variable "
-                            f"(values from {TOKEN_FILE_ENV} take precedence) and send an Authorization header."
+                            f"{TOKEN_ENV} environment variable and send an Authorization header."
                         ),
                     },
                 )
