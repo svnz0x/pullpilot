@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hmac
 import json
+import logging
 import os
 from collections import deque
 from datetime import datetime, timezone
@@ -10,7 +11,7 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Tuple
 
-from .config import ConfigData, ConfigStore, ValidationError
+from .config import ConfigData, ConfigError, ConfigStore, ValidationError
 from .resources import get_resource_path
 from .schedule import DEFAULT_SCHEDULE_PATH, ScheduleStore, ScheduleValidationError
 
@@ -68,6 +69,8 @@ def _match_token(expected: str, header: str) -> bool:
 DEFAULT_CONFIG_PATH = get_resource_path("config/updater.conf")
 DEFAULT_SCHEMA_PATH = get_resource_path("config/schema.json")
 MAX_UI_LOG_LINES = 400
+
+LOGGER = logging.getLogger("pullpilot.app")
 
 
 class ConfigAPI:
@@ -181,7 +184,21 @@ class ConfigAPI:
                 if candidate is not None and not isinstance(candidate, str):
                     return HTTPStatus.BAD_REQUEST, {"error": "'name' must be a string"}
                 selected_name = candidate
-            return HTTPStatus.OK, self._gather_logs(selected_name)
+            try:
+                logs_payload = self._gather_logs(selected_name)
+            except ConfigError as exc:
+                LOGGER.warning("Configuration error while gathering logs", exc_info=True)
+                return HTTPStatus.INTERNAL_SERVER_ERROR, {
+                    "error": "failed to load logs",
+                    "details": str(exc),
+                }
+            except Exception as exc:
+                LOGGER.warning("Unexpected error while gathering logs", exc_info=True)
+                return HTTPStatus.INTERNAL_SERVER_ERROR, {
+                    "error": "failed to load logs",
+                    "details": str(exc),
+                }
+            return HTTPStatus.OK, logs_payload
 
         if path in {"/", "/ui"}:
             return HTTPStatus.OK, {"message": "ui"}

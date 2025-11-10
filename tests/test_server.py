@@ -5,7 +5,7 @@ from typing import Mapping
 
 import pytest
 
-from pullpilot.config import ConfigStore
+from pullpilot.config import ConfigError, ConfigStore
 from pullpilot.schedule import ScheduleStore
 from pullpilot.app import ConfigAPI, create_app
 
@@ -191,6 +191,24 @@ def test_ui_endpoints_require_auth_when_token_set(
 
     status, body = api.handle_request("GET", "/ui/logs", headers=headers)
     assert status == HTTPStatus.OK
+
+
+def test_ui_logs_returns_internal_error_when_store_fails(
+    auth_headers: Mapping[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    store: ConfigStore,
+    schedule_store: ScheduleStore,
+) -> None:
+    api = ConfigAPI(store=store, schedule_store=schedule_store)
+
+    def failing_load() -> None:
+        raise ConfigError("boom")
+
+    monkeypatch.setattr(api.store, "load", failing_load)
+
+    status, body = api.handle_request("GET", "/ui/logs", headers=auth_headers)
+    assert status == HTTPStatus.INTERNAL_SERVER_ERROR
+    assert body == {"error": "failed to load logs", "details": "boom"}
 
 
 def test_ui_auth_check_allows_token_validation_when_config_fails(
