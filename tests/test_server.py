@@ -171,6 +171,28 @@ def test_token_auth_allows_token_scheme(
     assert status == HTTPStatus.OK
 
 
+@pytest.mark.parametrize(
+    "header_value",
+    [
+        "Bearer super-secret  ",
+        "  Bearer    super-secret",
+        "Bearer super-secret\n",
+        "Bearer\t super-secret\n\n",
+    ],
+)
+def test_token_auth_allows_headers_with_ows(
+    header_value: str,
+    monkeypatch: pytest.MonkeyPatch,
+    store: ConfigStore,
+    schedule_store: ScheduleStore,
+) -> None:
+    monkeypatch.setenv("PULLPILOT_TOKEN", "super-secret")
+    api = ConfigAPI(store=store, schedule_store=schedule_store)
+
+    status, body = api.handle_request("GET", "/config", headers={"Authorization": header_value})
+    assert status == HTTPStatus.OK
+
+
 def test_ui_endpoints_require_auth_when_token_set(
     monkeypatch: pytest.MonkeyPatch, store: ConfigStore, schedule_store: ScheduleStore
 ) -> None:
