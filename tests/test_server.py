@@ -1,4 +1,5 @@
 import logging
+import os
 from http import HTTPStatus
 from pathlib import Path
 from typing import Mapping
@@ -184,7 +185,28 @@ def test_authenticator_logs_error_when_token_file_missing(
     authenticator = Authenticator.from_env()
 
     assert authenticator.token == "fallback-token"
-    assert any("Failed to read token file" in record.getMessage() for record in caplog.records)
+    expanded_path = Path(os.path.expandvars(str(missing_file))).expanduser()
+    assert any(
+        "Failed to read token file" in record.getMessage() and str(expanded_path) in record.getMessage()
+        for record in caplog.records
+    )
+
+
+@pytest.mark.parametrize("token_file", ["~/token.txt", "$HOME/token.txt"])
+def test_authenticator_expands_token_file_path(
+    token_file: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    resolved_home = tmp_path / "home"
+    resolved_home.mkdir()
+    token_path = resolved_home / "token.txt"
+    token_path.write_text("  expanded-token  \n", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(resolved_home))
+    monkeypatch.setenv("PULLPILOT_TOKEN_FILE", token_file)
+    monkeypatch.setenv("PULLPILOT_TOKEN", "fallback-token")
+
+    authenticator = Authenticator.from_env()
+
+    assert authenticator.token == "expanded-token"
 
 
 def test_token_auth_allows_token_scheme(
