@@ -11,10 +11,12 @@ services:
       - "8000:8000"
     volumes:
       - pullpilot_config:/app/config:rw
-      - ./logs:/var/log/docker-updater:rw
-      - ./compose-projects:/srv/compose:rw
+      - pullpilot_logs:/var/log/docker-updater:rw
+      - pullpilot_projects:/srv/compose:rw
       - /var/run/docker.sock:/var/run/docker.sock:rw
     restart: unless-stopped
 
 volumes:
   pullpilot_config:
+  pullpilot_logs:
+  pullpilot_projects:

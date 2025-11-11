@@ -88,13 +88,15 @@ services:
       - "8000:8000"
     volumes:
       - pullpilot_config:/app/config:rw
-      - ./logs:/var/log/docker-updater:rw
-      - ./compose-projects:/srv/compose:rw
+      - pullpilot_logs:/var/log/docker-updater:rw
+      - pullpilot_projects:/srv/compose:rw
       - /var/run/docker.sock:/var/run/docker.sock:rw
     restart: unless-stopped
 
 volumes:
   pullpilot_config:
+  pullpilot_logs:
+  pullpilot_projects:
 ```
 
 > ℹ️ **¿Por qué los volúmenes son de lectura/escritura y se monta el socket de Docker?** La API expone endpoints para actualizar la configuración (`updater.conf`), por lo que necesita permisos de escritura sobre ese archivo y el directorio de proyectos. También genera registros bajo `logs/`. Además, la aplicación debe comunicarse con el daemon de Docker para recrear servicios y comprobar imágenes, de ahí el montaje del socket `/var/run/docker.sock`. Si prefieres gestionar tus propios secretos o rutas (incluido el uso de un `.env` con `PULLPILOT_TOKEN`), edita los montajes del ejemplo anterior según tus necesidades.
