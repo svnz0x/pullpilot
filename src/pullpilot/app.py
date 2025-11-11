@@ -75,12 +75,16 @@ def _load_token_from_env_files() -> Optional[str]:
             stripped = line.strip()
             if not stripped or stripped.startswith("#"):
                 continue
+            if stripped.startswith("export"):
+                remainder = stripped[len("export"):]
+                if not remainder or remainder[0].isspace():
+                    stripped = remainder.lstrip()
             if "=" not in stripped:
                 continue
             key, raw_value = stripped.split("=", 1)
             if key.strip() != TOKEN_ENV:
                 continue
-            normalized = _normalize_env_value(raw_value)
+            normalized = _normalize_env_value(_strip_inline_comments(raw_value))
             if normalized is None:
                 continue
             os.environ[TOKEN_ENV] = normalized
@@ -162,6 +166,27 @@ def _load_token_from_configured_sources() -> Optional[str]:
         return token
 
     return _normalize_env_value(os.environ.get(TOKEN_ENV))
+
+
+def _strip_inline_comments(value: str) -> str:
+    """Remove inline comments from ``.env`` style assignments."""
+
+    result = []
+    quote_char: Optional[str] = None
+    for char in value:
+        if quote_char:
+            if char == quote_char:
+                quote_char = None
+            result.append(char)
+            continue
+        if char in {'"', "'"}:
+            quote_char = char
+            result.append(char)
+            continue
+        if char == "#":
+            break
+        result.append(char)
+    return "".join(result)
 
 
 class Authenticator:
