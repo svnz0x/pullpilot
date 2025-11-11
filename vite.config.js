@@ -1,14 +1,14 @@
 import { defineConfig } from "vite";
 import { resolve } from "path";
 
-const uiRoot = resolve(__dirname, "src/pullpilot/resources/ui");
+const uiRoot = resolve(__dirname, "ui");
 
 export default defineConfig({
   root: uiRoot,
   publicDir: false,
   base: "/ui/",
   build: {
-    outDir: "dist",
+    outDir: "../src/pullpilot/resources/ui/dist",
     emptyOutDir: true,
     assetsDir: "assets",
     manifest: true,

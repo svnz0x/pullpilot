@@ -8,9 +8,10 @@ COPY package.json vite.config.js ./
 
 RUN npm install
 
-COPY src/pullpilot/resources/ui ./src/pullpilot/resources/ui
+COPY ui ./ui
 
-RUN npm run build
+RUN npm run build \
+    && rm -rf node_modules
 
 # Fijo a bookworm para evitar que el tag "slim" salte a trixie y rompa APT
 FROM python:3.11-slim-bookworm AS pullpilot
