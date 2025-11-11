@@ -17,7 +17,7 @@ vive dentro del contenedor (mediante volúmenes persistentes), por lo que tras u
 .
 ├─ .github/workflows/ghcr-publish.yml   # CI para construir y publicar a GHCR
 ├─ config/                              # Config por defecto y esquema
-├─ scripts/                             # Scripts de utilidades (p. ej. updater.sh)
+├─ scripts/                             # Wrappers y utilidades (p. ej. updater.sh → canonical empaquetado)
 ├─ src/pullpilot/                       # Código de la API y utilidades
 ├─ tests/                               # Pruebas
 ├─ Dockerfile                           # Imagen de la app

@@ -4,7 +4,7 @@ from pathlib import Path
 from pullpilot.app import ConfigAPI
 from pullpilot.resources import get_resource_path
 from pullpilot.schedule import ScheduleStore
-from pullpilot.scheduler.watch import resolve_default_updater_command
+from pullpilot.scheduler.watch import DEFAULT_COMMAND, resolve_default_updater_command
 
 
 def test_bundled_files_accessible(monkeypatch):
@@ -30,4 +30,4 @@ def test_bundled_files_accessible(monkeypatch):
     monkeypatch.setattr(
         "pullpilot.scheduler.watch._project_root", lambda: Path("/__does_not_exist__"),
     )
-    assert Path(resolve_default_updater_command()) == get_resource_path("scripts/updater.sh")
+    assert resolve_default_updater_command() == DEFAULT_COMMAND
