@@ -478,13 +478,23 @@ class ConfigAPI:
         multiline = payload.get("multiline")
         if multiline is not None and not isinstance(multiline, Mapping):
             return HTTPStatus.BAD_REQUEST, {"error": "'multiline' must be an object"}
+
+        try:
+            sanitized_values = self.store._validate(values)
+        except ValidationError as exc:
+            return HTTPStatus.BAD_REQUEST, {"error": "validation failed", "details": exc.errors}
+
+        sanitized_multiline = dict(multiline or {})
+        directory_error = self._ensure_required_directories(
+            ConfigData(sanitized_values, sanitized_multiline)
+        )
+        if directory_error is not None:
+            return directory_error
+
         try:
             data = self.store.save(values, multiline)
         except ValidationError as exc:
             return HTTPStatus.BAD_REQUEST, {"error": "validation failed", "details": exc.errors}
-        directory_error = self._ensure_required_directories(data)
-        if directory_error is not None:
-            return directory_error
         return HTTPStatus.OK, self._serialize(data)
 
     def _handle_schedule_put(self, payload: Optional[Mapping[str, Any]]) -> Tuple[int, Dict[str, Any]]:
