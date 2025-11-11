@@ -121,6 +121,36 @@ def test_write_cron_file_preserves_environment_assignments(tmp_path: Path) -> No
     assert cron_path.read_text(encoding="utf-8") == expected
 
 
+def test_write_cron_file_replace_failure_keeps_existing_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    schedule_path = tmp_path / "schedule.json"
+    schedule_path.write_text("{}", encoding="utf-8")
+
+    cron_path = tmp_path / "pullpilot.cron"
+    cron_path.write_text("ORIGINAL\n", encoding="utf-8")
+
+    watcher = SchedulerWatcher(schedule_path, cron_path, "echo hi", 1.0)
+
+    logs: List[str] = []
+
+    def capture(message: str) -> None:
+        logs.append(message)
+
+    monkeypatch.setattr("pullpilot.scheduler.watch._log", capture)
+
+    def failing_replace(src: Any, dst: Any) -> None:
+        raise OSError("boom")
+
+    monkeypatch.setattr("pullpilot.scheduler.watch.os.replace", failing_replace)
+
+    with pytest.raises(OSError):
+        watcher._write_cron_file("* * * * *")
+
+    assert cron_path.read_text(encoding="utf-8") == "ORIGINAL\n"
+    assert any("No se pudo reemplazar el archivo cron temporal" in entry for entry in logs)
+
+
 def test_watcher_default_schedule_path_matches_store_default() -> None:
     assert DEFAULT_SCHEDULE_FILE == DEFAULT_SCHEDULE_PATH
 
@@ -184,14 +214,10 @@ def test_cron_write_error_is_logged_and_loop_continues(
 
     monkeypatch.setattr("pullpilot.scheduler.watch._log", capture_log)
 
-    original_write_text = Path.write_text
+    def failing_replace(src: Any, dst: Any) -> None:
+        raise OSError("disk full")
 
-    def failing_write_text(self: Path, *args: Any, **kwargs: Any) -> int:
-        if self == cron_path:
-            raise OSError("disk full")
-        return original_write_text(self, *args, **kwargs)
-
-    monkeypatch.setattr(Path, "write_text", failing_write_text)
+    monkeypatch.setattr("pullpilot.scheduler.watch.os.replace", failing_replace)
 
     class SingleLoopEvent:
         def is_set(self) -> bool:
@@ -205,6 +231,7 @@ def test_cron_write_error_is_logged_and_loop_continues(
     assert watcher.current_signature is None
     assert watcher.process is None
     assert any("No se pudo preparar el archivo cron" in entry for entry in logs)
+    assert any("No se pudo reemplazar el archivo cron temporal" in entry for entry in logs)
     assert all("Iniciando supercronic" not in entry for entry in logs)
 
 
