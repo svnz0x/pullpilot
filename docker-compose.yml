@@ -10,15 +10,13 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - pullpilot_config:/app/config:rw
-      # Monta aquí el directorio de logs que vayas a configurar en la UI
-      # (sustituye ./logs por tu ruta en el host y asegúrate de reutilizar /var/log/docker-updater en la interfaz).
-      - ./logs:/var/log/docker-updater:rw
-      # Monta aquí el directorio de proyectos que vayas a configurar en la UI
-      # (sustituye ./projects por tu ruta en el host y asegúrate de reutilizar /srv/compose en la interfaz).
-      - ./projects:/srv/compose:rw
+      # Directorio persistente con la configuración y los datos definidos desde la UI
+      # (ajusta ./pullpilot-data a tu ruta preferida en el host o declara un volumen nombrado).
+      - ./pullpilot-data:/app/config:rw
       - /var/run/docker.sock:/var/run/docker.sock:rw
     restart: unless-stopped
 
-volumes:
-  pullpilot_config:
+# Si prefieres un volumen nombrado, declara por ejemplo:
+# volumes:
+#   pullpilot_config:
+# y reemplaza el bind-mount anterior por `pullpilot_config:/app/config:rw`.
