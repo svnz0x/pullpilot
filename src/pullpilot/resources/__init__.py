@@ -4,8 +4,12 @@ from __future__ import annotations
 from importlib import resources
 from pathlib import Path
 
+import logging
 import shutil
 import tempfile
+
+
+_LOGGER = logging.getLogger(__name__)
 
 __all__ = ["get_resource_path", "resource_exists"]
 
@@ -19,6 +23,11 @@ def _copy_file(source: resources.abc.Traversable, destination: Path) -> None:
 
 
 def _copy_directory(source: resources.abc.Traversable, destination: Path) -> None:
+    if destination.exists():
+        if destination.is_file() or destination.is_symlink():
+            destination.unlink()
+        else:
+            shutil.rmtree(destination)
     destination.mkdir(parents=True, exist_ok=True)
     for entry in source.iterdir():
         target = destination / entry.name
@@ -33,9 +42,43 @@ def _ensure_cached(relative: str) -> Path:
     target = _CACHE_DIR / relative
     if origin.is_dir():
         _copy_directory(origin, target)
+        _log_cache_state(relative, target)
         return target
     _copy_file(origin, target)
+    _log_cache_state(relative, target)
     return target
+
+
+def _log_cache_state(relative: str, target: Path) -> None:
+    try:
+        if target.is_file():
+            stats = target.stat()
+            _LOGGER.debug(
+                "Cached resource '%s' -> %s (size=%d bytes, mtime_ns=%d)",
+                relative,
+                target,
+                stats.st_size,
+                stats.st_mtime_ns,
+            )
+            return
+
+        files = list(target.rglob("*"))
+        file_count = sum(1 for path in files if path.is_file())
+        total_size = 0
+        for path in files:
+            if path.is_file():
+                total_size += path.stat().st_size
+        stats = target.stat()
+        _LOGGER.debug(
+            "Cached resource directory '%s' -> %s (files=%d, size=%d bytes, mtime_ns=%d)",
+            relative,
+            target,
+            file_count,
+            total_size,
+            stats.st_mtime_ns,
+        )
+    except OSError:
+        _LOGGER.debug("Cached resource '%s' -> %s", relative, target)
 
 
 def get_resource_path(relative: str) -> Path:
