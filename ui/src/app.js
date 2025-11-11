@@ -624,9 +624,71 @@
     return entries;
   };
 
+  const normalizeDetailEntries = (details, fieldContext = null) => {
+    if (details == null) {
+      return [];
+    }
+
+    const results = [];
+    const visit = (value, context) => {
+      if (value == null) {
+        return;
+      }
+
+      const valueType = typeof value;
+
+      if (valueType === "string" || valueType === "number" || valueType === "boolean") {
+        if (context) {
+          results.push({ field: context, message: value });
+        } else {
+          results.push(String(value));
+        }
+        return;
+      }
+
+      if (Array.isArray(value)) {
+        value.forEach((item) => visit(item, context));
+        return;
+      }
+
+      if (valueType === "object") {
+        const knownField = value.field ?? value.name ?? value.key ?? null;
+        const primitiveMessageKey = ["message", "error", "detail"].find((key) => {
+          const candidate = value[key];
+          return (
+            typeof candidate === "string" ||
+            typeof candidate === "number" ||
+            typeof candidate === "boolean"
+          );
+        });
+
+        if (knownField || primitiveMessageKey) {
+          const entry = { ...value };
+          if (!knownField && context) {
+            entry.field = context;
+          }
+          results.push(entry);
+          return;
+        }
+
+        const detailKeys = new Set(["message", "error", "detail", "errors", "non_field_errors"]);
+        Object.entries(value).forEach(([key, nested]) => {
+          const nextContext = detailKeys.has(key) ? context : context || key;
+          visit(nested, nextContext);
+        });
+        return;
+      }
+
+      results.push(String(value));
+    };
+
+    visit(details, fieldContext);
+    return results;
+  };
+
   const applyFieldErrorHighlights = (details) => {
     if (!fieldsContainer) return [];
-    const entries = Array.isArray(details) ? details : details != null ? [details] : [];
+    const entries = normalizeDetailEntries(details);
     const messages = [];
     entries.forEach((entry) => {
       if (entry == null) {
@@ -669,12 +731,109 @@
     return messages;
   };
 
+  const extractFirstText = (value) => {
+    if (value == null) {
+      return "";
+    }
+
+    const valueType = typeof value;
+    if (valueType === "string") {
+      return value.trim();
+    }
+    if (valueType === "number" || valueType === "boolean") {
+      return String(value);
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const text = extractFirstText(item);
+        if (text) {
+          return text;
+        }
+      }
+      return "";
+    }
+    if (valueType === "object") {
+      const prioritized = ["error", "detail", "message", "title"];
+      for (const key of prioritized) {
+        if (Object.prototype.hasOwnProperty.call(value, key)) {
+          const text = extractFirstText(value[key]);
+          if (text) {
+            return text;
+          }
+        }
+      }
+      for (const nested of Object.values(value)) {
+        const text = extractFirstText(nested);
+        if (text) {
+          return text;
+        }
+      }
+    }
+    return "";
+  };
+
+  const selectDetailSource = (data) => {
+    if (data == null) {
+      return null;
+    }
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (typeof data === "object") {
+      if (data.details !== undefined) {
+        return data.details;
+      }
+      if (data.detail !== undefined) {
+        return data.detail;
+      }
+      if (data.errors !== undefined) {
+        return data.errors;
+      }
+      if (Array.isArray(data.message) || (typeof data.message === "object" && data.message !== null)) {
+        return data.message;
+      }
+      if (Array.isArray(data.error) || (typeof data.error === "object" && data.error !== null)) {
+        return data.error;
+      }
+      const excludedKeys = new Set([
+        "error",
+        "detail",
+        "message",
+        "title",
+        "status",
+        "type",
+        "code",
+      ]);
+      const fallbackEntries = Object.entries(data).filter(([key]) => !excludedKeys.has(key));
+      if (fallbackEntries.length) {
+        return Object.fromEntries(fallbackEntries);
+      }
+    }
+    return null;
+  };
+
   const buildErrorStatusPayload = (data) => {
+    const defaultSummary = "No se pudo guardar la configuración.";
+    const detailSource = selectDetailSource(data);
+    const normalizedDetails = normalizeDetailEntries(detailSource);
+
+    const summaryCandidates = [];
+    if (typeof data === "string" || typeof data === "number" || typeof data === "boolean") {
+      summaryCandidates.push(data);
+    } else if (Array.isArray(data)) {
+      summaryCandidates.push(...data);
+    } else if (data && typeof data === "object") {
+      summaryCandidates.push(data.error, data.detail, data.message, data.title);
+    }
+
+    if (!summaryCandidates.length && normalizedDetails.length) {
+      summaryCandidates.push(...normalizedDetails);
+    }
+
     const summary =
-      data && typeof data.error === "string" && data.error.trim().length
-        ? data.error.trim()
-        : "No se pudo guardar la configuración.";
-    const details = applyFieldErrorHighlights(data?.details);
+      summaryCandidates.map((candidate) => extractFirstText(candidate)).find((text) => text?.length) ||
+      defaultSummary;
+    const details = applyFieldErrorHighlights(detailSource);
     return { summary, details };
   };
 
