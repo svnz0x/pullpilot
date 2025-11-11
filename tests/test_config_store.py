@@ -424,3 +424,24 @@ def test_compose_bin_rejects_dangerous_values(
         store.save(values, data.multiline)
 
     assert any(error["field"] == "COMPOSE_BIN" for error in exc.value.errors)
+
+
+def test_validate_config_cli_reports_errors(
+    tmp_path: Path, schema_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_path = tmp_path / "updater.conf"
+    config_path.write_text("UNKNOWN=value\n", encoding="utf-8")
+
+    import importlib.util
+
+    module_path = Path(__file__).resolve().parents[1] / "scripts" / "validate_config.py"
+    spec = importlib.util.spec_from_file_location("validate_config_cli", module_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    exit_code = module.main(["--config", str(config_path), "--schema", str(schema_path)])
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "UNKNOWN" in captured.out
