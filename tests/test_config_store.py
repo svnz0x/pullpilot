@@ -309,6 +309,38 @@ def test_multiline_path_rejects_parent_segments(
     assert any(error["field"] == "COMPOSE_PROJECTS_FILE" for error in exc.value.errors)
 
 
+def test_list_constraints_accept_whitespace_separated_values(
+    tmp_path: Path, schema_path: Path
+) -> None:
+    store = ConfigStore(tmp_path / "updater.conf", schema_path)
+    data = store.load()
+    values = data.values.copy()
+
+    values["EXCLUDE_PATTERNS"] = "vendor tmp cache"
+    result = store.save(values, data.multiline)
+
+    assert result.values["EXCLUDE_PATTERNS"] == "vendor tmp cache"
+
+
+@pytest.mark.parametrize(
+    "exclude_value",
+    ["", "   ", "vendor\ncache", "vendor\rcache"],
+)
+def test_list_constraints_reject_invalid_values(
+    tmp_path: Path, schema_path: Path, exclude_value: str
+) -> None:
+    store = ConfigStore(tmp_path / "updater.conf", schema_path)
+    data = store.load()
+    values = data.values.copy()
+
+    values["EXCLUDE_PATTERNS"] = exclude_value
+
+    with pytest.raises(ValidationError) as exc:
+        store.save(values, data.multiline)
+
+    assert any(error["field"] == "EXCLUDE_PATTERNS" for error in exc.value.errors)
+
+
 def test_compose_bin_accepts_safe_values(tmp_path: Path, schema_path: Path) -> None:
     store = ConfigStore(tmp_path / "updater.conf", schema_path)
     data = store.load()

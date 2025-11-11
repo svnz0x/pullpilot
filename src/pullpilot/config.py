@@ -262,6 +262,8 @@ class ConfigStore:
         constraints = variable.constraints
         if variable.type == "string":
             string_value = str(value)
+            if constraints.get("is_list"):
+                return self._check_list_constraint(variable, string_value)
             if not constraints.get("allow_empty", False) and string_value == "":
                 return "value cannot be empty"
             pattern = constraints.get("pattern")
@@ -293,6 +295,46 @@ class ConfigStore:
                 normalized = "true" if value else "false"
                 if normalized not in allowed_values:
                     return "value must be one of: " + ", ".join(map(str, allowed_values))
+        return None
+
+    def _check_list_constraint(
+        self, variable: SchemaVariable, string_value: str
+    ) -> Optional[str]:
+        constraints = variable.constraints
+        allow_empty = constraints.get("allow_empty", False)
+        if not string_value.strip():
+            return None if allow_empty else "list must contain at least one item"
+        if "\n" in string_value or "\r" in string_value:
+            return "list cannot contain newline characters"
+        separator = constraints.get("list_separator", "whitespace")
+        if separator == "whitespace":
+            items = string_value.split()
+        elif separator == "comma":
+            raw_items = string_value.split(",")
+            items = []
+            for raw_item in raw_items:
+                item = raw_item.strip()
+                if not item:
+                    return "list cannot contain empty items"
+                items.append(item)
+        else:
+            return f"unsupported list separator {separator!r}"
+        if not items:
+            return None if allow_empty else "list must contain at least one item"
+        for item in items:
+            if any(ord(char) < 32 for char in item):
+                return "list cannot contain control characters"
+        min_length = constraints.get("min_length")
+        if min_length is not None and len(items) < int(min_length):
+            return f"list must contain at least {min_length} items"
+        max_length = constraints.get("max_length")
+        if max_length is not None and len(items) > int(max_length):
+            return f"list cannot contain more than {max_length} items"
+        allowed_values = constraints.get("allowed_values")
+        if allowed_values:
+            invalid = [item for item in items if item not in allowed_values]
+            if invalid:
+                return "list contains invalid values: " + ", ".join(map(str, invalid))
         return None
 
     def _normalize_compose_bin(self, value: Any) -> str:
