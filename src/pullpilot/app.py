@@ -482,6 +482,9 @@ class ConfigAPI:
             data = self.store.save(values, multiline)
         except ValidationError as exc:
             return HTTPStatus.BAD_REQUEST, {"error": "validation failed", "details": exc.errors}
+        directory_error = self._ensure_required_directories(data)
+        if directory_error is not None:
+            return directory_error
         return HTTPStatus.OK, self._serialize(data)
 
     def _handle_schedule_put(self, payload: Optional[Mapping[str, Any]]) -> Tuple[int, Dict[str, Any]]:
@@ -504,6 +507,88 @@ class ConfigAPI:
         payload["schema"] = self.store.schema_overview()
         payload["meta"] = {"multiline_fields": self.store.multiline_fields}
         return payload
+
+    def _ensure_required_directories(
+        self, data: ConfigData
+    ) -> Optional[Tuple[int, Dict[str, Any]]]:
+        """Ensure updater directories exist inside the persistent volume.
+
+        ``scripts/updater.sh`` expects the configuration provided via the UI to
+        point to ready-to-use directories.  This helper is invoked right after
+        persisting the configuration to guarantee that both ``BASE_DIR`` and
+        ``LOG_DIR`` exist.  The persistent storage root is derived from
+        ``self.store.config_path.parent``; whenever a configured path resolves
+        outside that tree the request is rejected so operators know they must
+        mount it inside the volume beforehand.
+        """
+
+        try:
+            persistent_root = self.store.config_path.parent.resolve()
+        except OSError:
+            persistent_root = self.store.config_path.parent
+
+        def _error(field: str, message: str) -> Tuple[int, Dict[str, Any]]:
+            return (
+                HTTPStatus.BAD_REQUEST,
+                {
+                    "error": "invalid directory",
+                    "details": [{"field": field, "message": message}],
+                },
+            )
+
+        for field in ("BASE_DIR", "LOG_DIR"):
+            raw_value = data.values.get(field, "")
+            candidate = str(raw_value).strip() if raw_value is not None else ""
+            if not candidate:
+                continue
+            try:
+                target_path = Path(candidate).expanduser()
+            except Exception as exc:  # pragma: no cover - defensive
+                return _error(field, f"No se pudo resolver la ruta '{candidate}': {exc}")
+
+            try:
+                resolved_target = target_path.resolve()
+            except PermissionError as exc:
+                return _error(
+                    field,
+                    (
+                        f"No se pudo acceder al directorio '{candidate}' para validar permisos: {exc}."
+                    ),
+                )
+            except OSError:
+                resolved_target = target_path
+
+            try:
+                resolved_target.relative_to(persistent_root)
+            except ValueError:
+                return _error(
+                    field,
+                    (
+                        f"La ruta debe vivir dentro del volumen persistente '{persistent_root}'. "
+                        "Monta el directorio en esa ubicación antes de guardar la configuración."
+                    ),
+                )
+
+            try:
+                target_path.mkdir(parents=True, exist_ok=True)
+            except PermissionError as exc:
+                return _error(
+                    field,
+                    f"No se pudo crear el directorio '{candidate}' automáticamente: {exc}.",
+                )
+            except OSError as exc:
+                return _error(
+                    field,
+                    f"No se pudo preparar el directorio '{candidate}' automáticamente: {exc}.",
+                )
+
+            if not target_path.is_dir():  # pragma: no cover - defensive
+                return _error(
+                    field,
+                    f"La ruta '{candidate}' no es un directorio accesible tras crearlo automáticamente.",
+                )
+
+        return None
 
 
 def create_app(
