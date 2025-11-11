@@ -425,7 +425,13 @@ class ConfigAPI:
         entries: list[Tuple[Path, os.stat_result]] = []
         try:
             for entry in log_dir_path.iterdir():
-                if not entry.is_file() or entry.suffix != ".log":
+                try:
+                    if not entry.is_file():
+                        continue
+                except OSError:
+                    continue
+                suffixes = entry.suffixes
+                if not suffixes or suffixes[0].lower() != ".log":
                     continue
                 try:
                     stat_result = entry.stat()
