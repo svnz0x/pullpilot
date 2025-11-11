@@ -30,6 +30,13 @@ def schedule_store(tmp_path: Path) -> ScheduleStore:
     return ScheduleStore(schedule_path)
 
 
+@pytest.fixture(autouse=True)
+def fake_ui_resources(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    ui_root = tmp_path / "ui"
+    ui_root.mkdir()
+    monkeypatch.setattr("pullpilot.app.get_resource_path", lambda relative: ui_root)
+
+
 @pytest.fixture()
 def auth_headers(monkeypatch: pytest.MonkeyPatch) -> Mapping[str, str]:
     token = "test-token"
@@ -204,6 +211,42 @@ def test_put_rejects_directories_outside_volume(
     assert any(detail["field"] == "BASE_DIR" for detail in response.get("details", []))
     assert not base_dir.exists()
     assert not log_dir.exists()
+
+
+def test_put_invalid_directory_does_not_modify_config(
+    auth_headers: Mapping[str, str],
+    tmp_path: Path,
+    store: ConfigStore,
+    schedule_store: ScheduleStore,
+) -> None:
+    api = create_app(store=store, schedule_store=schedule_store)
+    status, body = api.handle_request("GET", "/config", headers=auth_headers)
+    assert status == HTTPStatus.OK
+
+    values = dict(body["values"])
+    base_dir = tmp_path / "compose"
+    log_dir = tmp_path / "logs"
+    values["BASE_DIR"] = str(base_dir)
+    values["LOG_DIR"] = str(log_dir)
+
+    status, response = api.handle_request(
+        "PUT", "/config", {"values": values}, headers=auth_headers
+    )
+    assert status == HTTPStatus.OK
+    baseline = store.config_path.read_text(encoding="utf-8")
+
+    invalid_values = dict(values)
+    invalid_values["BASE_DIR"] = str(tmp_path.parent / "escape-base")
+    invalid_values["LOG_DIR"] = str(tmp_path.parent / "escape-logs")
+
+    status, error = api.handle_request(
+        "PUT", "/config", {"values": invalid_values}, headers=auth_headers
+    )
+
+    assert status == HTTPStatus.BAD_REQUEST
+    assert error["error"] == "invalid directory"
+    assert error.get("details")
+    assert store.config_path.read_text(encoding="utf-8") == baseline
 
 
 def test_requests_rejected_without_credentials(
