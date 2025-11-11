@@ -9,13 +9,61 @@ set -Eeuo pipefail
 shopt -s nullglob dotglob
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-DEFAULT_CONF=
-for candidate in "$SCRIPT_DIR/../config/updater.conf" "$SCRIPT_DIR/config/updater.conf" "$SCRIPT_DIR/updater.conf"; do
-  if [[ -z "$DEFAULT_CONF" && -f "$candidate" ]]; then
-    DEFAULT_CONF="$candidate"
+
+find_python() {
+  local candidate
+  if [[ -n "${PULLPILOT_PYTHON-}" ]]; then
+    candidate="${PULLPILOT_PYTHON}"
+    if command -v "$candidate" >/dev/null 2>&1; then
+      printf '%s' "$candidate"
+      return 0
+    fi
   fi
-done
-CONF_FILE="${CONF_FILE:-"${DEFAULT_CONF:-"$SCRIPT_DIR/../config/updater.conf"}"}"
+  for candidate in python3 python; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+      printf '%s' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+discover_default_conf() {
+  local python_bin resource_path
+  if ! python_bin="$(find_python)"; then
+    return 1
+  fi
+  resource_path="$("$python_bin" - <<'PYRES'
+from pullpilot.resources import get_resource_path
+print(get_resource_path("config/updater.conf"))
+PYRES
+)" || return 1
+  [[ -f "$resource_path" ]] || return 1
+  printf '%s' "$resource_path"
+}
+
+DEFAULT_CONF=""
+if [[ -z "${CONF_FILE-}" ]]; then
+  if DEFAULT_CONF="$(discover_default_conf)"; then
+    :
+  else
+    DEFAULT_CONF=""
+  fi
+fi
+
+if [[ -z "${CONF_FILE-}" ]]; then
+  if [[ -n "$DEFAULT_CONF" ]]; then
+    CONF_FILE="$DEFAULT_CONF"
+  else
+    for candidate in "$SCRIPT_DIR/../config/updater.conf" "$SCRIPT_DIR/config/updater.conf" "$SCRIPT_DIR/updater.conf"; do
+      if [[ -f "$candidate" ]]; then
+        CONF_FILE="$candidate"
+        break
+      fi
+    done
+    CONF_FILE="${CONF_FILE:-"$SCRIPT_DIR/../config/updater.conf"}"
+  fi
+fi
 
 # Colores (desactivables con NO_COLOR=1)
 if [[ "${NO_COLOR:-0}" != 1 && -t 1 ]]; then

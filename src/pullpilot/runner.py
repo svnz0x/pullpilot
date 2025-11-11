@@ -20,6 +20,8 @@ from .scheduler.watch import build_watcher
 
 LOGGER = logging.getLogger("pullpilot.runner")
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+LEGACY_CONFIG_DIRNAME = "Legacy - config"
 DEFAULT_CONFIG_TARGET = Path("/app/config")
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 8000
@@ -53,18 +55,14 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
 
 
 def _resolve_config_dir() -> Path:
-    project_config = Path(__file__).resolve().parents[2] / "config"
-    if project_config.exists():
-        return project_config
+    for candidate_name in (LEGACY_CONFIG_DIRNAME, "config"):
+        candidate = PROJECT_ROOT / candidate_name
+        if candidate.exists():
+            return candidate
     return DEFAULT_CONFIG_TARGET
 
 
 def _discover_default_config_dir() -> Optional[Path]:
-    project_root = Path(__file__).resolve().parents[2]
-    for name in ("config.defaults", "config"):
-        candidate = project_root / name
-        if candidate.exists():
-            return candidate
     try:
         resource_path = get_resource_path("config")
     except FileNotFoundError:

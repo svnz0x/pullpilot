@@ -10,6 +10,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+SRC_DIR = REPO_ROOT / "src"
+if SRC_DIR.exists() and str(SRC_DIR) not in sys.path:
+  sys.path.insert(0, str(SRC_DIR))
+
+from pullpilot.resources import get_resource_path
+
 
 @dataclass
 class VariableDefinition:
@@ -211,14 +218,18 @@ def validate_constraints(name: str, value: Any, definition: VariableDefinition, 
   return errors
 
 
-def validate_config(definitions: Dict[str, VariableDefinition], assignments: Dict[str, Tuple[str, int]]) -> int:
+def validate_config(
+  definitions: Dict[str, VariableDefinition],
+  assignments: Dict[str, Tuple[str, int]],
+  schema_path: Path,
+) -> int:
   errors: List[str] = []
 
   schema_names = set(definitions.keys())
   for key in assignments:
     if key not in schema_names:
       value, lineno = assignments[key]
-      errors.append(f"{key} (línea {lineno}) no está definido en config/schema.json")
+      errors.append(f"{key} (línea {lineno}) no está definido en {schema_path}")
 
   for name, definition in definitions.items():
     raw = assignments.get(name)
@@ -233,7 +244,7 @@ def validate_config(definitions: Dict[str, VariableDefinition], assignments: Dic
       print(f"ERROR: {err}")
     return 1
 
-  print("Configuración válida según config/schema.json")
+  print(f"Configuración válida según {schema_path}")
   return 0
 
 
@@ -241,23 +252,35 @@ def main(argv: Iterable[str] | None = None) -> int:
   parser = argparse.ArgumentParser(description="Valida updater.conf frente al esquema JSON")
   parser.add_argument(
     "--config",
-    default="config/updater.conf",
-    help="Ruta del archivo de configuración a validar (default: config/updater.conf)",
+    default=None,
+    help=(
+      "Ruta del archivo de configuración a validar. "
+      "Por defecto se usa el `updater.conf` empaquetado."
+    ),
   )
   parser.add_argument(
     "--schema",
-    default="config/schema.json",
-    help="Ruta del esquema JSON (default: config/schema.json)",
+    default=None,
+    help=(
+      "Ruta del esquema JSON. "
+      "Por defecto se usa el esquema empaquetado."
+    ),
   )
   args = parser.parse_args(list(argv) if argv is not None else None)
 
-  repo_root = Path(__file__).resolve().parent.parent
-  config_path = (repo_root / args.config).resolve()
-  schema_path = (repo_root / args.schema).resolve()
+  if args.schema is None:
+    schema_path = get_resource_path("config/schema.json")
+  else:
+    schema_path = Path(args.schema).expanduser().resolve()
+
+  if args.config is None:
+    config_path = get_resource_path("config/updater.conf")
+  else:
+    config_path = Path(args.config).expanduser().resolve()
 
   definitions = load_schema(schema_path)
   assignments = parse_conf(config_path)
-  return validate_config(definitions, assignments)
+  return validate_config(definitions, assignments, schema_path)
 
 
 if __name__ == "__main__":
