@@ -19,12 +19,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
-__all__ = [
-    "ConfigData",
-    "ConfigError",
-    "ConfigStore",
-    "ValidationError",
-]
+from .resources import get_resource_path
+
+DEFAULT_SCHEMA_PATH = get_resource_path("config/schema.json")
 
 
 class ConfigError(RuntimeError):
@@ -695,4 +692,30 @@ class ConfigStore:
         return False
 
 
-__all__ = ["ConfigStore", "ConfigError", "ValidationError", "ConfigData"]
+def validate_conf(
+    config_path: Path, schema_path: Optional[Path] = None
+) -> ConfigData:
+    """Validate ``config_path`` against the updater schema."""
+
+    resolved_config = Path(config_path).expanduser()
+    resolved_schema = (
+        Path(schema_path).expanduser() if schema_path is not None else DEFAULT_SCHEMA_PATH
+    )
+    store = ConfigStore(resolved_config, resolved_schema)
+    try:
+        data = store.load()
+    except (ValidationError, ConfigError):
+        raise
+    except ValueError as exc:  # pragma: no cover - defensive fallback
+        raise ConfigError(str(exc)) from exc
+
+    values = data.values.copy()
+    for line in store._read_document():
+        if isinstance(line, AssignmentLine) and line.key not in store.schema_map:
+            values[line.key] = line.value
+
+    store._validate(values)
+    return data
+
+
+__all__ = ["ConfigStore", "ConfigError", "ValidationError", "ConfigData", "validate_conf"]
