@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import shutil
 import signal
 import sys
 from pathlib import Path
@@ -14,6 +13,7 @@ import uvicorn
 
 from .app import create_app
 from .config import ConfigStore
+from .config_utils import copy_config_tree
 from .resources import get_resource_path
 from .schedule import ScheduleStore
 from .scheduler.watch import build_watcher
@@ -75,40 +75,34 @@ def _copy_missing_config(config_dir: Path, default_dir: Optional[Path]) -> None:
     if not default_dir or not default_dir.exists():
         LOGGER.debug("No default config directory found; skipping bootstrap")
         return
-    def _copy_entry(source: Path, destination: Path) -> None:
-        if source.is_dir():
-            if not destination.exists():
-                destination.mkdir(parents=True, exist_ok=True)
-                LOGGER.info(
-                    "Copiado recurso de configuración por defecto: %s", destination
-                )
-            try:
-                children = list(source.iterdir())
-            except OSError as exc:
-                LOGGER.warning(
-                    "No se pudo listar el directorio de configuración por defecto %s", source,
-                    exc_info=exc,
-                )
-                return
-            for child in children:
-                _copy_entry(child, destination / child.name)
-            return
+    def _on_directory_created(path: Path) -> None:
+        LOGGER.info("Copiado recurso de configuración por defecto: %s", path)
 
-        if destination.exists():
-            return
+    def _on_file_copied(path: Path) -> None:
+        LOGGER.info("Copiado recurso de configuración por defecto: %s", path)
 
-        try:
-            shutil.copy2(source, destination)
-        except OSError as exc:
+    def _handle_error(operation: str, path: Path, exc: OSError) -> bool:
+        if operation == "listdir":
             LOGGER.warning(
-                "No se pudo copiar el recurso de configuración por defecto %s", source,
+                "No se pudo listar el directorio de configuración por defecto %s", path,
                 exc_info=exc,
             )
-            return
-        LOGGER.info("Copiado recurso de configuración por defecto: %s", destination)
+        else:
+            LOGGER.warning(
+                "No se pudo copiar el recurso de configuración por defecto %s", path,
+                exc_info=exc,
+            )
+        return True
 
     for entry in default_dir.iterdir():
-        _copy_entry(entry, config_dir / entry.name)
+        copy_config_tree(
+            entry,
+            config_dir / entry.name,
+            overwrite=False,
+            on_directory_created=_on_directory_created,
+            on_file_copied=_on_file_copied,
+            error_handler=_handle_error,
+        )
 
 
 def _configure_logging(level: str) -> None:

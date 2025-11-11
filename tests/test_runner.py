@@ -60,7 +60,7 @@ def test_copy_missing_config_logs_warning_on_copy_failure(tmp_path, monkeypatch,
     def _failing_copy2(*args, **kwargs):
         raise OSError("permission denied")
 
-    monkeypatch.setattr("pullpilot.runner.shutil.copy2", _failing_copy2)
+    monkeypatch.setattr("pullpilot.config_utils.shutil.copy2", _failing_copy2)
 
     caplog.set_level(logging.WARNING, logger="pullpilot.runner")
 
