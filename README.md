@@ -90,21 +90,22 @@ services:
       - "8000:8000"
     volumes:
       - pullpilot_config:/app/config:rw
-      - ${PULLPILOT_LOGS_VOLUME:-pullpilot_logs}:/var/log/docker-updater:rw
-      - ${PULLPILOT_PROJECTS_VOLUME:-pullpilot_projects}:/srv/compose:rw
+      # Monta aquí el directorio de logs que vayas a configurar en la UI.
+      # Sustituye ./logs por tu ruta en el host y reutiliza /var/log/docker-updater al definirlo en la interfaz.
+      - ./logs:/var/log/docker-updater:rw
+      # Monta aquí el directorio de proyectos que vayas a configurar en la UI.
+      # Sustituye ./projects por tu ruta en el host y reutiliza /srv/compose al definirlo en la interfaz.
+      - ./projects:/srv/compose:rw
       - /var/run/docker.sock:/var/run/docker.sock:rw
     restart: unless-stopped
 
 volumes:
   pullpilot_config:
-  ${PULLPILOT_LOGS_VOLUME:-pullpilot_logs}:
-  ${PULLPILOT_PROJECTS_VOLUME:-pullpilot_projects}:
 ```
 
 > ℹ️ **¿Por qué los volúmenes son de lectura/escritura y se monta el socket de Docker?** La API expone endpoints para actualizar la configuración (`updater.conf`), por lo que necesita permisos de escritura sobre ese archivo y el directorio de proyectos. También genera registros bajo `logs/`. Además, la aplicación debe comunicarse con el daemon de Docker para recrear servicios y comprobar imágenes, de ahí el montaje del socket `/var/run/docker.sock`. Si prefieres gestionar tus propios secretos o rutas (incluido el uso de un `.env` con `PULLPILOT_TOKEN`), edita los montajes del ejemplo anterior según tus necesidades.
-> Compose tomará automáticamente el valor de `PULLPILOT_TOKEN` del fichero `.env` especificado en `env_file`, y puedes redefinir
-> los volúmenes persistentes mediante `PULLPILOT_LOGS_VOLUME` y `PULLPILOT_PROJECTS_VOLUME`. Basta con proporcionar un `.env`
-> (con tus valores) y el `docker-compose.yml` anterior para desplegar PullPilot.
+> Los directorios de proyectos y logs se configuran desde la interfaz de PullPilot. Asegúrate de que el `docker-compose.yml`
+> monte en el contenedor las mismas rutas internas que introduzcas en la UI para que la aplicación pueda acceder a ellas.
 
 ## Licencia
 

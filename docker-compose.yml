@@ -11,12 +11,14 @@ services:
       - "8000:8000"
     volumes:
       - pullpilot_config:/app/config:rw
-      - ${PULLPILOT_LOGS_VOLUME:-pullpilot_logs}:/var/log/docker-updater:rw
-      - ${PULLPILOT_PROJECTS_VOLUME:-pullpilot_projects}:/srv/compose:rw
+      # Monta aquí el directorio de logs que vayas a configurar en la UI
+      # (sustituye ./logs por tu ruta en el host y asegúrate de reutilizar /var/log/docker-updater en la interfaz).
+      - ./logs:/var/log/docker-updater:rw
+      # Monta aquí el directorio de proyectos que vayas a configurar en la UI
+      # (sustituye ./projects por tu ruta en el host y asegúrate de reutilizar /srv/compose en la interfaz).
+      - ./projects:/srv/compose:rw
       - /var/run/docker.sock:/var/run/docker.sock:rw
     restart: unless-stopped
 
 volumes:
   pullpilot_config:
-  ${PULLPILOT_LOGS_VOLUME:-pullpilot_logs}:
-  ${PULLPILOT_PROJECTS_VOLUME:-pullpilot_projects}:
