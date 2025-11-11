@@ -55,6 +55,10 @@ docker run --rm -p 8000:8000 ghcr.io/svnz0x/pullpilot:latest
 - Antes de ejecutar el comando se comprueba que el binario exista y sea ejecutable para evitar inyecciones en `updater.sh`.
 - Si dejas el campo vacío, el script autodetectará el mejor comando disponible.
 
+### Registros del scheduler
+
+- Si el watcher no puede leer `pullpilot.schedule` (p. ej. por permisos en el volumen montado), verás un aviso en los logs del backend indicando `No se pudo leer la programación...`. La aplicación continúa en ejecución con la programación previa hasta que pueda acceder de nuevo al archivo.
+
 ### Autenticación de la API
 
 - **Credenciales obligatorias**: la API de configuración requiere un token bearer establecido mediante la variable de entorno `PULLPILOT_TOKEN`. Si no se define, la aplicación rechazará todas las peticiones protegidas.

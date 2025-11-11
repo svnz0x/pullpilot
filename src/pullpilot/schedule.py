@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import tempfile
@@ -11,6 +12,8 @@ from pathlib import Path
 from typing import Any, Mapping, MutableMapping, Optional
 
 from .resources import get_resource_path
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_SCHEDULE_PATH = get_resource_path("config/pullpilot.schedule")
 DEFAULT_CRON_EXPRESSION = "0 4 * * *"
@@ -59,6 +62,15 @@ class ScheduleStore:
             raw = self.schedule_path.read_text(encoding="utf-8") or "{}"
         except FileNotFoundError:
             return ScheduleData(mode="cron", expression=DEFAULT_CRON_EXPRESSION)
+        except OSError as exc:
+            logger.warning(
+                "No se pudo leer la programación desde %s: %s",
+                self.schedule_path,
+                exc,
+            )
+            raise ScheduleValidationError(
+                "No se pudo leer la programación almacenada; revisa los permisos del archivo."
+            ) from exc
         payload = json.loads(raw)
         return self._validate(payload)
 
