@@ -72,24 +72,16 @@ uvicorn pullpilot.app:create_app --host 0.0.0.0 --port 8000 --reload
 services:
   pullpilot:
     image: ghcr.io/svnz0x/pullpilot:latest
-    # Usa "build: ." si prefieres construir la imagen localmente
     env_file: .env
     environment:
-      PULLPILOT_TOKEN: ${PULLPILOT_TOKEN:?Define PULLPILOT_TOKEN en .env}
+      PULLPILOT_TOKEN: ${PULLPILOT_TOKEN}
       # PULLPILOT_TOKEN_FILE: /run/secrets/pullpilot_token
     ports:
       - "8000:8000"
     volumes:
-      # Directorio persistente con la configuración y los datos definidos desde la UI
-      # (sustituye ./pullpilot-data por tu ruta preferida en el host).
       - ./pullpilot-data:/app/config:rw
       - /var/run/docker.sock:/var/run/docker.sock:rw
     restart: unless-stopped
-
-# Si prefieres un volumen nombrado: declara `pullpilot_config:/app/config:rw`
-# y añade el bloque `volumes:` al final del archivo con su definición.
-# volumes:
-#   pullpilot_config:
 ```
 
 > ℹ️ **¿Por qué los volúmenes son de lectura/escritura y se monta el socket de Docker?** La API expone endpoints para actualizar la configuración (`updater.conf`), por lo que necesita permisos de escritura sobre ese archivo y los directorios de proyectos y logs definidos desde la UI. Además, la aplicación debe comunicarse con el daemon de Docker para recrear servicios y comprobar imágenes, de ahí el montaje del socket `/var/run/docker.sock`. Si prefieres gestionar tus propios secretos o rutas (incluido el uso de un `.env` con `PULLPILOT_TOKEN`), edita los montajes del ejemplo anterior según tus necesidades.
