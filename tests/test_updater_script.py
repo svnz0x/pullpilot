@@ -165,6 +165,58 @@ def base_environment(tmp_path: Path, docker_path: Path) -> dict[str, str]:
     return env
 
 
+def test_script_allows_empty_base_directory(tmp_path: Path, fake_docker: Path) -> None:
+    base_dir = tmp_path / "compose"
+    base_dir.mkdir()
+
+    log_dir = tmp_path / "logs"
+    lock_file = tmp_path / "lock"
+    conf_path = tmp_path / "updater-empty.conf"
+    conf_path.write_text(
+        textwrap.dedent(
+            f"""
+            BASE_DIR="{base_dir}"
+            LOG_DIR="{log_dir}"
+            LOCK_FILE="{lock_file}"
+            LOG_RETENTION_DAYS=7
+            EMAIL_TO=""
+            EMAIL_FROM="tester@example.com"
+            SUBJECT_PREFIX="[docker-updater]"
+            SMTP_CMD="msmtp"
+            SMTP_ACCOUNT="default"
+            SMTP_READ_ENVELOPE=true
+            DOCKER_TIMEOUT=120
+            QUIET_PULL=true
+            PULL_POLICY="always"
+            PARALLEL_PULL=0
+            EXCLUDE_PATTERNS=""
+            COMPOSE_PROJECTS_FILE=""
+            ATTACH_LOGS_ON="changes"
+            PRUNE_ENABLED=false
+            PRUNE_VOLUMES=false
+            PRUNE_FILTER_UNTIL=""
+            DRY_RUN=true
+            """
+        ).strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_docker.parent}:{env.get('PATH', '')}",
+            "CONF_FILE": str(conf_path),
+            "NO_COLOR": "1",
+        }
+    )
+
+    result = run_updater(env)
+
+    assert result.returncode == 0
+    assert "No se encontraron proyectos bajo" in result.stdout
+
+
 def test_script_accepts_absolute_compose_path(tmp_path: Path, fake_docker: Path) -> None:
     env = base_environment(tmp_path, fake_docker)
     compose_value = f"{fake_docker} compose"
