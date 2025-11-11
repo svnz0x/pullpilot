@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shlex
 import subprocess
 import sys
+import tempfile
 import time
 from threading import Event
 from pathlib import Path
@@ -154,9 +156,30 @@ class SchedulerWatcher:
             else:
                 escaped_command_parts.append(shlex.quote(arg))
         escaped_command = " ".join(escaped_command_parts)
-        self.cron_path.write_text(
-            f"{expression} {escaped_command}\n", encoding="utf-8"
+        fd, temp_path = tempfile.mkstemp(
+            dir=self.cron_path.parent,
+            prefix=f".{self.cron_path.name}",
+            suffix=".tmp",
         )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(f"{expression} {escaped_command}\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            try:
+                os.replace(temp_path, self.cron_path)
+            except OSError as exc:
+                _log(
+                    "No se pudo reemplazar el archivo cron temporal: "
+                    f"{exc}"
+                )
+                raise
+        except Exception:
+            try:
+                os.unlink(temp_path)
+            except FileNotFoundError:
+                pass
+            raise
 
     def _stop_process(self) -> None:
         process = self.process
