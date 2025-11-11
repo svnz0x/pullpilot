@@ -13,7 +13,6 @@ from threading import Event
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from ..resources import get_resource_path
 from ..schedule import DEFAULT_SCHEDULE_PATH, ScheduleStore, ScheduleValidationError
 
 DEFAULT_SCHEDULE_FILE = DEFAULT_SCHEDULE_PATH
@@ -231,18 +230,20 @@ def _project_root() -> Path:
 def resolve_default_updater_command() -> str:
     """Determine the default updater command path.
 
-    When running from a checked-out source tree, prefer the updater script
-    located under ``scripts/updater.sh``. When the project is packaged into the
-    production image the script is shipped at ``/app/updater.sh``; fall back to
-    that location when the local script is missing.
+    Prefer the checked-out wrapper at ``scripts/updater.sh`` so local
+    development runs use the same entry point as production. When the wrapper is
+    absent, fall back to the packaged location used inside the container image
+    (``/app/updater.sh``). If neither file exists we still return the default
+    string so callers fail fast instead of silently selecting the canonical
+    resource.
     """
 
     scripts_path = _project_root() / "scripts" / "updater.sh"
     if scripts_path.exists():
         return str(scripts_path)
-    packaged = get_resource_path("scripts/updater.sh")
-    if packaged.exists():
-        return str(packaged)
+    packaged_wrapper = Path(DEFAULT_COMMAND)
+    if packaged_wrapper.exists():
+        return str(packaged_wrapper)
     return DEFAULT_COMMAND
 
 

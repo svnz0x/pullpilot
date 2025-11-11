@@ -10,6 +10,7 @@ from typing import Any, Dict, List
 import pytest
 
 from pullpilot.scheduler.watch import (
+    DEFAULT_COMMAND,
     DEFAULT_CRON_FILE,
     DEFAULT_INTERVAL,
     DEFAULT_SCHEDULE_FILE,
@@ -168,16 +169,12 @@ def test_default_updater_command_prefers_local_script(
     assert resolve_default_updater_command() == str(local_script)
 
 
-def test_default_updater_command_falls_back_to_packaged_script(
+def test_default_updater_command_falls_back_to_default_string(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    from pullpilot.resources import get_resource_path
-
     monkeypatch.setattr("pullpilot.scheduler.watch._project_root", lambda: tmp_path)
 
-    assert resolve_default_updater_command() == str(
-        get_resource_path("scripts/updater.sh")
-    )
+    assert resolve_default_updater_command() == DEFAULT_COMMAND
 
 
 def test_scheduler_package_reexports_watcher() -> None:
