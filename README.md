@@ -11,15 +11,6 @@ vive dentro del contenedor (mediante volúmenes persistentes), por lo que tras u
 
 ---
 
-## Características
-
-- Descubrimiento de proyectos Docker/Compose.
-- Actualización segura (pull, recreate, healthcheck opcional).
-- Ejecución programada (cron) mediante *supercronic*.
-- Notificaciones por correo (opcional).
-- Imagen Docker lista para usar.
-- Publicación automática en **GHCR** con *GitHub Actions*.
-
 ## Estructura del repositorio
 
 ```text
