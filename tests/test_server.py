@@ -680,15 +680,30 @@ def test_ui_logs_listing_and_selection(
     status, _ = api.handle_request("POST", "/ui/config", {"values": values}, headers=auth_headers)
     assert status == HTTPStatus.OK
 
-    first_log = tmp_path / "uno.log"
-    first_log.write_text("linea 1\nlinea 2\n", encoding="utf-8")
+    rotated_log = tmp_path / "uno.log.1"
+    rotated_log.write_text("linea antigua\n", encoding="utf-8")
+    compressed_log = tmp_path / "uno.log.1.gz"
+    compressed_log.write_text("linea comprimida\n", encoding="utf-8")
+    dated_log = tmp_path / "errores.log.20240101.gz"
+    dated_log.write_text("error 1\n", encoding="utf-8")
     second_log = tmp_path / "dos.log"
     second_log.write_text("hola\n", encoding="utf-8")
+    ignored = tmp_path / "notes.txt"
+    ignored.write_text("no es un log\n", encoding="utf-8")
+    first_log = tmp_path / "uno.log"
+    first_log.write_text("linea 1\nlinea 2\n", encoding="utf-8")
 
     status, logs = api.handle_request("GET", "/ui/logs", headers=auth_headers)
     assert status == HTTPStatus.OK
-    assert {entry["name"] for entry in logs["files"]} == {"uno.log", "dos.log"}
-    assert logs["selected"] is None or logs["selected"]["name"] in {"uno.log", "dos.log"}
+    expected_names = {
+        "uno.log",
+        "uno.log.1",
+        "uno.log.1.gz",
+        "dos.log",
+        "errores.log.20240101.gz",
+    }
+    assert {entry["name"] for entry in logs["files"]} == expected_names
+    assert logs["selected"] is None or logs["selected"]["name"] in expected_names
 
     status, selected = api.handle_request(
         "GET", "/ui/logs", {"name": "uno.log"}, headers=auth_headers
