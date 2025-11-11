@@ -19,6 +19,7 @@ def test_bundled_files_accessible(monkeypatch):
         with resources.as_file(resource) as extracted:
             assert Path(extracted).is_file()
 
+    monkeypatch.setenv("PULLPILOT_TOKEN", "bundled-token")
     api = ConfigAPI()
     assert api.store.schema_path == get_resource_path("config/schema.json")
     assert api.store.config_path == get_resource_path("config/updater.conf")

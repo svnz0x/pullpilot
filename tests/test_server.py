@@ -122,7 +122,11 @@ def test_requests_rejected_without_credentials(
     monkeypatch, store: ConfigStore, schedule_store: ScheduleStore
 ) -> None:
     monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
-    api = ConfigAPI(store=store, schedule_store=schedule_store)
+    api = ConfigAPI(
+        store=store,
+        schedule_store=schedule_store,
+        authenticator=Authenticator(token=None),
+    )
 
     status, body = api.handle_request("GET", "/config")
     assert status == HTTPStatus.UNAUTHORIZED
@@ -196,6 +200,18 @@ def test_token_auth_allows_headers_with_ows(
 
     status, body = api.handle_request("GET", "/config", headers={"Authorization": header_value})
     assert status == HTTPStatus.OK
+
+
+def test_create_app_without_token_raises(
+    monkeypatch: pytest.MonkeyPatch,
+    store: ConfigStore,
+    schedule_store: ScheduleStore,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(RuntimeError, match="PULLPILOT_TOKEN"):
+        create_app(store=store, schedule_store=schedule_store)
 
 
 def test_ui_endpoints_require_auth_when_token_set(
@@ -281,7 +297,11 @@ def test_ui_root_allows_anonymous_access(
     monkeypatch: pytest.MonkeyPatch, store: ConfigStore, schedule_store: ScheduleStore
 ) -> None:
     monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
-    api = ConfigAPI(store=store, schedule_store=schedule_store)
+    api = ConfigAPI(
+        store=store,
+        schedule_store=schedule_store,
+        authenticator=Authenticator(token=None),
+    )
 
     status, body = api.handle_request("GET", "/")
     assert status == HTTPStatus.OK
@@ -424,7 +444,11 @@ def test_ui_config_rejected_without_credentials(
 ) -> None:
     monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
 
-    api = ConfigAPI(store=store, schedule_store=schedule_store)
+    api = ConfigAPI(
+        store=store,
+        schedule_store=schedule_store,
+        authenticator=Authenticator(token=None),
+    )
 
     status, body = api.handle_request("GET", "/ui/config")
     assert status == HTTPStatus.UNAUTHORIZED

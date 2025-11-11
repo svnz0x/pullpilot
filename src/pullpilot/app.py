@@ -9,7 +9,7 @@ from collections import deque
 from datetime import datetime, timezone
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Tuple
+from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
 
 from .config import ConfigData, ConfigError, ConfigStore, ValidationError
 from .resources import get_resource_path
@@ -33,6 +33,58 @@ def _normalize_env_value(value: Optional[str]) -> Optional[str]:
     return normalized
 
 
+def _iter_candidate_env_paths() -> Iterable[Path]:
+    """Yield possible ``.env`` locations for token discovery."""
+
+    candidates = []
+    package_root = Path(__file__).resolve().parent
+    project_root = package_root.parent
+    for root in (Path.cwd(), package_root, project_root):
+        try:
+            resolved = root.resolve()
+        except OSError:
+            resolved = root
+        if resolved in candidates:
+            continue
+        candidates.append(resolved)
+        yield resolved / ".env"
+
+
+def _load_token_from_env_files() -> None:
+    """Populate ``os.environ`` with the token from ``.env`` files when needed."""
+
+    existing = os.environ.get(TOKEN_ENV)
+    normalized_existing = _normalize_env_value(existing)
+    if normalized_existing is not None:
+        if existing != normalized_existing:
+            os.environ[TOKEN_ENV] = normalized_existing
+        return
+    if existing is not None:
+        os.environ.pop(TOKEN_ENV, None)
+
+    for path in _iter_candidate_env_paths():
+        if not path.is_file():
+            continue
+        try:
+            content = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        for line in content.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if "=" not in stripped:
+                continue
+            key, raw_value = stripped.split("=", 1)
+            if key.strip() != TOKEN_ENV:
+                continue
+            normalized = _normalize_env_value(raw_value)
+            if normalized is None:
+                continue
+            os.environ[TOKEN_ENV] = normalized
+            return
+
+
 class Authenticator:
     """Simple helper that validates Authorization headers when configured."""
 
@@ -47,7 +99,12 @@ class Authenticator:
         ``PULLPILOT_TOKEN`` environment variable.
         """
 
+        _load_token_from_env_files()
         token = _normalize_env_value(os.getenv(TOKEN_ENV))
+        if token is None:
+            raise RuntimeError(
+                "Missing authentication token. Configure the PULLPILOT_TOKEN environment variable."
+            )
         return cls(token=token)
 
     @property
