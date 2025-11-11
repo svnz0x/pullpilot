@@ -1,3 +1,5 @@
+import { createTokenStorage } from "./token-storage.js";
+
 (() => {
   const body = document.body;
   const loginForm = document.getElementById("token-form");
@@ -16,10 +18,10 @@
   const logsStatus = document.getElementById("logs-status");
   const refreshLogs = document.getElementById("refresh-logs");
 
-  const TOKEN_STORAGE_KEY = "pullpilot.bearerToken";
   let lastConfigSnapshot = null;
   let memoryToken = null;
   let storedToken = null;
+  const tokenStorage = createTokenStorage(window);
 
   const buildApiUrl = (() => {
     let cachedBase = null;
@@ -115,6 +117,32 @@
     rememberCheckbox.setAttribute("data-storage-unavailable", "true");
   };
 
+  const hasLocalStorageFailure = (status) => {
+    const errors = Array.isArray(status?.errors) ? status.errors : [];
+    return errors.some((entry) => entry?.storage === "localStorage");
+  };
+
+  const describeFallbackLabel = (status) => {
+    if (status?.storageLabel) {
+      return status.storageLabel;
+    }
+    if (status?.storage === "sessionStorage") {
+      return "el almacenamiento de sesión";
+    }
+    return "un almacenamiento alternativo";
+  };
+
+  const buildFallbackMessage = (status) => {
+    const label = describeFallbackLabel(status);
+    if (status?.operation === "read") {
+      return `Se recuperó el token usando ${label} porque el almacenamiento local no está disponible. El token se conservará solo durante esta sesión.`;
+    }
+    if (status?.persisted) {
+      return `El token se recordará usando ${label} porque el almacenamiento local no está disponible.`;
+    }
+    return `No se pudo usar el almacenamiento local. El token se guardará solo durante esta sesión (${label}).`;
+  };
+
   const processStorageStatus = (
     status,
     { message, tone = "error", silent = false } = {},
@@ -140,20 +168,43 @@
       };
     }
 
+    if (status.fallbackUsed) {
+      disableRememberTokenOption();
+      const fallbackMessage = message || buildFallbackMessage(status);
+      const fallbackTone = tone ?? "error";
+      if (!silent) {
+        showLoginMessage(fallbackMessage, fallbackTone);
+      }
+      return {
+        handled: true,
+        message: fallbackMessage,
+        tone: fallbackTone,
+        status,
+      };
+    }
+
+    if (status.hadErrors && hasLocalStorageFailure(status)) {
+      disableRememberTokenOption();
+      const resolvedMessage =
+        message ||
+        STORAGE_FAILURE_MESSAGES[status.operation] ||
+        STORAGE_FAILURE_MESSAGES.generic;
+      if (!silent) {
+        showLoginMessage(resolvedMessage, tone);
+      }
+      return {
+        handled: true,
+        message: resolvedMessage,
+        tone,
+        status,
+      };
+    }
+
     return { handled: false, status };
   };
 
-  const readStoredTokenStatus = () => {
-    try {
-      const token = window.localStorage.getItem(TOKEN_STORAGE_KEY) || null;
-      return { ok: true, operation: "read", token };
-    } catch (error) {
-      return { ok: false, operation: "read", error };
-    }
-  };
-
-  const storedTokenStatus = readStoredTokenStatus();
-  storedToken = storedTokenStatus.ok ? storedTokenStatus.token : null;
+  const storedTokenStatus = tokenStorage.readToken();
+  storedToken = storedTokenStatus?.token ?? null;
   const initialStorageOutcome = processStorageStatus(storedTokenStatus, {
     silent: true,
   });
@@ -200,38 +251,18 @@
       memoryToken = trimmed || null;
 
       if (!memoryToken) {
-        try {
-          window.localStorage.removeItem(TOKEN_STORAGE_KEY);
-          return { ok: true, operation: "remove", persisted: false };
-        } catch (error) {
-          return { ok: false, operation: "remove", error };
-        }
+        return tokenStorage.clearToken("remove");
       }
 
       if (persist) {
-        try {
-          window.localStorage.setItem(TOKEN_STORAGE_KEY, memoryToken);
-          return { ok: true, operation: "write", persisted: true };
-        } catch (error) {
-          return { ok: false, operation: "write", error };
-        }
+        return tokenStorage.persistToken(memoryToken);
       }
 
-      try {
-        window.localStorage.removeItem(TOKEN_STORAGE_KEY);
-        return { ok: true, operation: "remove", persisted: false };
-      } catch (error) {
-        return { ok: false, operation: "remove", error };
-      }
+      return tokenStorage.clearToken("remove");
     },
     clearToken: () => {
       memoryToken = null;
-      try {
-        window.localStorage.removeItem(TOKEN_STORAGE_KEY);
-        return { ok: true, operation: "clear" };
-      } catch (error) {
-        return { ok: false, operation: "clear", error };
-      }
+      return tokenStorage.clearToken("clear");
     },
   };
 
