@@ -69,10 +69,10 @@
         margin: 2rem auto 0;
         width: min(32rem, 92vw);
         background: var(--card-color);
-        border-radius: 1.25rem;
+        border-radius: 0.9rem;
         border: 1px solid var(--card-border);
-        padding: clamp(1.5rem, 4vw, 2rem);
-        box-shadow: 0 20px 35px var(--shadow-color);
+        padding: clamp(1.25rem, 4vw, 1.75rem);
+        box-shadow: none;
         display: none;
       }
 
@@ -121,23 +121,24 @@
 
       #login-screen input[type="password"] {
         width: 100%;
-        padding: 0.7rem 0.85rem;
-        border-radius: 0.9rem;
-        border: 1px solid rgba(120, 124, 131, 0.3);
-        background: rgba(255, 255, 255, 0.75);
+        padding: 0.65rem 0.85rem;
+        border-radius: 0.5rem;
+        border: 1px solid rgba(120, 124, 131, 0.4);
+        background: #ffffff;
         color: inherit;
         font: inherit;
       }
 
       #login-screen input[type="password"]:focus {
-        outline: none;
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px var(--focus-ring);
+        outline: 2px solid rgba(120, 124, 131, 0.35);
+        outline-offset: 0;
+        border-color: rgba(120, 124, 131, 0.75);
+        box-shadow: none;
       }
 
       .login-actions {
         display: flex;
-        gap: 0.75rem;
+        gap: 0.5rem;
         flex-wrap: wrap;
       }
 
@@ -179,11 +180,10 @@
 
       section {
         background: var(--card-color);
-        border-radius: 1.25rem;
+        border-radius: 0.9rem;
         border: 1px solid var(--card-border);
-        backdrop-filter: blur(18px);
-        padding: clamp(1.5rem, 2vw, 2rem);
-        box-shadow: 0 20px 35px var(--shadow-color);
+        padding: clamp(1.25rem, 2vw, 1.75rem);
+        box-shadow: none;
       }
 
       section h2 {
@@ -194,12 +194,12 @@
 
       .config-grid {
         display: grid;
-        gap: 1.25rem;
+        gap: 1rem;
       }
 
       .config-field {
         display: grid;
-        gap: 0.5rem;
+        gap: 0.4rem;
       }
 
       .config-field label {
@@ -211,7 +211,7 @@
 
       .config-field .field-input {
         display: flex;
-        gap: 0.75rem;
+        gap: 0.5rem;
         flex-wrap: wrap;
       }
 
@@ -220,13 +220,13 @@
       .config-field select,
       .config-field textarea {
         width: min(100%, 30rem);
-        padding: 0.65rem 0.75rem;
-        border-radius: 0.75rem;
-        border: 1px solid rgba(120, 124, 131, 0.3);
-        background: rgba(255, 255, 255, 0.7);
+        padding: 0.6rem 0.75rem;
+        border-radius: 0.5rem;
+        border: 1px solid rgba(120, 124, 131, 0.4);
+        background: #ffffff;
         color: inherit;
         font: inherit;
-        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        transition: border-color 0.2s ease, outline-color 0.2s ease;
         resize: vertical;
       }
 
@@ -245,9 +245,10 @@
       .config-field input:focus,
       .config-field select:focus,
       .config-field textarea:focus {
-        outline: none;
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px var(--focus-ring);
+        outline: 2px solid rgba(120, 124, 131, 0.35);
+        outline-offset: 0;
+        border-color: rgba(120, 124, 131, 0.75);
+        box-shadow: none;
       }
 
       .config-field .field-description {
@@ -265,39 +266,57 @@
       }
 
       .form-actions {
-        margin-top: 1.5rem;
+        margin-top: 1rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--card-border);
         display: flex;
-        gap: 0.75rem;
+        gap: 0.5rem;
         flex-wrap: wrap;
       }
 
       button {
         appearance: none;
-        border: none;
-        border-radius: 999px;
-        padding: 0.75rem 1.6rem;
+        border: 1px solid rgba(120, 124, 131, 0.35);
+        border-radius: 0.55rem;
+        padding: 0.65rem 1.35rem;
         font-weight: 600;
         cursor: pointer;
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        background: #ffffff;
+        color: inherit;
+        transition: transform 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
       }
 
       button.primary {
-        background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+        background: var(--accent);
+        border-color: rgba(124, 140, 255, 0.6);
         color: #ffffff;
-        box-shadow: 0 15px 30px rgba(124, 140, 255, 0.28);
+      }
+
+      button.primary:hover {
+        background: var(--accent-strong);
       }
 
       button.secondary {
-        background: rgba(120, 124, 131, 0.12);
+        background: rgba(120, 124, 131, 0.08);
         color: inherit;
+      }
+
+      button.secondary:hover {
+        background: rgba(120, 124, 131, 0.12);
       }
 
       button:hover {
         transform: translateY(-1px);
+        border-color: rgba(120, 124, 131, 0.6);
       }
 
       button:active {
         transform: translateY(1px);
+      }
+
+      button:focus-visible {
+        outline: 2px solid rgba(120, 124, 131, 0.45);
+        outline-offset: 2px;
       }
 
       .status {
@@ -342,7 +361,9 @@
       .config-field.is-error .value-input,
       .config-field.is-error textarea[data-multiline] {
         border-color: rgba(210, 113, 113, 0.6);
-        box-shadow: 0 0 0 3px rgba(210, 113, 113, 0.25);
+        box-shadow: none;
+        outline: 1px solid rgba(210, 113, 113, 0.25);
+        outline-offset: 0;
       }
 
       .logs-header {
@@ -383,7 +404,7 @@
         }
 
         section {
-          padding: 1.25rem;
+          padding: 1rem;
         }
 
         .config-field input[type="text"],
