@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from pullpilot.app import Authenticator, ConfigAPI
-from pullpilot.config import ConfigStore, ValidationError
+from pullpilot.config import ConfigStore, PersistenceError, ValidationError
 from pullpilot.schedule import ScheduleStore
 
 
@@ -197,6 +197,47 @@ def test_api_returns_bad_request_when_multiline_path_inaccessible(
     } in body.get("details", [])
 
 
+def test_api_returns_persistence_error_payload(
+    tmp_path: Path, schema_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = ConfigStore(tmp_path / "updater.conf", schema_path)
+    data = store.load()
+    values = data.values.copy()
+    ensure_required_paths(values, tmp_path)
+    multiline = data.multiline.copy()
+
+    def fail_replace(src: str, dst: str) -> None:
+        raise PermissionError("permission denied")
+
+    monkeypatch.setattr("pullpilot.config.os.replace", fail_replace)
+
+    api = ConfigAPI(
+        store=store,
+        schedule_store=ScheduleStore(tmp_path / "schedule.json"),
+        authenticator=Authenticator(token="secret-token"),
+    )
+    headers = {"Authorization": "Bearer secret-token"}
+
+    status, body = api.handle_request(
+        "POST",
+        "/ui/config",
+        {"values": values, "multiline": multiline},
+        headers=headers,
+    )
+
+    assert status == HTTPStatus.BAD_REQUEST
+    assert body["error"] == "write failed"
+    assert body["details"]
+    detail = body["details"][0]
+    assert detail["path"] == str(store.config_path)
+    assert detail["operation"] == "write configuration"
+    assert "permission denied" in detail["message"].lower()
+    assert not any(
+        path.name.startswith(f".{store.config_path.name}.") and path.suffix == ".tmp"
+        for path in store.config_path.parent.iterdir()
+    )
+
+
 def test_validation_error_collects_all_fields(tmp_path: Path, schema_path: Path) -> None:
     store = ConfigStore(tmp_path / "updater.conf", schema_path)
     data = store.load()
@@ -249,16 +290,25 @@ def test_save_does_not_truncate_config_when_write_fails(
     values["BASE_DIR"] = str(base_dir)
 
     def fail_replace(src: str, dst: str) -> None:
-        raise OSError("disk full")
+        raise PermissionError("disk full")
 
     monkeypatch.setattr("pullpilot.config.os.replace", fail_replace)
 
-    with pytest.raises(OSError):
+    with pytest.raises(PersistenceError) as exc:
         store.save(values, data.multiline)
+
+    detail = exc.value.details[0]
+    assert detail["path"] == str(config_path)
+    assert detail["operation"] == "write configuration"
+    assert "disk full" in detail["message"].lower()
 
     assert config_path.read_text(encoding="utf-8") == original_content
     entries = {path.name for path in tmp_path.iterdir()}
     assert "updater.conf" in entries
+    assert not any(
+        path.name.startswith(f".{config_path.name}.") and path.suffix == ".tmp"
+        for path in tmp_path.iterdir()
+    )
 
 
 def test_multiline_save_does_not_truncate_file_when_write_fails(
@@ -283,13 +333,18 @@ def test_multiline_save_does_not_truncate_file_when_write_fails(
 
     def fail_replace(src: str, dst: str) -> None:
         if Path(dst) == projects_path:
-            raise OSError("disk full")
+            raise PermissionError("disk full")
         original_replace(src, dst)
 
     monkeypatch.setattr("pullpilot.config.os.replace", fail_replace)
 
-    with pytest.raises(OSError):
+    with pytest.raises(PersistenceError) as exc:
         store.save(values, multiline)
+
+    detail = exc.value.details[0]
+    assert detail["path"] == str(projects_path)
+    assert detail["operation"] == "write multiline content"
+    assert "disk full" in detail["message"].lower()
 
     assert config_path.read_text(encoding="utf-8") == (
         f'COMPOSE_PROJECTS_FILE="{projects_path}"\n'
@@ -297,6 +352,10 @@ def test_multiline_save_does_not_truncate_file_when_write_fails(
     assert projects_path.read_text(encoding="utf-8") == original_projects
     entries = {path.name for path in tmp_path.iterdir()}
     assert {"updater.conf", "projects.txt"}.issubset(entries)
+    assert not any(
+        path.name.startswith(f".{projects_path.name}.") and path.suffix == ".tmp"
+        for path in projects_path.parent.iterdir()
+    )
 
 
 def test_multiline_path_must_reside_in_allowed_directory(
