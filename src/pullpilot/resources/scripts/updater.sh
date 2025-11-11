@@ -60,8 +60,8 @@ else
 fi
 
 # Defaults si no están en el conf
-BASE_DIR=${BASE_DIR:-/srv/compose}
-LOG_DIR=${LOG_DIR:-/var/log/docker-updater}
+BASE_DIR=${BASE_DIR:-}
+LOG_DIR=${LOG_DIR:-}
 LOCK_FILE=${LOCK_FILE:-/var/lock/docker-updater.lock}
 EMAIL_TO=${EMAIL_TO:-""}
 EMAIL_FROM=${EMAIL_FROM:-"homelab@localhost"}
@@ -82,6 +82,29 @@ COMPOSE_PROJECTS_FILE=${COMPOSE_PROJECTS_FILE:-""}
 SMTP_CMD=${SMTP_CMD:-msmtp}                  # msmtp|mailx|sendmail
 SMTP_ACCOUNT=${SMTP_ACCOUNT:-default}
 SMTP_READ_ENVELOPE=${SMTP_READ_ENVELOPE:-true}
+
+trimmed_base_dir=${BASE_DIR//[[:space:]]/}
+trimmed_log_dir=${LOG_DIR//[[:space:]]/}
+
+if [[ -z "$BASE_DIR" || -z "$trimmed_base_dir" ]]; then
+  die "BASE_DIR no puede estar vacío. Configura una ruta absoluta existente en ${CONF_FILE}."
+fi
+if [[ "$BASE_DIR" != /* ]]; then
+  die "BASE_DIR debe ser una ruta absoluta: $BASE_DIR"
+fi
+if [[ ! -d "$BASE_DIR" ]]; then
+  die "BASE_DIR apunta a un directorio inexistente: $BASE_DIR"
+fi
+
+if [[ -z "$LOG_DIR" || -z "$trimmed_log_dir" ]]; then
+  die "LOG_DIR no puede estar vacío. Configura una ruta absoluta existente en ${CONF_FILE}."
+fi
+if [[ "$LOG_DIR" != /* ]]; then
+  die "LOG_DIR debe ser una ruta absoluta: $LOG_DIR"
+fi
+if [[ ! -d "$LOG_DIR" ]]; then
+  die "LOG_DIR apunta a un directorio inexistente: $LOG_DIR"
+fi
 
 # ————————————————
 # Lock para evitar solapes

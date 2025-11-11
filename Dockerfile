@@ -66,8 +66,6 @@ COPY --from=ui-builder /build/src/pullpilot/resources/ui/dist ./src/pullpilot/re
 
 RUN chmod +x /app/updater.sh
 
-RUN mkdir -p /srv/compose
-
 EXPOSE 8000
 
 ENTRYPOINT ["python", "-m", "pullpilot"]

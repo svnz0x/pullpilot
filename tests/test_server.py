@@ -41,7 +41,8 @@ def test_get_returns_defaults(
     api = create_app(store=store, schedule_store=schedule_store)
     status, body = api.handle_request("GET", "/config", headers=auth_headers)
     assert status == HTTPStatus.OK
-    assert body["values"]["BASE_DIR"] == "/srv/compose"
+    assert body["values"]["BASE_DIR"] == ""
+    assert body["values"]["LOG_DIR"] == ""
 
 
 def test_get_includes_schema_metadata(
@@ -69,7 +70,12 @@ def test_put_updates_config_and_multiline(
 
     values = dict(body["values"])
     projects_path = tmp_path / "projects.txt"
-    values["BASE_DIR"] = str(tmp_path / "compose")
+    base_dir = tmp_path / "compose"
+    base_dir.mkdir()
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    values["BASE_DIR"] = str(base_dir)
+    values["LOG_DIR"] = str(log_dir)
     values["LOG_RETENTION_DAYS"] = 30
     values["SMTP_READ_ENVELOPE"] = False
     values["COMPOSE_PROJECTS_FILE"] = str(projects_path)
@@ -92,14 +98,20 @@ def test_put_returns_validation_errors(
     auth_headers: Mapping[str, str], store: ConfigStore, schedule_store: ScheduleStore
 ) -> None:
     api = ConfigAPI(store=store, schedule_store=schedule_store)
+    defaults = store.load()
+    values = defaults.values.copy()
+    values["BASE_DIR"] = ""
+    values["LOG_DIR"] = ""
+    values["LOG_RETENTION_DAYS"] = 0
     status, body = api.handle_request(
         "PUT",
         "/config",
-        {"values": {"BASE_DIR": "", "LOG_RETENTION_DAYS": 0}},
+        {"values": values},
         headers=auth_headers,
     )
     assert status == HTTPStatus.BAD_REQUEST
     assert any(error["field"] == "BASE_DIR" for error in body["details"])
+    assert any(error["field"] == "LOG_DIR" for error in body["details"])
 
 
 def test_put_rejects_multiline_paths_outside_allowed_directory(
@@ -113,6 +125,12 @@ def test_put_rejects_multiline_paths_outside_allowed_directory(
     assert status == HTTPStatus.OK
 
     values = dict(body["values"])
+    base_dir = tmp_path / "compose"
+    base_dir.mkdir()
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    values["BASE_DIR"] = str(base_dir)
+    values["LOG_DIR"] = str(log_dir)
     values["COMPOSE_PROJECTS_FILE"] = str(tmp_path.parent / "escape.txt")
     multiline = {"COMPOSE_PROJECTS_FILE": "/tmp/app\n"}
 
@@ -518,6 +536,12 @@ def test_ui_config_put_updates_values(
     assert status == HTTPStatus.OK
 
     values = dict(body["values"])
+    base_dir = tmp_path / "compose"
+    base_dir.mkdir()
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    values["BASE_DIR"] = str(base_dir)
+    values["LOG_DIR"] = str(log_dir)
     values["LOG_RETENTION_DAYS"] = 7
     projects_file = tmp_path / "projects.txt"
     values["COMPOSE_PROJECTS_FILE"] = str(projects_file)
@@ -542,6 +566,9 @@ def test_ui_logs_listing_and_selection(
     assert status == HTTPStatus.OK
 
     values = dict(body["values"])
+    base_dir = tmp_path / "compose"
+    base_dir.mkdir()
+    values["BASE_DIR"] = str(base_dir)
     values["LOG_DIR"] = str(tmp_path)
     status, _ = api.handle_request("POST", "/ui/config", {"values": values}, headers=auth_headers)
     assert status == HTTPStatus.OK

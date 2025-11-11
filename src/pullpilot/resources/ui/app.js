@@ -597,6 +597,33 @@
     });
   };
 
+  const REQUIRED_PATH_FIELDS = [
+    {
+      name: "BASE_DIR",
+      message: "Indica un directorio base absoluto y existente antes de guardar.",
+    },
+    {
+      name: "LOG_DIR",
+      message: "Indica un directorio de logs absoluto y existente antes de guardar.",
+    },
+  ];
+
+  const collectMissingPathErrors = (values) => {
+    if (!values || typeof values !== "object") {
+      return REQUIRED_PATH_FIELDS.slice();
+    }
+    const entries = [];
+    REQUIRED_PATH_FIELDS.forEach((field) => {
+      const rawValue = values[field.name];
+      const normalized =
+        typeof rawValue === "string" ? rawValue.trim() : rawValue != null ? String(rawValue).trim() : "";
+      if (!normalized) {
+        entries.push({ field: field.name, message: field.message });
+      }
+    });
+    return entries;
+  };
+
   const applyFieldErrorHighlights = (details) => {
     if (!fieldsContainer) return [];
     const entries = Array.isArray(details) ? details : details != null ? [details] : [];
@@ -666,8 +693,11 @@
     label.htmlFor = `field-${variable.name}`;
 
     const isBaseDirField = variable.name === "BASE_DIR";
+    const isLogDirField = variable.name === "LOG_DIR";
     if (isBaseDirField) {
       label.textContent = "Carpeta de proyectos docker-compose";
+    } else if (isLogDirField) {
+      label.textContent = "Carpeta de logs del updater";
     } else {
       label.textContent = variable.name;
     }
@@ -681,16 +711,21 @@
     const defaultValue = hasValue ? values[variable.name] : variable.default;
     let control;
 
-    if (isBaseDirField) {
+    if (isBaseDirField || isLogDirField) {
       control = document.createElement("input");
       control.type = "text";
       control.id = `field-${variable.name}`;
-      control.classList.add("value-input", "base-dir-input");
+      control.classList.add("value-input");
+      if (isBaseDirField) {
+        control.classList.add("base-dir-input");
+      } else if (isLogDirField) {
+        control.classList.add("log-dir-input");
+      }
       control.dataset.type = variable.type;
-      control.placeholder =
-        variable.default && String(variable.default).trim().length
-          ? variable.default
-          : "/srv/compose";
+      const placeholder = isBaseDirField
+        ? "Introduce una ruta absoluta (ej.: /ruta/a/proyectos)"
+        : "Introduce una ruta absoluta existente";
+      control.placeholder = placeholder;
       control.spellcheck = false;
       if (variable.constraints?.pattern) {
         control.pattern = variable.constraints.pattern;
@@ -762,13 +797,25 @@
     const description = document.createElement("p");
     description.className = "field-description";
     description.id = descriptionId;
-    if (isBaseDirField) {
-      const helpLines = [
-        "Ruta absoluta de la carpeta donde se buscarán los proyectos Docker Compose.",
-        "Debe contener los archivos docker-compose.yml en sus subdirectorios para que el escaneo funcione.",
-      ];
+    if (isBaseDirField || isLogDirField) {
+      const helpLines = [];
       if (variable.description) {
-        helpLines.unshift(variable.description);
+        helpLines.push(variable.description);
+      }
+      if (isBaseDirField) {
+        helpLines.push(
+          "Ruta absoluta de la carpeta donde se buscarán los proyectos Docker Compose.",
+        );
+        helpLines.push(
+          "Debe existir antes de ejecutar el script y contener los proyectos docker-compose en sus subdirectorios.",
+        );
+      } else {
+        helpLines.push(
+          "Directorio absoluto donde se almacenarán los logs diarios del updater.",
+        );
+        helpLines.push(
+          "Asegúrate de crear la carpeta con permisos de escritura antes de lanzar el script.",
+        );
       }
       if (helpLines.length) {
         description.textContent = helpLines[0];
@@ -820,7 +867,8 @@
         payload.values[name] = control.value === "" ? null : Number(control.value);
       } else {
         const rawValue = control.value;
-        payload.values[name] = name === "BASE_DIR" ? rawValue.trim() : rawValue;
+        payload.values[name] =
+          name === "BASE_DIR" || name === "LOG_DIR" ? rawValue.trim() : rawValue;
       }
       const multilineControl = field.querySelector("textarea[data-multiline]");
       if (multilineControl) {
@@ -842,8 +890,21 @@
       }
       const data = await response.json();
       populateConfig(data);
-      showStatus(configStatus, "Configuración cargada correctamente.", "success");
-      setTimeout(() => hideStatus(configStatus), 2500);
+      const missingPathErrors = collectMissingPathErrors(data?.values);
+      if (missingPathErrors.length) {
+        applyFieldErrorHighlights(missingPathErrors);
+        showStatus(
+          configStatus,
+          {
+            summary: "Configura las rutas obligatorias antes de ejecutar el updater.",
+            details: missingPathErrors,
+          },
+          "error",
+        );
+      } else {
+        showStatus(configStatus, "Configuración cargada correctamente.", "success");
+        setTimeout(() => hideStatus(configStatus), 2500);
+      }
       return true;
     } catch (error) {
       console.error(error);
@@ -869,6 +930,19 @@
     hideStatus(configStatus);
     clearFieldErrors();
     const payload = readFormValues();
+    const missingPathErrors = collectMissingPathErrors(payload.values);
+    if (missingPathErrors.length) {
+      applyFieldErrorHighlights(missingPathErrors);
+      showStatus(
+        configStatus,
+        {
+          summary: "Completa las rutas obligatorias antes de guardar.",
+          details: missingPathErrors,
+        },
+        "error",
+      );
+      return;
+    }
     try {
       const response = await authorizedFetch(buildApiUrl("config"), {
         method: "POST",
@@ -912,8 +986,21 @@
   const resetConfig = () => {
     if (!lastConfigSnapshot) return;
     populateConfig(lastConfigSnapshot);
-    showStatus(configStatus, "Se restauraron los valores cargados.");
-    setTimeout(() => hideStatus(configStatus), 2500);
+    const missingPathErrors = collectMissingPathErrors(lastConfigSnapshot.values);
+    if (missingPathErrors.length) {
+      applyFieldErrorHighlights(missingPathErrors);
+      showStatus(
+        configStatus,
+        {
+          summary: "Se restauraron los valores cargados. Completa las rutas obligatorias antes de guardar.",
+          details: missingPathErrors,
+        },
+        "error",
+      );
+    } else {
+      showStatus(configStatus, "Se restauraron los valores cargados.");
+      setTimeout(() => hideStatus(configStatus), 2500);
+    }
   };
 
   const fetchLogs = async (selectedName = null) => {
@@ -946,7 +1033,17 @@
 
   const renderLogs = (data) => {
     const files = Array.isArray(data.files) ? data.files : [];
+    const notice =
+      data && typeof data.notice === "string" && data.notice.trim().length
+        ? data.notice.trim()
+        : "";
     logSelect.innerHTML = "";
+
+    if (notice) {
+      showStatus(logsStatus, notice, "error");
+    } else {
+      hideStatus(logsStatus);
+    }
 
     if (files.length === 0) {
       const option = document.createElement("option");
@@ -955,7 +1052,8 @@
       option.selected = true;
       logSelect.appendChild(option);
       logSelect.disabled = true;
-      logContent.textContent = "No se encontraron archivos .log en el directorio configurado.";
+      logContent.textContent =
+        notice || "No se encontraron archivos .log en el directorio configurado.";
       logMeta.textContent = data.log_dir ? `Directorio: ${data.log_dir}` : "";
       return;
     }
