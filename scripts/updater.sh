@@ -500,7 +500,10 @@ else
   done < <("${find_cmd[@]}")
 fi
 
-[[ ${#PROJECT_DIRS[@]} -eq 0 ]] && die "No se encontraron proyectos bajo $BASE_DIR"
+if [[ ${#PROJECT_DIRS[@]} -eq 0 ]]; then
+  warn "No se encontraron proyectos bajo $BASE_DIR; saliendo"
+  exit 0
+fi
 
 changed_projects=()
 failed_projects=()

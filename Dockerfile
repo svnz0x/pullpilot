@@ -52,6 +52,8 @@ COPY src ./src
 
 RUN chmod +x /app/updater.sh
 
+RUN mkdir -p /srv/compose
+
 EXPOSE 8000
 
 ENTRYPOINT ["python", "-m", "pullpilot"]
