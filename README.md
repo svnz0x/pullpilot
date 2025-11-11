@@ -47,6 +47,7 @@ docker run --rm -p 8000:8000 ghcr.io/svnz0x/pullpilot:latest
 - Los ajustes relacionados con credenciales se definen mediante `PULLPILOT_TOKEN` (ver detalles más adelante). El resto de opciones se controlan desde la interfaz de usuario o modificando directamente los archivos persistidos en el volumen.
 - El esquema JSON en `config/schema.json` documenta cada opción.
 - Para validación rápida: `python scripts/validate_config.py`
+  - La imagen conserva temporalmente el script legacy empaquetado en `src/pullpilot/resources/scripts/Legacy-validate_config.py` por si necesitas copiarlo manualmente antes de eliminarlo.
 - Los archivos auxiliares multilinea (p. ej. `COMPOSE_PROJECTS_FILE`) deben residir dentro del mismo directorio de configuración (por defecto `/app/config/`). La API rechazará rutas fuera de ese árbol o que incluyan `..`.
 - Si prefieres rutas distintas, modifica directamente los montajes de volumen en tu `docker-compose.yml`.
 
