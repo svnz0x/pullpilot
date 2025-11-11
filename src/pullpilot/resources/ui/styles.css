@@ -1,0 +1,412 @@
+:root {
+  color-scheme: light dark;
+  --bg-color: #f4f4f6;
+  --card-color: rgba(255, 255, 255, 0.85);
+  --card-border: rgba(120, 124, 131, 0.2);
+  --accent: #7c8cff;
+  --accent-strong: #5f6dd4;
+  --text: #1f2733;
+  --text-secondary: #5f6473;
+  --danger: #d27171;
+  --success: #6ba984;
+  --focus-ring: rgba(124, 140, 255, 0.26);
+  --shadow-color: rgba(31, 35, 40, 0.12);
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg-color);
+  background: linear-gradient(135deg, var(--bg-color) 0%, #edeff2 100%);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  padding: 2.5rem 1.5rem 1rem;
+  text-align: center;
+}
+
+header h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3rem);
+  letter-spacing: -0.03em;
+}
+
+header p {
+  margin: 0.75rem auto 0;
+  max-width: 40rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+body.requires-auth main {
+  display: none;
+}
+
+body.authenticated main {
+  display: grid;
+}
+
+body.requires-auth #login-screen {
+  display: block;
+}
+
+body.authenticated #login-screen {
+  display: none;
+}
+
+#login-screen {
+  margin: 2rem auto 0;
+  width: min(32rem, 92vw);
+  background: var(--card-color);
+  border-radius: 0.9rem;
+  border: 1px solid var(--card-border);
+  padding: clamp(1.25rem, 4vw, 1.75rem);
+  box-shadow: none;
+  display: none;
+}
+
+#login-screen form {
+  display: grid;
+  gap: 1rem;
+}
+
+#login-screen label {
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+#login-screen label.remember-token {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 500;
+}
+
+#login-screen label.remember-token input[type="checkbox"] {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+#login-screen label.remember-token .remember-token-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+#login-screen label.remember-token .remember-token-text strong {
+  font-weight: 600;
+}
+
+#login-screen label.remember-token .remember-token-text span {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+#login-screen input[type="password"] {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(120, 124, 131, 0.4);
+  background: #ffffff;
+  color: inherit;
+  font: inherit;
+}
+
+#login-screen input[type="password"]:focus {
+  outline: 2px solid rgba(120, 124, 131, 0.35);
+  outline-offset: 0;
+  border-color: rgba(120, 124, 131, 0.75);
+  box-shadow: none;
+}
+
+.login-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.login-actions button {
+  flex: 1 1 auto;
+  min-width: 8rem;
+}
+
+.login-status {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  min-height: 1.35em;
+}
+
+.login-status.is-success {
+  color: var(--success);
+}
+
+.login-status.is-error {
+  color: var(--danger);
+}
+
+.logout-button {
+  display: none;
+  margin: 1.5rem auto 0;
+}
+
+body.authenticated .logout-button {
+  display: inline-flex;
+}
+
+main {
+  flex: 1 0 auto;
+  width: min(1100px, 92vw);
+  margin: 0 auto 3rem;
+  display: grid;
+  gap: 2rem;
+}
+
+section {
+  background: var(--card-color);
+  border-radius: 0.9rem;
+  border: 1px solid var(--card-border);
+  padding: clamp(1.25rem, 2vw, 1.75rem);
+  box-shadow: none;
+}
+
+section h2 {
+  margin-top: 0;
+  font-size: 1.5rem;
+  letter-spacing: -0.015em;
+}
+
+.config-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.config-field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.config-field label {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.config-field .field-input {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.config-field input[type="text"],
+.config-field input[type="number"],
+.config-field select,
+.config-field textarea {
+  width: min(100%, 30rem);
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(120, 124, 131, 0.4);
+  background: #ffffff;
+  color: inherit;
+  font: inherit;
+  transition: border-color 0.2s ease, outline-color 0.2s ease;
+  resize: vertical;
+}
+
+.config-field textarea.multiline-input {
+  width: min(100%, 42rem);
+  min-height: 6rem;
+  line-height: 1.4;
+}
+
+.config-field input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--accent);
+}
+
+.config-field input:focus,
+.config-field select:focus,
+.config-field textarea:focus {
+  outline: 2px solid rgba(120, 124, 131, 0.35);
+  outline-offset: 0;
+  border-color: rgba(120, 124, 131, 0.75);
+  box-shadow: none;
+}
+
+.config-field .field-description {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  font-size: 0.95rem;
+}
+
+.config-field .field-default {
+  display: inline-block;
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+  color: rgba(95, 100, 115, 0.75);
+}
+
+.form-actions {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--card-border);
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+button {
+  appearance: none;
+  border: 1px solid rgba(120, 124, 131, 0.35);
+  border-radius: 0.55rem;
+  padding: 0.65rem 1.35rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: #ffffff;
+  color: inherit;
+  transition: transform 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: rgba(124, 140, 255, 0.6);
+  color: #ffffff;
+}
+
+button.primary:hover {
+  background: var(--accent-strong);
+}
+
+button.secondary {
+  background: rgba(120, 124, 131, 0.08);
+  color: inherit;
+}
+
+button.secondary:hover {
+  background: rgba(120, 124, 131, 0.12);
+}
+
+button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(120, 124, 131, 0.6);
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+button:focus-visible {
+  outline: 2px solid rgba(120, 124, 131, 0.45);
+  outline-offset: 2px;
+}
+
+.status {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.9rem;
+  font-size: 0.95rem;
+  background: rgba(120, 124, 131, 0.1);
+  border: 1px solid rgba(120, 124, 131, 0.2);
+  color: var(--text-secondary);
+}
+
+.status ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.status li {
+  margin: 0;
+  padding: 0;
+  list-style: disc;
+}
+
+.status.success {
+  background: rgba(107, 169, 132, 0.18);
+  border-color: rgba(107, 169, 132, 0.35);
+  color: var(--success);
+}
+
+.status.error {
+  background: rgba(210, 113, 113, 0.18);
+  border-color: rgba(210, 113, 113, 0.35);
+  color: var(--danger);
+}
+
+.config-field.is-error label {
+  color: var(--danger);
+}
+
+.config-field.is-error .value-input,
+.config-field.is-error textarea[data-multiline] {
+  border-color: rgba(210, 113, 113, 0.6);
+  box-shadow: none;
+  outline: 1px solid rgba(210, 113, 113, 0.25);
+  outline-offset: 0;
+}
+
+.logs-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.logs-header select {
+  min-width: 14rem;
+}
+
+.log-meta {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.log-output {
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 1rem;
+  border: 1px solid var(--card-border);
+  padding: 1rem;
+  margin-top: 1rem;
+  max-height: 24rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 768px) {
+  main {
+    gap: 1.25rem;
+  }
+
+  section {
+    padding: 1rem;
+  }
+
+  .config-field input[type="text"],
+  .config-field input[type="number"],
+  .config-field select,
+  .config-field textarea {
+    width: 100%;
+  }
+
+  .config-field textarea.multiline-input {
+    width: 100%;
+  }
+}

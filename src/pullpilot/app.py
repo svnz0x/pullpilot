@@ -276,13 +276,23 @@ class ConfigAPI:
         headers: Optional[Mapping[str, str]] = None,
     ) -> Tuple[int, Dict[str, Any]]:
         method = method.upper()
-        ui_public_paths = {"/", "/ui"}
+        ui_public_paths = {
+            "/",
+            "/ui",
+            "/ui/",
+            "/ui/styles.css",
+            "/ui/app.js",
+            "/ui/manifest.json",
+        }
+        ui_public_prefixes = ("/ui/assets",)
         ui_auth_only_paths = {"/ui/auth-check"}
         is_ui_request = path == "/" or path.startswith("/ui")
+        is_public_asset_request = any(path.startswith(prefix) for prefix in ui_public_prefixes)
         requires_auth = (
             path in ui_auth_only_paths
             or (
-                path not in ui_public_paths
+                not is_public_asset_request
+                and path not in ui_public_paths
                 and (path.startswith("/ui") or path in {"/config", "/schedule"})
             )
         )
@@ -380,7 +390,7 @@ class ConfigAPI:
                 }
             return HTTPStatus.OK, logs_payload
 
-        if path in {"/", "/ui"}:
+        if path in {"/", "/ui", "/ui/"}:
             return HTTPStatus.OK, {"message": "ui"}
 
         return HTTPStatus.NOT_FOUND, {"error": "not found"}
@@ -495,10 +505,55 @@ def create_app(
     api = ConfigAPI(store=store, schedule_store=schedule_store)
     try:  # pragma: no cover - exercised when FastAPI is available
         from fastapi import Depends, FastAPI, HTTPException, Request
-        from fastapi.responses import HTMLResponse, JSONResponse, Response
+        from fastapi.responses import (
+            FileResponse,
+            HTMLResponse,
+            JSONResponse,
+            RedirectResponse,
+            Response,
+        )
+        from fastapi.staticfiles import StaticFiles
 
         app = FastAPI()
-        ui_index_content = get_resource_path("ui/index.html").read_text(encoding="utf-8")
+
+        ui_root_dir = get_resource_path("ui")
+        ui_dist_dir = ui_root_dir / "dist"
+        dist_index_path = ui_dist_dir / "index.html"
+        has_built_assets = dist_index_path.exists()
+        ui_index_path = dist_index_path if has_built_assets else ui_root_dir / "index.html"
+        ui_index_content = ui_index_path.read_text(encoding="utf-8")
+        ui_assets_dir = ui_dist_dir / "assets" if has_built_assets else None
+        ui_manifest_path = ui_dist_dir / "manifest.json" if has_built_assets else None
+        ui_styles_path = ui_root_dir / "styles.css"
+        ui_script_path = ui_root_dir / "app.js"
+
+        if ui_assets_dir and ui_assets_dir.exists():
+            app.mount("/ui/assets", StaticFiles(directory=ui_assets_dir), name="ui-assets")
+
+        if ui_manifest_path and ui_manifest_path.exists():
+            @app.get("/ui/manifest.json")
+            def get_ui_manifest() -> FileResponse:
+                return FileResponse(ui_manifest_path, media_type="application/json")
+
+        @app.get("/", include_in_schema=False)
+        def redirect_root_to_ui() -> RedirectResponse:
+            return RedirectResponse("/ui/", status_code=HTTPStatus.TEMPORARY_REDIRECT)
+
+        @app.get("/ui", include_in_schema=False)
+        def redirect_ui() -> RedirectResponse:
+            return RedirectResponse("/ui/", status_code=HTTPStatus.TEMPORARY_REDIRECT)
+
+        @app.get("/ui/styles.css")
+        def get_ui_styles() -> FileResponse:
+            return FileResponse(ui_styles_path, media_type="text/css")
+
+        @app.get("/ui/app.js")
+        def get_ui_script() -> FileResponse:
+            return FileResponse(ui_script_path, media_type="application/javascript")
+
+        @app.get("/ui/", response_class=HTMLResponse)
+        def get_ui_page() -> HTMLResponse:
+            return HTMLResponse(ui_index_content)
 
         async def _require_auth(request: Request) -> None:
             authenticator = api.authenticator
@@ -513,11 +568,6 @@ def create_app(
             if authenticator.authorize(request.headers):
                 return
             raise HTTPException(status_code=HTTPStatus.UNAUTHORIZED, detail={"error": "unauthorized"})
-
-        @app.get("/", response_class=HTMLResponse)
-        @app.get("/ui", response_class=HTMLResponse)
-        def get_ui_page() -> HTMLResponse:
-            return HTMLResponse(ui_index_content)
 
         @app.get("/ui/config", dependencies=[Depends(_require_auth)])
         def get_ui_config(request: Request):
