@@ -1,22 +1,13 @@
 services:
   pullpilot:
     image: ghcr.io/svnz0x/pullpilot:latest
-    # Usa "build: ." si prefieres construir la imagen localmente
     env_file: .env
     environment:
-      PULLPILOT_TOKEN: ${PULLPILOT_TOKEN:?Define PULLPILOT_TOKEN en .env}
-      # O define PULLPILOT_TOKEN_FILE con la ruta a un fichero montado (por ejemplo `/run/secrets/pullpilot_token`).
+      PULLPILOT_TOKEN: ${PULLPILOT_TOKEN}
       # PULLPILOT_TOKEN_FILE: /run/secrets/pullpilot_token
     ports:
       - "8000:8000"
     volumes:
-      # Directorio persistente con la configuración y los datos definidos desde la UI
-      # (ajusta ./pullpilot-data a tu ruta preferida en el host o declara un volumen nombrado).
       - ./pullpilot-data:/app/config:rw
       - /var/run/docker.sock:/var/run/docker.sock:rw
     restart: unless-stopped
-
-# Si prefieres un volumen nombrado, declara por ejemplo:
-# volumes:
-#   pullpilot_config:
-# y reemplaza el bind-mount anterior por `pullpilot_config:/app/config:rw`.
