@@ -13,7 +13,9 @@ from pullpilot.schedule import ScheduleStore
 
 @pytest.fixture()
 def schema_path() -> Path:
-    return Path(__file__).resolve().parents[1] / "config" / "schema.json"
+    from pullpilot.resources import get_resource_path
+
+    return get_resource_path("config/schema.json")
 
 
 def ensure_required_paths(values: dict[str, object], tmp_path: Path) -> None:

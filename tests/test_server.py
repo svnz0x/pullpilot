@@ -17,7 +17,9 @@ from pullpilot.app import (
 
 @pytest.fixture()
 def store(tmp_path: Path) -> ConfigStore:
-    schema = Path(__file__).resolve().parents[1] / "config" / "schema.json"
+    from pullpilot.resources import get_resource_path
+
+    schema = get_resource_path("config/schema.json")
     config_path = tmp_path / "updater.conf"
     return ConfigStore(config_path, schema)
 
