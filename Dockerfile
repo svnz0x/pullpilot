@@ -1,4 +1,17 @@
 # syntax=docker/dockerfile:1
+
+FROM node:20-slim AS ui-builder
+
+WORKDIR /build
+
+COPY package.json vite.config.js ./
+
+RUN npm install
+
+COPY src/pullpilot/resources/ui ./src/pullpilot/resources/ui
+
+RUN npm run build
+
 # Fijo a bookworm para evitar que el tag "slim" salte a trixie y rompa APT
 FROM python:3.11-slim-bookworm AS pullpilot
 
@@ -49,6 +62,7 @@ RUN cp -r ./config.defaults ./config
 COPY scripts/updater.sh ./updater.sh
 COPY config/updater.conf ./updater.conf
 COPY src ./src
+COPY --from=ui-builder /build/src/pullpilot/resources/ui/dist ./src/pullpilot/resources/ui/dist
 
 RUN chmod +x /app/updater.sh
 
