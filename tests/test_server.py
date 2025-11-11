@@ -142,6 +142,68 @@ def test_put_rejects_multiline_paths_outside_allowed_directory(
     assert any(error["field"] == "COMPOSE_PROJECTS_FILE" for error in response["details"])
 
 
+def test_put_creates_required_directories(
+    auth_headers: Mapping[str, str],
+    tmp_path: Path,
+    store: ConfigStore,
+    schedule_store: ScheduleStore,
+) -> None:
+    api = create_app(store=store, schedule_store=schedule_store)
+    status, body = api.handle_request("GET", "/config", headers=auth_headers)
+    assert status == HTTPStatus.OK
+
+    values = dict(body["values"])
+    base_dir = tmp_path / "compose" / "projects"
+    log_dir = tmp_path / "logs"
+    assert not base_dir.exists()
+    assert not log_dir.exists()
+    values["BASE_DIR"] = str(base_dir)
+    values["LOG_DIR"] = str(log_dir)
+
+    status, response = api.handle_request(
+        "PUT",
+        "/config",
+        {"values": values},
+        headers=auth_headers,
+    )
+
+    assert status == HTTPStatus.OK
+    assert response["values"]["BASE_DIR"] == str(base_dir)
+    assert response["values"]["LOG_DIR"] == str(log_dir)
+    assert base_dir.is_dir()
+    assert log_dir.is_dir()
+
+
+def test_put_rejects_directories_outside_volume(
+    auth_headers: Mapping[str, str],
+    tmp_path: Path,
+    store: ConfigStore,
+    schedule_store: ScheduleStore,
+) -> None:
+    api = create_app(store=store, schedule_store=schedule_store)
+    status, body = api.handle_request("GET", "/config", headers=auth_headers)
+    assert status == HTTPStatus.OK
+
+    values = dict(body["values"])
+    base_dir = tmp_path.parent / "escape-base"
+    log_dir = tmp_path.parent / "escape-logs"
+    values["BASE_DIR"] = str(base_dir)
+    values["LOG_DIR"] = str(log_dir)
+
+    status, response = api.handle_request(
+        "PUT",
+        "/config",
+        {"values": values},
+        headers=auth_headers,
+    )
+
+    assert status == HTTPStatus.BAD_REQUEST
+    assert response["error"] == "invalid directory"
+    assert any(detail["field"] == "BASE_DIR" for detail in response.get("details", []))
+    assert not base_dir.exists()
+    assert not log_dir.exists()
+
+
 def test_requests_rejected_without_credentials(
     monkeypatch, store: ConfigStore, schedule_store: ScheduleStore
 ) -> None:
