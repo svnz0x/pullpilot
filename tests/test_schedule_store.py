@@ -123,6 +123,29 @@ def test_default_path_uses_config_location(monkeypatch: pytest.MonkeyPatch, tmp_
     assert payload["expression"] == "45 3 * * 3"
 
 
+def test_load_logs_and_raises_when_permission_denied(
+    schedule_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    schedule_path.write_text("{}", encoding="utf-8")
+    store = ScheduleStore(schedule_path)
+
+    original_read_text = Path.read_text
+
+    def failing_read_text(self: Path, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if self == schedule_path:
+            raise PermissionError("Permission denied")
+        return original_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", failing_read_text)
+
+    with caplog.at_level("WARNING", logger="pullpilot.schedule"):
+        with pytest.raises(ScheduleValidationError) as excinfo:
+            store.load()
+
+    assert "revisa los permisos" in str(excinfo.value)
+    assert any("Permission denied" in record.getMessage() for record in caplog.records)
+
+
 def test_default_schedule_path_points_to_packaged_file() -> None:
     from pullpilot.resources import get_resource_path
 

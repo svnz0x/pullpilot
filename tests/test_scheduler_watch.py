@@ -208,6 +208,47 @@ def test_cron_write_error_is_logged_and_loop_continues(
     assert all("Iniciando supercronic" not in entry for entry in logs)
 
 
+def test_run_logs_permission_error_and_continues(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    schedule_path = tmp_path / "schedule.json"
+    schedule_path.write_text("{}", encoding="utf-8")
+    cron_path = tmp_path / "schedule.cron"
+
+    watcher = SchedulerWatcher(schedule_path, cron_path, "echo hi", DEFAULT_INTERVAL)
+
+    original_read_text = Path.read_text
+
+    def failing_read_text(self: Path, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if self == schedule_path:
+            raise PermissionError("Permission denied")
+        return original_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", failing_read_text)
+
+    logs: List[str] = []
+
+    def capture_log(message: str) -> None:
+        logs.append(message)
+
+    monkeypatch.setattr("pullpilot.scheduler.watch._log", capture_log)
+
+    class SingleLoopEvent:
+        def is_set(self) -> bool:
+            return False
+
+        def wait(self, interval: float) -> bool:
+            return True
+
+    with caplog.at_level("WARNING", logger="pullpilot.schedule"):
+        watcher.run(stop_event=SingleLoopEvent())
+
+    assert watcher.current_signature is None
+    assert watcher.process is None
+    assert any("No se pudo interpretar la programación" in entry for entry in logs)
+    assert any("Permission denied" in record.getMessage() for record in caplog.records)
+
+
 def test_once_completion_keeps_signature(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     schedule_data = {"mode": "once", "datetime": "2023-09-01T10:00:00Z"}
     signature = json.dumps(schedule_data, sort_keys=True)
