@@ -5,6 +5,8 @@ services:
     env_file: .env
     environment:
       PULLPILOT_TOKEN: ${PULLPILOT_TOKEN:?Define PULLPILOT_TOKEN en .env}
+      # O define PULLPILOT_TOKEN_FILE con la ruta a un fichero montado (por ejemplo `/run/secrets/pullpilot_token`).
+      # PULLPILOT_TOKEN_FILE: /run/secrets/pullpilot_token
     ports:
       - "8000:8000"
     volumes:
