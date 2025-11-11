@@ -1,3 +1,4 @@
+import os
 from http import HTTPStatus
 from pathlib import Path
 from typing import Mapping
@@ -7,7 +8,12 @@ import pytest
 
 from pullpilot.config import ConfigError, ConfigStore
 from pullpilot.schedule import ScheduleStore
-from pullpilot.app import Authenticator, ConfigAPI, create_app
+from pullpilot.app import (
+    Authenticator,
+    ConfigAPI,
+    _load_token_from_env_files,
+    create_app,
+)
 
 @pytest.fixture()
 def store(tmp_path: Path) -> ConfigStore:
@@ -200,6 +206,28 @@ def test_token_auth_allows_headers_with_ows(
 
     status, body = api.handle_request("GET", "/config", headers={"Authorization": header_value})
     assert status == HTTPStatus.OK
+
+
+@pytest.mark.parametrize(
+    "line, expected",
+    [
+        ("export PULLPILOT_TOKEN=super-secret", "super-secret"),
+        ("PULLPILOT_TOKEN=another-secret   # comment", "another-secret"),
+        ("export   PULLPILOT_TOKEN=\"quoted # value\"   # trailing comment", "quoted # value"),
+    ],
+)
+def test_env_loader_supports_real_world_syntax(
+    line: str, expected: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
+    monkeypatch.chdir(tmp_path)
+    env_path = tmp_path / ".env"
+    env_path.write_text(f"{line}\n", encoding="utf-8")
+
+    _load_token_from_env_files()
+
+    assert os.environ["PULLPILOT_TOKEN"] == expected
+    monkeypatch.setenv("PULLPILOT_TOKEN", expected)
 
 
 def test_create_app_without_token_raises(
