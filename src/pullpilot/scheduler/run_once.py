@@ -9,6 +9,8 @@ import time
 from datetime import datetime, timezone
 from typing import Dict, List, Tuple
 
+from pullpilot.schedule import normalize_datetime_utc
+
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Execute a command once at the desired datetime")
@@ -21,13 +23,7 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
 
 
 def parse_datetime(value: str) -> datetime:
-    candidate = value.strip()
-    if candidate.endswith("Z"):
-        candidate = f"{candidate[:-1]}+00:00"
-    parsed = datetime.fromisoformat(candidate)
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+    return normalize_datetime_utc(value)
 
 
 def run_once(argv: List[str] | None = None) -> int:

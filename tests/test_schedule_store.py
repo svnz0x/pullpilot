@@ -8,6 +8,7 @@ from pullpilot.schedule import (
     DEFAULT_SCHEDULE_PATH,
     ScheduleStore,
     ScheduleValidationError,
+    normalize_datetime_utc,
 )
 
 
@@ -95,9 +96,11 @@ def test_save_preserves_existing_file_on_write_failure(
 
 def test_save_normalizes_datetime(schedule_path: Path) -> None:
     store = ScheduleStore(schedule_path)
-    saved = store.save({"mode": "once", "datetime": "2035-12-01T23:15:00+02:00"})
+    raw_value = "2035-12-01T23:15:00+02:00"
+    saved = store.save({"mode": "once", "datetime": raw_value})
     assert saved.mode == "once"
-    assert saved.datetime.endswith("+00:00")
+    expected = normalize_datetime_utc(raw_value).isoformat()
+    assert saved.datetime == expected
 
 
 def test_save_rejects_expression_when_once(schedule_path: Path) -> None:
