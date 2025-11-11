@@ -122,6 +122,7 @@ def base_environment(tmp_path: Path, docker_path: Path) -> dict[str, str]:
     projects_list.write_text(f"{project_dir}\n", encoding="utf-8")
 
     log_dir = tmp_path / "logs"
+    log_dir.mkdir()
     lock_file = tmp_path / "lock"
     conf_path = tmp_path / "updater.conf"
     conf_path.write_text(
@@ -170,6 +171,7 @@ def test_script_allows_empty_base_directory(tmp_path: Path, fake_docker: Path) -
     base_dir.mkdir()
 
     log_dir = tmp_path / "logs"
+    log_dir.mkdir()
     lock_file = tmp_path / "lock"
     conf_path = tmp_path / "updater-empty.conf"
     conf_path.write_text(
@@ -246,3 +248,68 @@ def test_script_requires_executable_path(tmp_path: Path, fake_docker: Path) -> N
 
     assert result.returncode != 0
     assert "no existe o no es ejecutable" in result.stdout
+
+
+def test_script_fails_when_base_dir_missing(tmp_path: Path, fake_docker: Path) -> None:
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    conf_path = tmp_path / "updater-missing-base.conf"
+    conf_path.write_text(
+        textwrap.dedent(
+            f"""
+            BASE_DIR=""
+            LOG_DIR="{log_dir}"
+            LOCK_FILE="{tmp_path / "lock"}"
+            DRY_RUN=true
+            """
+        ).strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_docker.parent}:{env.get('PATH', '')}",
+            "CONF_FILE": str(conf_path),
+            "NO_COLOR": "1",
+        }
+    )
+
+    result = run_updater(env)
+
+    assert result.returncode != 0
+    assert "BASE_DIR no puede estar vacío" in result.stdout
+
+
+def test_script_fails_when_log_dir_missing(tmp_path: Path, fake_docker: Path) -> None:
+    base_dir = tmp_path / "compose"
+    base_dir.mkdir()
+    missing_log = tmp_path / "logs"
+    conf_path = tmp_path / "updater-missing-log.conf"
+    conf_path.write_text(
+        textwrap.dedent(
+            f"""
+            BASE_DIR="{base_dir}"
+            LOG_DIR="{missing_log}"
+            LOCK_FILE="{tmp_path / "lock"}"
+            DRY_RUN=true
+            """
+        ).strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_docker.parent}:{env.get('PATH', '')}",
+            "CONF_FILE": str(conf_path),
+            "NO_COLOR": "1",
+        }
+    )
+
+    result = run_updater(env)
+
+    assert result.returncode != 0
+    assert f"LOG_DIR apunta a un directorio inexistente: {missing_log}" in result.stdout

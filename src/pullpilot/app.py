@@ -398,25 +398,40 @@ class ConfigAPI:
     def _gather_logs(self, selected_name: Optional[str] = None) -> Dict[str, Any]:
         data = self.store.load()
         log_dir_raw = data.values.get("LOG_DIR", "")
-        log_dir_str = str(log_dir_raw) if log_dir_raw is not None else ""
-        try:
-            log_dir = Path(log_dir_str).expanduser()
-        except Exception:
-            log_dir = Path(log_dir_str)
+        log_dir_str = str(log_dir_raw).strip() if log_dir_raw is not None else ""
+        if not log_dir_str:
+            return {
+                "log_dir": "",
+                "files": [],
+                "selected": None,
+                "notice": "LOG_DIR no está configurado. Define un directorio absoluto para poder consultar los logs.",
+            }
 
-        files_payload = []
+        try:
+            log_dir_path = Path(log_dir_str).expanduser()
+        except Exception:
+            log_dir_path = Path(log_dir_str)
+
+        if not log_dir_path.exists() or not log_dir_path.is_dir():
+            return {
+                "log_dir": log_dir_str,
+                "files": [],
+                "selected": None,
+                "notice": f"El directorio de logs '{log_dir_str}' no existe o no es accesible.",
+            }
+
+        files_payload: list[Dict[str, Any]] = []
         selected_payload: Optional[Dict[str, Any]] = None
         entries: list[Tuple[Path, os.stat_result]] = []
         try:
-            if log_dir.exists():
-                for entry in log_dir.iterdir():
-                    if not entry.is_file() or entry.suffix != ".log":
-                        continue
-                    try:
-                        stat_result = entry.stat()
-                    except OSError:
-                        continue
-                    entries.append((entry, stat_result))
+            for entry in log_dir_path.iterdir():
+                if not entry.is_file() or entry.suffix != ".log":
+                    continue
+                try:
+                    stat_result = entry.stat()
+                except OSError:
+                    continue
+                entries.append((entry, stat_result))
         except OSError:
             entries = []
 
@@ -441,7 +456,7 @@ class ConfigAPI:
                 selected_payload["content"] = content
 
         return {
-            "log_dir": str(log_dir),
+            "log_dir": str(log_dir_path),
             "files": files_payload,
             "selected": selected_payload,
         }

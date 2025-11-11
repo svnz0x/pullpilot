@@ -6,19 +6,21 @@
     {
       "name": "BASE_DIR",
       "type": "string",
-      "default": "/srv/compose",
-      "description": "Directorio raíz donde se escanean proyectos Docker Compose de forma recursiva cuando no se define COMPOSE_PROJECTS_FILE.",
+      "default": "",
+      "description": "Directorio raíz donde se escanean proyectos Docker Compose de forma recursiva cuando no se define COMPOSE_PROJECTS_FILE. Debe configurarse a una ruta absoluta existente antes de ejecutar el script.",
       "constraints": {
-        "pattern": "^/.*"
+        "pattern": "^/.*",
+        "allow_empty": false
       }
     },
     {
       "name": "LOG_DIR",
       "type": "string",
-      "default": "/var/log/docker-updater",
-      "description": "Ruta donde se almacenan los logs diarios del script.",
+      "default": "",
+      "description": "Ruta donde se almacenan los logs diarios del script. Debe establecerse a un directorio absoluto existente antes de ejecutar el script.",
       "constraints": {
-        "pattern": "^/.*"
+        "pattern": "^/.*",
+        "allow_empty": false
       }
     },
     {

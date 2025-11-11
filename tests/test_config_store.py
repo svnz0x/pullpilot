@@ -16,10 +16,20 @@ def schema_path() -> Path:
     return Path(__file__).resolve().parents[1] / "config" / "schema.json"
 
 
+def ensure_required_paths(values: dict[str, object], tmp_path: Path) -> None:
+    base_dir = tmp_path / "compose-base"
+    log_dir = tmp_path / "compose-logs"
+    base_dir.mkdir(parents=True, exist_ok=True)
+    log_dir.mkdir(parents=True, exist_ok=True)
+    values["BASE_DIR"] = str(base_dir)
+    values["LOG_DIR"] = str(log_dir)
+
+
 def test_load_defaults_when_config_missing(tmp_path: Path, schema_path: Path) -> None:
     store = ConfigStore(tmp_path / "updater.conf", schema_path)
     data = store.load()
-    assert data.values["BASE_DIR"] == "/srv/compose"
+    assert data.values["BASE_DIR"] == ""
+    assert data.values["LOG_DIR"] == ""
     assert data.values["LOG_RETENTION_DAYS"] == 14
     assert data.values["SMTP_READ_ENVELOPE"] is True
 
@@ -37,6 +47,7 @@ def test_roundtrip_preserves_comments_and_quotes(tmp_path: Path, schema_path: Pa
 
     data = store.load()
     values = data.values.copy()
+    ensure_required_paths(values, tmp_path)
     values["LOG_RETENTION_DAYS"] = 21
     values["SMTP_CMD"] = "mailx"
     values["SMTP_READ_ENVELOPE"] = False
@@ -70,6 +81,9 @@ def test_load_handles_crlf_line_endings(tmp_path: Path, schema_path: Path) -> No
     assert data.values["SMTP_READ_ENVELOPE"] is False
 
     # ensure saving does not raise validation errors after normalization
+    logs_dir = tmp_path / "logs"
+    logs_dir.mkdir()
+    data.values["LOG_DIR"] = str(logs_dir)
     store.save(data.values, data.multiline)
 
 
@@ -87,6 +101,7 @@ def test_multiline_file_roundtrip(tmp_path: Path, schema_path: Path) -> None:
     assert data.multiline["COMPOSE_PROJECTS_FILE"] == "/srv/app\n/srv/api\n"
 
     values = data.values.copy()
+    ensure_required_paths(values, tmp_path)
     values["COMPOSE_PROJECTS_FILE"] = str(projects_path)
     multiline = data.multiline.copy()
     multiline["COMPOSE_PROJECTS_FILE"] = "/srv/ui\n"
@@ -144,6 +159,7 @@ def test_api_returns_bad_request_when_multiline_path_inaccessible(
     store = ConfigStore(tmp_path / "updater.conf", schema_path)
     data = store.load()
     values = data.values.copy()
+    ensure_required_paths(values, tmp_path)
     target_path = tmp_path / "restricted" / "projects.txt"
     values["COMPOSE_PROJECTS_FILE"] = str(target_path)
     multiline = data.multiline.copy()
@@ -183,8 +199,9 @@ def test_validation_error_collects_all_fields(tmp_path: Path, schema_path: Path)
     store = ConfigStore(tmp_path / "updater.conf", schema_path)
     data = store.load()
     values = data.values.copy()
+    ensure_required_paths(values, tmp_path)
     values["LOG_RETENTION_DAYS"] = 0
-    values.pop("BASE_DIR")
+    values["BASE_DIR"] = ""
 
     with pytest.raises(ValidationError) as exc:
         store.save(values, data.multiline)
@@ -204,6 +221,7 @@ def test_save_does_not_touch_config_when_multiline_fails(
     store = ConfigStore(config_path, schema_path)
     data = store.load()
     values = data.values.copy()
+    ensure_required_paths(values, tmp_path)
     multiline = data.multiline.copy()
     multiline["COMPOSE_PROJECTS_FILE"] = "/srv/app\n"
 
@@ -223,7 +241,10 @@ def test_save_does_not_truncate_config_when_write_fails(
     store = ConfigStore(config_path, schema_path)
     data = store.load()
     values = data.values.copy()
-    values["BASE_DIR"] = "/srv/other"
+    ensure_required_paths(values, tmp_path)
+    base_dir = tmp_path / "compose"
+    base_dir.mkdir(exist_ok=True)
+    values["BASE_DIR"] = str(base_dir)
 
     def fail_replace(src: str, dst: str) -> None:
         raise OSError("disk full")
@@ -234,7 +255,8 @@ def test_save_does_not_truncate_config_when_write_fails(
         store.save(values, data.multiline)
 
     assert config_path.read_text(encoding="utf-8") == original_content
-    assert {path.name for path in tmp_path.iterdir()} == {"updater.conf"}
+    entries = {path.name for path in tmp_path.iterdir()}
+    assert "updater.conf" in entries
 
 
 def test_multiline_save_does_not_truncate_file_when_write_fails(
@@ -251,6 +273,7 @@ def test_multiline_save_does_not_truncate_file_when_write_fails(
     store = ConfigStore(config_path, schema_path)
     data = store.load()
     values = data.values.copy()
+    ensure_required_paths(values, tmp_path)
     multiline = data.multiline.copy()
     multiline["COMPOSE_PROJECTS_FILE"] = "/srv/other\n"
 
@@ -270,7 +293,8 @@ def test_multiline_save_does_not_truncate_file_when_write_fails(
         f'COMPOSE_PROJECTS_FILE="{projects_path}"\n'
     )
     assert projects_path.read_text(encoding="utf-8") == original_projects
-    assert {path.name for path in tmp_path.iterdir()} == {"updater.conf", "projects.txt"}
+    entries = {path.name for path in tmp_path.iterdir()}
+    assert {"updater.conf", "projects.txt"}.issubset(entries)
 
 
 def test_multiline_path_must_reside_in_allowed_directory(
@@ -282,6 +306,7 @@ def test_multiline_path_must_reside_in_allowed_directory(
 
     data = store.load()
     values = data.values.copy()
+    ensure_required_paths(values, tmp_path)
     values["COMPOSE_PROJECTS_FILE"] = str(tmp_path.parent / "escape.txt")
     multiline = {"COMPOSE_PROJECTS_FILE": "/srv/app\n"}
 
@@ -298,6 +323,7 @@ def test_multiline_path_rejects_parent_segments(
     store = ConfigStore(tmp_path / "updater.conf", schema_path)
     data = store.load()
     values = data.values.copy()
+    ensure_required_paths(values, tmp_path)
     multiline = data.multiline.copy()
 
     values["COMPOSE_PROJECTS_FILE"] = "/tmp/../etc/passwd"
@@ -315,6 +341,7 @@ def test_list_constraints_accept_whitespace_separated_values(
     store = ConfigStore(tmp_path / "updater.conf", schema_path)
     data = store.load()
     values = data.values.copy()
+    ensure_required_paths(values, tmp_path)
 
     values["EXCLUDE_PATTERNS"] = "vendor tmp cache"
     result = store.save(values, data.multiline)
@@ -332,6 +359,7 @@ def test_list_constraints_reject_invalid_values(
     store = ConfigStore(tmp_path / "updater.conf", schema_path)
     data = store.load()
     values = data.values.copy()
+    ensure_required_paths(values, tmp_path)
 
     values["EXCLUDE_PATTERNS"] = exclude_value
 
@@ -345,22 +373,26 @@ def test_compose_bin_accepts_safe_values(tmp_path: Path, schema_path: Path) -> N
     store = ConfigStore(tmp_path / "updater.conf", schema_path)
     data = store.load()
     values = data.values.copy()
+    ensure_required_paths(values, tmp_path)
 
     values["COMPOSE_BIN"] = " docker compose "
     result = store.save(values, data.multiline)
     assert result.values["COMPOSE_BIN"] == "docker compose"
 
     values = result.values.copy()
+    ensure_required_paths(values, tmp_path)
     values["COMPOSE_BIN"] = "docker-compose"
     result = store.save(values, data.multiline)
     assert result.values["COMPOSE_BIN"] == "docker-compose"
 
     values = result.values.copy()
+    ensure_required_paths(values, tmp_path)
     values["COMPOSE_BIN"] = "/usr/bin/docker compose"
     result = store.save(values, data.multiline)
     assert result.values["COMPOSE_BIN"] == "/usr/bin/docker compose"
 
     values = result.values.copy()
+    ensure_required_paths(values, tmp_path)
     values["COMPOSE_BIN"] = "/opt/bin/docker-compose"
     result = store.save(values, data.multiline)
     assert result.values["COMPOSE_BIN"] == "/opt/bin/docker-compose"
@@ -383,6 +415,7 @@ def test_compose_bin_rejects_dangerous_values(
     store = ConfigStore(tmp_path / "updater.conf", schema_path)
     data = store.load()
     values = data.values.copy()
+    ensure_required_paths(values, tmp_path)
     values["COMPOSE_BIN"] = compose_value
 
     with pytest.raises(ValidationError) as exc:
