@@ -16,7 +16,6 @@ vive dentro del contenedor (mediante volúmenes persistentes), por lo que tras u
 ```text
 .
 ├─ .github/workflows/ghcr-publish.yml   # CI para construir y publicar a GHCR
-├─ Legacy - config/                     # Copia editable opcional de los defaults
 ├─ scripts/                             # Wrappers y utilidades (p. ej. updater.sh → canonical empaquetado)
 ├─ src/pullpilot/                       # Código de la API y utilidades
 ├─ tests/                               # Pruebas
@@ -37,7 +36,6 @@ docker run --rm -p 8000:8000 ghcr.io/svnz0x/pullpilot:latest
 - La imagen monta por defecto un volumen nombrado `pullpilot_config` en `/app/config`. En el primer arranque se copian automáticamente los archivos por defecto y, a partir de ahí, se preservan los cambios que hagas desde la API o editando el volumen. Los nuevos archivos añadidos a `config.defaults` (incluidos los subdirectorios) se sincronizan en arranques posteriores sin sobrescribir tus personalizaciones existentes.
 - Los ajustes relacionados con credenciales se definen mediante `PULLPILOT_TOKEN` (ver detalles más adelante). El resto de opciones se controlan desde la interfaz de usuario o modificando directamente los archivos persistidos en el volumen.
 - El esquema JSON empaquetado (`pullpilot.resources.get_resource_path("config/schema.json")`) documenta cada opción.
-- Para obtener una copia editable de los defaults (solo cuando lo necesites), ejecuta `python scripts/sync_config_defaults.py`. Esto poblará `Legacy - config/` sin sobrescribir archivos existentes.
 - Para validación rápida: `python scripts/validate_config.py`
 - Los archivos auxiliares multilinea (p. ej. `COMPOSE_PROJECTS_FILE`) deben residir dentro del mismo directorio de configuración (por defecto `/app/config/`). La API rechazará rutas fuera de ese árbol o que incluyan `..`.
 - Los campos `BASE_DIR` y `LOG_DIR` se definen desde la interfaz de usuario. Al guardar la configuración, el backend garantiza que existan como subdirectorios del volumen persistente (creándolos automáticamente si faltan) y conserva las rutas establecidas para reinicios futuros. Si la ruta apunta fuera del volumen montado, la API rechazará la petición para que montes ese directorio dentro del volumen antes de reintentar.
