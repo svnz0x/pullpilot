@@ -129,7 +129,7 @@
       "name": "EXCLUDE_PATTERNS",
       "type": "string",
       "default": ".git node_modules backup tmp",
-      "description": "Lista separada por espacios de patrones de directorio que se deben excluir del escaneo.",
+      "description": "Lista separada por espacios de patrones de directorio que se deben excluir del escaneo. Se valida como lista sin entradas vacías ni saltos de línea.",
       "constraints": {
         "is_list": true,
         "list_separator": "whitespace"
