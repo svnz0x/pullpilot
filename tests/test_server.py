@@ -247,6 +247,30 @@ def test_authenticator_ignores_wrapping_quotes_in_token(
     assert authenticator.token == "secreto"
 
 
+def test_authenticator_loads_token_from_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    token_path = tmp_path / "token.txt"
+    token_path.write_text("  token-desde-fichero  \n", encoding="utf-8")
+
+    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
+    monkeypatch.setenv("PULLPILOT_TOKEN_FILE", str(token_path))
+
+    authenticator = Authenticator.from_env()
+
+    assert authenticator.token == "token-desde-fichero"
+
+
+def test_authenticator_missing_token_file_falls_back_to_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
+    monkeypatch.setenv("PULLPILOT_TOKEN_FILE", str(tmp_path / "no-existe.txt"))
+
+    with pytest.raises(RuntimeError, match="PULLPILOT_TOKEN"):
+        Authenticator.from_env()
+
+
 def test_ui_logs_returns_internal_error_when_store_fails(
     auth_headers: Mapping[str, str],
     monkeypatch: pytest.MonkeyPatch,

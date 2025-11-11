@@ -5,6 +5,7 @@ import hmac
 import json
 import logging
 import os
+import stat
 from collections import deque
 from datetime import datetime, timezone
 from http import HTTPStatus
@@ -16,6 +17,7 @@ from .resources import get_resource_path
 from .schedule import DEFAULT_SCHEDULE_PATH, ScheduleStore, ScheduleValidationError
 
 TOKEN_ENV = "PULLPILOT_TOKEN"
+TOKEN_FILE_ENV = "PULLPILOT_TOKEN_FILE"
 
 LOGGER = logging.getLogger("pullpilot.app")
 
@@ -50,7 +52,7 @@ def _iter_candidate_env_paths() -> Iterable[Path]:
         yield resolved / ".env"
 
 
-def _load_token_from_env_files() -> None:
+def _load_token_from_env_files() -> Optional[str]:
     """Populate ``os.environ`` with the token from ``.env`` files when needed."""
 
     existing = os.environ.get(TOKEN_ENV)
@@ -58,7 +60,7 @@ def _load_token_from_env_files() -> None:
     if normalized_existing is not None:
         if existing != normalized_existing:
             os.environ[TOKEN_ENV] = normalized_existing
-        return
+        return normalized_existing
     if existing is not None:
         os.environ.pop(TOKEN_ENV, None)
 
@@ -82,7 +84,84 @@ def _load_token_from_env_files() -> None:
             if normalized is None:
                 continue
             os.environ[TOKEN_ENV] = normalized
-            return
+            return normalized
+    return None
+
+
+def _load_token_from_file_env() -> Optional[str]:
+    """Populate ``os.environ`` with the token defined via ``PULLPILOT_TOKEN_FILE``."""
+
+    raw_path = os.environ.get(TOKEN_FILE_ENV)
+    normalized_path = _normalize_env_value(raw_path)
+    if not normalized_path:
+        return None
+
+    token_path = Path(normalized_path)
+    try:
+        file_stat = token_path.lstat()
+    except FileNotFoundError:
+        LOGGER.warning(
+            "Token file '%s' not found; falling back to environment variables and .env files.",
+            token_path,
+        )
+        return None
+    except OSError as exc:
+        LOGGER.warning(
+            "Failed to access token file '%s': %s; falling back to other configuration sources.",
+            token_path,
+            exc,
+        )
+        return None
+
+    if not stat.S_ISREG(file_stat.st_mode):
+        LOGGER.warning(
+            "Token file '%s' is not a regular file; ignoring it and falling back to other sources.",
+            token_path,
+        )
+        return None
+
+    try:
+        content = token_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        LOGGER.warning(
+            "Failed to read token file '%s': %s; falling back to other configuration sources.",
+            token_path,
+            exc,
+        )
+        return None
+
+    normalized = _normalize_env_value(content)
+    if normalized is None:
+        LOGGER.warning(
+            "Token file '%s' is empty or contains only whitespace; ignoring it.",
+            token_path,
+        )
+        return None
+
+    os.environ[TOKEN_ENV] = normalized
+    return normalized
+
+
+def _load_token_from_configured_sources() -> Optional[str]:
+    """Ensure the authentication token is loaded from env vars, files or `.env`."""
+
+    token = _normalize_env_value(os.environ.get(TOKEN_ENV))
+    if token is not None:
+        if os.environ[TOKEN_ENV] != token:
+            os.environ[TOKEN_ENV] = token
+        return token
+
+    os.environ.pop(TOKEN_ENV, None)
+
+    token = _load_token_from_file_env()
+    if token is not None:
+        return token
+
+    token = _load_token_from_env_files()
+    if token is not None:
+        return token
+
+    return _normalize_env_value(os.environ.get(TOKEN_ENV))
 
 
 class Authenticator:
@@ -99,8 +178,7 @@ class Authenticator:
         ``PULLPILOT_TOKEN`` environment variable.
         """
 
-        _load_token_from_env_files()
-        token = _normalize_env_value(os.getenv(TOKEN_ENV))
+        token = _load_token_from_configured_sources()
         if token is None:
             raise RuntimeError(
                 "Missing authentication token. Configure the PULLPILOT_TOKEN environment variable."

@@ -62,7 +62,7 @@ docker run --rm -p 8000:8000 ghcr.io/svnz0x/pullpilot:latest
 ### Autenticación de la API
 
 - **Credenciales obligatorias**: la API de configuración requiere un token bearer establecido mediante la variable de entorno `PULLPILOT_TOKEN`. Si no se define, la aplicación rechazará todas las peticiones protegidas.
-- **Carga desde `.env`**: puedes declarar `PULLPILOT_TOKEN=...` en un fichero `.env` y referenciarlo desde `docker-compose` u otros gestores. Las comillas simples o dobles son opcionales; si las incluyes, el backend las eliminará automáticamente antes de validar el token.
+- **Carga desde `.env` o secretos montados**: puedes declarar `PULLPILOT_TOKEN=...` en un fichero `.env` y referenciarlo desde `docker-compose` u otros gestores. Las comillas simples o dobles son opcionales; si las incluyes, el backend las eliminará automáticamente antes de validar el token. En despliegues donde uses secretos montados, expón `PULLPILOT_TOKEN_FILE=/ruta/al/secreto` y el backend leerá el contenido del fichero de forma segura antes de caer en las variables de entorno o el `.env`.
 - La interfaz web local muestra un banner para introducir ese token. Por defecto solo se conserva en memoria, pero puedes marcar «Recordar token» para guardarlo en `localStorage` y reutilizarlo en ese navegador. Evita recordar el token en equipos compartidos o públicos. Mientras no se valide el token, la UI permanece deshabilitada y cualquier petición 401 solicitará nuevamente las credenciales antes de reintentarse automáticamente.
 
 ## Desarrollo local
@@ -83,6 +83,7 @@ services:
     env_file: .env
     environment:
       PULLPILOT_TOKEN: ${PULLPILOT_TOKEN:?Define PULLPILOT_TOKEN en .env}
+      # PULLPILOT_TOKEN_FILE: /run/secrets/pullpilot_token
     ports:
       - "8000:8000"
     volumes:
