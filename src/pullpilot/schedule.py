@@ -165,14 +165,20 @@ def _is_valid_cron(expression: str) -> bool:
     return all(CRON_FIELD_PATTERN.match(part) for part in parts)
 
 
-def _normalize_datetime(value: str) -> str:
+def normalize_datetime_utc(value: str) -> datetime:
+    """Parse ``value`` as an ISO 8601 datetime and normalize it to UTC."""
+
     candidate = value.strip()
     if candidate.endswith("Z"):
         candidate = f"{candidate[:-1]}+00:00"
-    try:
-        parsed = datetime.fromisoformat(candidate)
-    except ValueError as exc:  # pragma: no cover - sanity guard for unexpected formats
-        raise ScheduleValidationError("Formato de fecha/hora inválido.", field="datetime") from exc
+    parsed = datetime.fromisoformat(candidate)
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc).isoformat()
+    return parsed.astimezone(timezone.utc)
+
+
+def _normalize_datetime(value: str) -> str:
+    try:
+        return normalize_datetime_utc(value).isoformat()
+    except ValueError as exc:  # pragma: no cover - sanity guard for unexpected formats
+        raise ScheduleValidationError("Formato de fecha/hora inválido.", field="datetime") from exc
