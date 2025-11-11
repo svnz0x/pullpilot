@@ -34,7 +34,7 @@ except ImportError:  # pragma: no cover - optional dependency
     Response = None  # type: ignore
     StaticFiles = None  # type: ignore
 
-from .config import ConfigData, ConfigError, ConfigStore, ValidationError
+from .config import ConfigData, ConfigError, ConfigStore, PersistenceError, ValidationError
 from .resources import get_resource_path
 from .schedule import DEFAULT_SCHEDULE_PATH, ScheduleStore, ScheduleValidationError
 
@@ -523,6 +523,8 @@ class ConfigAPI:
             data = self.store.save(values, multiline)
         except ValidationError as exc:
             return HTTPStatus.BAD_REQUEST, {"error": "validation failed", "details": exc.errors}
+        except PersistenceError as exc:
+            return HTTPStatus.BAD_REQUEST, {"error": "write failed", "details": exc.details}
         return HTTPStatus.OK, self._serialize(data)
 
     def _handle_schedule_put(self, payload: Optional[Mapping[str, Any]]) -> Tuple[int, Dict[str, Any]]:

@@ -36,6 +36,24 @@ class ValidationError(ConfigError):
         self.errors = errors
 
 
+class PersistenceError(ConfigError):
+    """Raised when persisting configuration or auxiliary files fails."""
+
+    def __init__(self, *, path: Path, operation: str, error: OSError):
+        message_text = error.strerror or str(error)
+        message = f"Unable to {operation} at '{path}': {message_text}"
+        super().__init__(message)
+        detail: Dict[str, Any] = {
+            "path": str(path),
+            "operation": operation,
+            "message": message_text,
+        }
+        errno = getattr(error, "errno", None)
+        if errno is not None:
+            detail["errno"] = errno
+        self.details = [detail]
+
+
 @dataclass
 class SchemaVariable:
     name: str
@@ -536,12 +554,20 @@ class ConfigStore:
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(tmp_path, self.config_path)
-        except Exception:
+        except (OSError, PermissionError) as exc:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
             try:
                 tmp_path.unlink()
             except FileNotFoundError:
                 pass
-            raise
+            except OSError:
+                pass
+            raise PersistenceError(
+                path=self.config_path, operation="write configuration", error=exc
+            ) from exc
 
     def _format_value(self, line: AssignmentLine) -> str:
         variable = self.schema_map.get(line.key)
@@ -643,12 +669,20 @@ class ConfigStore:
                     handle.flush()
                     os.fsync(handle.fileno())
                 os.replace(tmp_path, target)
-            except Exception:
+            except (OSError, PermissionError) as exc:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
                 try:
                     tmp_path.unlink()
                 except FileNotFoundError:
                     pass
-                raise
+                except OSError:
+                    pass
+                raise PersistenceError(
+                    path=target, operation="write multiline content", error=exc
+                ) from exc
 
     def _normalize_multiline_path(self, key: str, raw: Path) -> Path:
         normalized = raw.expanduser()
@@ -718,4 +752,11 @@ def validate_conf(
     return data
 
 
-__all__ = ["ConfigStore", "ConfigError", "ValidationError", "ConfigData", "validate_conf"]
+__all__ = [
+    "ConfigStore",
+    "ConfigError",
+    "ValidationError",
+    "PersistenceError",
+    "ConfigData",
+    "validate_conf",
+]
