@@ -54,7 +54,7 @@ RUN set -eux; \
     chmod +x /usr/local/bin/supercronic
 
 # ---- Python deps que ya tenías ----
-RUN pip install --no-cache-dir "fastapi==0.110.*" "uvicorn[standard]==0.29.*" "starlette==0.36.*"
+RUN pip install --no-cache-dir "fastapi==0.115.*" "uvicorn[standard]==0.30.*"
 
 # ---- Archivos de la app (igual que tu Dockerfile original) ----
 COPY config ./config.defaults
