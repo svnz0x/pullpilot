@@ -5,7 +5,9 @@
 # PullPilot
 
 **PullPilot** es un servicio ligero para homelabs que **busca y actualiza imágenes Docker** de tus servicios,
-con opciones de ejecución programada, notificaciones y una pequeña API para gestionar la configuración.
+con opciones de ejecución programada, notificaciones y una pequeña API para gestionar la configuración. Toda la configuración
+vive dentro del contenedor (mediante volúmenes persistentes), por lo que tras un simple `docker compose pull` seguido de
+`docker compose up -d` el servicio queda listo para producción.
 
 ---
 
@@ -88,19 +90,21 @@ services:
       - "8000:8000"
     volumes:
       - pullpilot_config:/app/config:rw
-      - pullpilot_logs:/var/log/docker-updater:rw
-      - pullpilot_projects:/srv/compose:rw
+      - ${PULLPILOT_LOGS_VOLUME:-pullpilot_logs}:/var/log/docker-updater:rw
+      - ${PULLPILOT_PROJECTS_VOLUME:-pullpilot_projects}:/srv/compose:rw
       - /var/run/docker.sock:/var/run/docker.sock:rw
     restart: unless-stopped
 
 volumes:
   pullpilot_config:
-  pullpilot_logs:
-  pullpilot_projects:
+  ${PULLPILOT_LOGS_VOLUME:-pullpilot_logs}:
+  ${PULLPILOT_PROJECTS_VOLUME:-pullpilot_projects}:
 ```
 
 > ℹ️ **¿Por qué los volúmenes son de lectura/escritura y se monta el socket de Docker?** La API expone endpoints para actualizar la configuración (`updater.conf`), por lo que necesita permisos de escritura sobre ese archivo y el directorio de proyectos. También genera registros bajo `logs/`. Además, la aplicación debe comunicarse con el daemon de Docker para recrear servicios y comprobar imágenes, de ahí el montaje del socket `/var/run/docker.sock`. Si prefieres gestionar tus propios secretos o rutas (incluido el uso de un `.env` con `PULLPILOT_TOKEN`), edita los montajes del ejemplo anterior según tus necesidades.
-> Compose tomará automáticamente el valor de `PULLPILOT_TOKEN` del fichero `.env` especificado en `env_file`.
+> Compose tomará automáticamente el valor de `PULLPILOT_TOKEN` del fichero `.env` especificado en `env_file`, y puedes redefinir
+> los volúmenes persistentes mediante `PULLPILOT_LOGS_VOLUME` y `PULLPILOT_PROJECTS_VOLUME`. Basta con proporcionar un `.env`
+> (con tus valores) y el `docker-compose.yml` anterior para desplegar PullPilot.
 
 ## Licencia
 
