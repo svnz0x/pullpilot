@@ -195,7 +195,16 @@ def _strip_inline_comments(value: str) -> str:
 
     result = []
     quote_char: Optional[str] = None
+    escape = False
     for char in value:
+        if escape:
+            result.append(char)
+            escape = False
+            continue
+        if char == "\\":
+            result.append(char)
+            escape = True
+            continue
         if quote_char:
             if char == quote_char:
                 quote_char = None
