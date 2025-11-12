@@ -123,6 +123,42 @@ def test_put_returns_validation_errors(
     assert any(error["field"] == "LOG_DIR" for error in body["details"])
 
 
+def test_put_rejects_non_string_multiline(
+    auth_headers: Mapping[str, str],
+    tmp_path: Path,
+    store: ConfigStore,
+    schedule_store: ScheduleStore,
+) -> None:
+    api = create_app(store=store, schedule_store=schedule_store)
+    status, body = api.handle_request("GET", "/config", headers=auth_headers)
+    assert status == HTTPStatus.OK
+
+    values = dict(body["values"])
+    base_dir = tmp_path / "compose"
+    base_dir.mkdir()
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    values["BASE_DIR"] = str(base_dir)
+    values["LOG_DIR"] = str(log_dir)
+    values["COMPOSE_PROJECTS_FILE"] = str(tmp_path / "projects.txt")
+    multiline = {"COMPOSE_PROJECTS_FILE": ["/tmp/app"]}
+
+    status, response = api.handle_request(
+        "PUT",
+        "/config",
+        {"values": values, "multiline": multiline},
+        headers=auth_headers,
+    )
+
+    assert status == HTTPStatus.BAD_REQUEST
+    assert response["error"] == "validation failed"
+    assert any(
+        error["field"] == "COMPOSE_PROJECTS_FILE"
+        and "must be strings" in error["message"]
+        for error in response.get("details", [])
+    )
+
+
 def test_put_rejects_multiline_paths_outside_allowed_directory(
     auth_headers: Mapping[str, str],
     tmp_path: Path,

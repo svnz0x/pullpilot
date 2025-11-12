@@ -504,15 +504,36 @@ class ConfigAPI:
         if not isinstance(values, Mapping):
             return HTTPStatus.BAD_REQUEST, {"error": "'values' must be an object"}
         multiline = payload.get("multiline")
-        if multiline is not None and not isinstance(multiline, Mapping):
-            return HTTPStatus.BAD_REQUEST, {"error": "'multiline' must be an object"}
+        sanitized_multiline: Dict[str, str] = {}
+        if multiline is not None:
+            if not isinstance(multiline, Mapping):
+                return HTTPStatus.BAD_REQUEST, {"error": "'multiline' must be an object"}
+
+            errors = []
+            for key, value in multiline.items():
+                if isinstance(value, str):
+                    sanitized_multiline[str(key)] = value
+                    continue
+                errors.append(
+                    {
+                        "field": str(key),
+                        "message": "multiline values must be strings",
+                    }
+                )
+
+            if errors:
+                return HTTPStatus.BAD_REQUEST, {
+                    "error": "validation failed",
+                    "details": errors,
+                }
+        else:
+            sanitized_multiline = {}
 
         try:
             sanitized_values = self.store._validate(values)
         except ValidationError as exc:
             return HTTPStatus.BAD_REQUEST, {"error": "validation failed", "details": exc.errors}
 
-        sanitized_multiline = dict(multiline or {})
         directory_error = self._ensure_required_directories(
             ConfigData(sanitized_values, sanitized_multiline)
         )
@@ -520,7 +541,7 @@ class ConfigAPI:
             return directory_error
 
         try:
-            data = self.store.save(values, multiline)
+            data = self.store.save(values, sanitized_multiline if multiline is not None else None)
         except ValidationError as exc:
             return HTTPStatus.BAD_REQUEST, {"error": "validation failed", "details": exc.errors}
         except PersistenceError as exc:

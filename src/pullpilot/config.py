@@ -639,6 +639,11 @@ class ConfigStore:
                 continue
             path_value = values.get(key, "")
             content = multiline[key]
+            if not isinstance(content, str):
+                errors.append(
+                    {"field": key, "message": "multiline values must be strings"}
+                )
+                continue
             if not path_value:
                 if content.strip():
                     raise ValidationError(
