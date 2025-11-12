@@ -9,6 +9,7 @@ from typing import Any, Dict, List
 
 import pytest
 
+from pullpilot.resources import get_resource_path
 from pullpilot.scheduler.watch import (
     DEFAULT_COMMAND,
     DEFAULT_CRON_FILE,
@@ -175,6 +176,25 @@ def test_default_updater_command_falls_back_to_default_string(
     monkeypatch.setattr("pullpilot.scheduler.watch._project_root", lambda: tmp_path)
 
     assert resolve_default_updater_command() == DEFAULT_COMMAND
+
+
+def test_default_updater_command_uses_packaged_resource(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr("pullpilot.scheduler.watch._project_root", lambda: tmp_path)
+
+    original_exists = Path.exists
+
+    def fake_exists(self: Path) -> bool:
+        if str(self) == DEFAULT_COMMAND:
+            return False
+        return original_exists(self)
+
+    monkeypatch.setattr(Path, "exists", fake_exists)
+
+    expected = str(get_resource_path("scripts/updater.sh"))
+
+    assert resolve_default_updater_command() == expected
 
 
 def test_scheduler_package_reexports_watcher() -> None:

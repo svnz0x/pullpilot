@@ -13,6 +13,7 @@ from threading import Event
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from ..resources import get_resource_path
 from ..schedule import DEFAULT_SCHEDULE_PATH, ScheduleStore, ScheduleValidationError
 
 DEFAULT_SCHEDULE_FILE = DEFAULT_SCHEDULE_PATH
@@ -244,6 +245,13 @@ def resolve_default_updater_command() -> str:
     packaged_wrapper = Path(DEFAULT_COMMAND)
     if packaged_wrapper.exists():
         return str(packaged_wrapper)
+    try:
+        bundled_wrapper = get_resource_path("scripts/updater.sh")
+    except FileNotFoundError:
+        bundled_wrapper = None
+    else:
+        if bundled_wrapper.exists():
+            return str(bundled_wrapper)
     return DEFAULT_COMMAND
 
 
