@@ -75,6 +75,15 @@ def test_save_rejects_invalid_every_durations(
         store.save({"mode": "cron", "expression": expression})
 
 
+@pytest.mark.parametrize("expression", ["@every -5m", "@every 0s", "@every 0h"]) 
+def test_save_rejects_non_positive_every_durations(
+    schedule_path: Path, expression: str
+) -> None:
+    store = ScheduleStore(schedule_path)
+    with pytest.raises(ScheduleValidationError):
+        store.save({"mode": "cron", "expression": expression})
+
+
 def test_save_preserves_existing_file_on_write_failure(
     schedule_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

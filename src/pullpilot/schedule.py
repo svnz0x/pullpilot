@@ -135,8 +135,20 @@ class ScheduleStore:
 
 CRON_FIELD_PATTERN = re.compile(r"^[\w*/,.-]+$")
 DURATION_PATTERN = re.compile(
-    r"^[-+]?((?:\d+(?:\.\d+)?|\.\d+)(?:ns|us|µs|ms|s|m|h))+"
+    r"^((?:\d+(?:\.\d+)?|\.\d+)(?:ns|us|µs|ms|s|m|h))+"
 )
+DURATION_COMPONENT_PATTERN = re.compile(
+    r"(?P<value>(?:\d+(?:\.\d+)?|\.\d+))(?P<unit>ns|us|µs|ms|s|m|h)"
+)
+DURATION_UNIT_SECONDS = {
+    "ns": 1e-9,
+    "us": 1e-6,
+    "µs": 1e-6,
+    "ms": 1e-3,
+    "s": 1.0,
+    "m": 60.0,
+    "h": 3600.0,
+}
 
 CRON_MACROS = {
     "@yearly",
@@ -153,10 +165,18 @@ CRON_MACROS = {
 def _is_valid_cron(expression: str) -> bool:
     lowered = expression.lower()
     if lowered.startswith("@every"):
-        parts = lowered.split(maxsplit=1)
+        parts = expression.split(maxsplit=1)
         if len(parts) < 2:
             return False
-        return bool(DURATION_PATTERN.fullmatch(parts[1].strip()))
+        duration = parts[1].strip()
+        if not DURATION_PATTERN.fullmatch(duration):
+            return False
+        total_seconds = 0.0
+        for match in DURATION_COMPONENT_PATTERN.finditer(duration):
+            value = float(match.group("value"))
+            unit = match.group("unit")
+            total_seconds += value * DURATION_UNIT_SECONDS[unit]
+        return total_seconds > 0
     if lowered in CRON_MACROS:
         return True
     parts = [part for part in expression.split() if part]
