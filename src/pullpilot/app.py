@@ -115,7 +115,12 @@ def _load_token_from_env_files() -> Optional[str]:
 
 
 def _load_token_from_file_env() -> Optional[str]:
-    """Populate ``os.environ`` with the token defined via ``PULLPILOT_TOKEN_FILE``."""
+    """Populate ``os.environ`` with the token defined via ``PULLPILOT_TOKEN_FILE``.
+
+    The token file must be a regular file with permissions that do not grant read
+    access to group or other users. Insecure files are ignored to avoid leaking
+    authentication credentials.
+    """
 
     raw_path = os.environ.get(TOKEN_FILE_ENV)
     normalized_path = _normalize_env_value(raw_path)
@@ -142,6 +147,15 @@ def _load_token_from_file_env() -> Optional[str]:
     if not stat.S_ISREG(file_stat.st_mode):
         LOGGER.warning(
             "Token file '%s' is not a regular file; ignoring it and falling back to other sources.",
+            token_path,
+        )
+        return None
+
+    mode = stat.S_IMODE(file_stat.st_mode)
+    insecure_permissions = stat.S_IRGRP | stat.S_IROTH
+    if mode & insecure_permissions:
+        LOGGER.warning(
+            "Token file '%s' has insecure permissions; it must not be readable by group or other users.",
             token_path,
         )
         return None
