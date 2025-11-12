@@ -123,6 +123,20 @@ def test_write_cron_file_preserves_environment_assignments(tmp_path: Path) -> No
     assert cron_path.read_text(encoding="utf-8") == expected
 
 
+def test_write_cron_file_quotes_assignment_values_with_spaces(tmp_path: Path) -> None:
+    schedule_path = tmp_path / "schedule.json"
+    schedule_path.write_text("{}", encoding="utf-8")
+
+    cron_path = tmp_path / "pullpilot.cron"
+    updater_command = 'FOO="two words" /path/script'
+    watcher = SchedulerWatcher(schedule_path, cron_path, updater_command, 1.0)
+
+    watcher._write_cron_file("30 6 * * *")
+
+    expected = "30 6 * * * FOO='two words' /path/script\n"
+    assert cron_path.read_text(encoding="utf-8") == expected
+
+
 def test_write_cron_file_replace_failure_keeps_existing_file(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -174,6 +188,10 @@ def test_default_updater_command_falls_back_to_default_string(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr("pullpilot.scheduler.watch._project_root", lambda: tmp_path)
+    def missing_resource(_: str) -> Path:
+        raise FileNotFoundError
+
+    monkeypatch.setattr("pullpilot.scheduler.watch.get_resource_path", missing_resource)
 
     assert resolve_default_updater_command() == DEFAULT_COMMAND
 
