@@ -36,7 +36,12 @@ except ImportError:  # pragma: no cover - optional dependency
 
 from .config import ConfigData, ConfigError, ConfigStore, PersistenceError, ValidationError
 from .resources import get_resource_path
-from .schedule import DEFAULT_SCHEDULE_PATH, ScheduleStore, ScheduleValidationError
+from .schedule import (
+    DEFAULT_SCHEDULE_PATH,
+    SchedulePersistenceError,
+    ScheduleStore,
+    ScheduleValidationError,
+)
 
 TOKEN_ENV = "PULLPILOT_TOKEN"
 TOKEN_FILE_ENV = "PULLPILOT_TOKEN_FILE"
@@ -583,6 +588,19 @@ class ConfigAPI:
                 "error": "validation failed",
                 "details": [exc.as_payload()],
             }
+        except SchedulePersistenceError as exc:
+            return HTTPStatus.BAD_REQUEST, {"error": "write failed", "details": exc.details}
+        except OSError as exc:
+            message = exc.strerror or str(exc)
+            detail = {
+                "path": str(self.schedule_store.schedule_path),
+                "operation": "write",
+                "message": message,
+            }
+            errno = getattr(exc, "errno", None)
+            if errno is not None:
+                detail["errno"] = errno
+            return HTTPStatus.BAD_REQUEST, {"error": "write failed", "details": [detail]}
         return HTTPStatus.OK, data.to_dict()
 
     # ------------------------------------------------------------------
