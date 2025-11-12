@@ -1,4 +1,5 @@
 import os
+import stat
 from http import HTTPStatus
 from pathlib import Path
 from typing import Mapping
@@ -12,6 +13,7 @@ from pullpilot.app import (
     Authenticator,
     ConfigAPI,
     _load_token_from_env_files,
+    _load_token_from_file_env,
     create_app,
 )
 
@@ -42,6 +44,42 @@ def auth_headers(monkeypatch: pytest.MonkeyPatch) -> Mapping[str, str]:
     token = "test-token"
     monkeypatch.setenv("PULLPILOT_TOKEN", token)
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX file permissions not supported on Windows")
+def test_load_token_from_file_env_requires_secure_permissions(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    token_path = tmp_path / "token.txt"
+    token_path.write_text("posix-token\n", encoding="utf-8")
+    os.chmod(token_path, 0o644)
+
+    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
+    monkeypatch.setenv("PULLPILOT_TOKEN_FILE", str(token_path))
+
+    with caplog.at_level("WARNING"):
+        token = _load_token_from_file_env()
+
+    assert token is None
+    assert "insecure permissions" in " ".join(caplog.messages)
+    assert "PULLPILOT_TOKEN" not in os.environ
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX file permissions not supported on Windows")
+def test_load_token_from_file_env_accepts_secure_permissions(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    token_path = tmp_path / "token.txt"
+    token_path.write_text("secure-token\n", encoding="utf-8")
+    os.chmod(token_path, stat.S_IRUSR | stat.S_IWUSR)
+
+    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
+    monkeypatch.setenv("PULLPILOT_TOKEN_FILE", str(token_path))
+
+    token = _load_token_from_file_env()
+
+    assert token == "secure-token"
+    assert os.environ.get("PULLPILOT_TOKEN") == "secure-token"
 
 
 def test_get_returns_defaults(
@@ -436,11 +474,13 @@ def test_authenticator_ignores_wrapping_quotes_in_token(
     assert authenticator.token == "secreto"
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX file permissions not supported on Windows")
 def test_authenticator_loads_token_from_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     token_path = tmp_path / "token.txt"
     token_path.write_text("  token-desde-fichero  \n", encoding="utf-8")
+    os.chmod(token_path, stat.S_IRUSR | stat.S_IWUSR)
 
     monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
     monkeypatch.setenv("PULLPILOT_TOKEN_FILE", str(token_path))
