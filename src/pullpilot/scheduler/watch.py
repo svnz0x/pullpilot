@@ -152,7 +152,12 @@ class SchedulerWatcher:
         escaped_command_parts = []
         for arg in command_args:
             if self._ASSIGNMENT_PATTERN.match(arg):
-                escaped_command_parts.append(arg)
+                name, value = arg.split("=", 1)
+                quoted_value = shlex.quote(value)
+                if quoted_value != value:
+                    escaped_command_parts.append(f"{name}={quoted_value}")
+                else:
+                    escaped_command_parts.append(arg)
             else:
                 escaped_command_parts.append(shlex.quote(arg))
         escaped_command = " ".join(escaped_command_parts)
