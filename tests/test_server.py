@@ -413,6 +413,11 @@ def test_token_auth_allows_headers_with_ows(
         ("export PULLPILOT_TOKEN=super-secret", "super-secret"),
         ("PULLPILOT_TOKEN=another-secret   # comment", "another-secret"),
         ("export   PULLPILOT_TOKEN=\"quoted # value\"   # trailing comment", "quoted # value"),
+        (r"PULLPILOT_TOKEN=hash\#value", r"hash\#value"),
+        (
+            "export PULLPILOT_TOKEN=\"quoted with \\\"inner\\\" quote and \\# hash\"   # comment",
+            "quoted with \\\"inner\\\" quote and \\# hash",
+        ),
     ],
 )
 def test_env_loader_supports_real_world_syntax(
