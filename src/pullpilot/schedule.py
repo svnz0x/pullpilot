@@ -15,7 +15,8 @@ from .resources import get_resource_path
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SCHEDULE_PATH = get_resource_path("config/pullpilot.schedule")
+_CONFIG_RESOURCE_DIR = get_resource_path("config")
+DEFAULT_SCHEDULE_PATH = _CONFIG_RESOURCE_DIR / "pullpilot.schedule"
 DEFAULT_CRON_EXPRESSION = "0 4 * * *"
 
 

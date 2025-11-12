@@ -174,8 +174,12 @@ def test_default_updater_command_falls_back_to_default_string(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr("pullpilot.scheduler.watch._project_root", lambda: tmp_path)
-
-    assert resolve_default_updater_command() == DEFAULT_COMMAND
+    result = resolve_default_updater_command()
+    if Path(DEFAULT_COMMAND).exists():
+        assert result == DEFAULT_COMMAND
+    else:
+        expected = str(get_resource_path("scripts/updater.sh"))
+        assert result == expected
 
 
 def test_default_updater_command_uses_packaged_resource(

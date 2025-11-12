@@ -1,6 +1,7 @@
 import logging
 import os
 from http import HTTPStatus
+import shutil
 from pathlib import Path
 
 
@@ -504,3 +505,83 @@ def test_validate_config_cli_reports_errors(
     captured = capsys.readouterr()
     assert exit_code == 1
     assert "UNKNOWN" in captured.out
+
+
+def test_default_paths_survive_resource_refresh() -> None:
+    from pullpilot.app import DEFAULT_CONFIG_PATH, DEFAULT_SCHEMA_PATH
+    from pullpilot.resources import get_resource_path
+    from pullpilot.schedule import DEFAULT_SCHEDULE_PATH
+
+    config_store = ConfigStore(DEFAULT_CONFIG_PATH, DEFAULT_SCHEMA_PATH)
+    schedule_store = ScheduleStore()
+
+    config_path = Path(DEFAULT_CONFIG_PATH)
+    schedule_path = Path(DEFAULT_SCHEDULE_PATH)
+
+    original_config_text = (
+        config_path.read_text(encoding="utf-8") if config_path.exists() else None
+    )
+    original_schedule_text = (
+        schedule_path.read_text(encoding="utf-8") if schedule_path.exists() else None
+    )
+
+    base_dir = config_path.parent / "__test_base__"
+    log_dir = config_path.parent / "__test_logs__"
+
+    try:
+        config_snapshot = config_store.load()
+        desired_policy = (
+            "never" if config_snapshot.values.get("PULL_POLICY") != "never" else "always"
+        )
+        updated_values = config_snapshot.values.copy()
+        updated_values["PULL_POLICY"] = desired_policy
+
+        base_dir.mkdir(exist_ok=True)
+        log_dir.mkdir(exist_ok=True)
+        updated_values["BASE_DIR"] = str(base_dir)
+        updated_values["LOG_DIR"] = str(log_dir)
+
+        config_store.save(updated_values, config_snapshot.multiline)
+
+        refreshed_config = config_store.load()
+        assert refreshed_config.values["PULL_POLICY"] == desired_policy
+
+        get_resource_path("config")
+
+        cached_config = config_store.load()
+        assert cached_config.values["PULL_POLICY"] == desired_policy
+
+        updated_schedule = schedule_store.save(
+            {"mode": "cron", "expression": "1 2 * * *"}
+        )
+        assert updated_schedule.mode == "cron"
+        assert updated_schedule.expression == "1 2 * * *"
+
+        get_resource_path("config")
+
+        cached_schedule = schedule_store.load()
+        assert cached_schedule.mode == "cron"
+        assert cached_schedule.expression == "1 2 * * *"
+    finally:
+        if original_config_text is None:
+            try:
+                config_path.unlink()
+            except FileNotFoundError:
+                pass
+        else:
+            config_path.write_text(original_config_text, encoding="utf-8")
+        try:
+            shutil.rmtree(base_dir)
+        except FileNotFoundError:
+            pass
+        try:
+            shutil.rmtree(log_dir)
+        except FileNotFoundError:
+            pass
+        if original_schedule_text is None:
+            try:
+                schedule_path.unlink()
+            except FileNotFoundError:
+                pass
+        else:
+            schedule_path.write_text(original_schedule_text, encoding="utf-8")

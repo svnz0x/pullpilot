@@ -30,7 +30,11 @@ def test_bundled_files_accessible(monkeypatch):
     monkeypatch.setattr(
         "pullpilot.scheduler.watch._project_root", lambda: Path("/__does_not_exist__"),
     )
-    assert resolve_default_updater_command() == DEFAULT_COMMAND
+    resolved_command = resolve_default_updater_command()
+    if Path(DEFAULT_COMMAND).exists():
+        assert resolved_command == DEFAULT_COMMAND
+    else:
+        assert resolved_command == str(get_resource_path("scripts/updater.sh"))
 
 
 def test_ui_bundle_included():

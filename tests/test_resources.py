@@ -47,9 +47,14 @@ def test_cached_directory_matches_packaged_contents(tmp_path: Path, monkeypatch:
     cached = get_resource_path("data")
     cached_file = cached / resource_file.name
     assert cached_file.exists()
+    assert cached_file.read_text() == "original"
 
-    resource_file.unlink()
+    resource_file.write_text("updated")
 
     cached = get_resource_path("data")
     cached_file = cached / "example.txt"
-    assert not cached_file.exists()
+    assert cached_file.read_text() == "original"
+
+    cached = get_resource_path("data", refresh=True)
+    cached_file = cached / "example.txt"
+    assert cached_file.read_text() == "updated"

@@ -296,8 +296,9 @@ def _match_token(expected: str, header: str) -> bool:
     return False
 
 
-DEFAULT_CONFIG_PATH = get_resource_path("config/updater.conf")
-DEFAULT_SCHEMA_PATH = get_resource_path("config/schema.json")
+CONFIG_RESOURCE_DIR = get_resource_path("config")
+DEFAULT_CONFIG_PATH = CONFIG_RESOURCE_DIR / "updater.conf"
+DEFAULT_SCHEMA_PATH = CONFIG_RESOURCE_DIR / "schema.json"
 MAX_UI_LOG_LINES = 400
 
 class ConfigAPI:
