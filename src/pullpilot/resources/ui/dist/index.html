@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PullPilot · Panel local</title>
+    <script type="module" crossorigin src="/ui/assets/index-CSFkb0Dz.js"></script>
+    <link rel="stylesheet" crossorigin href="/ui/assets/index-Uc5ojoM9.css">
+  </head>
+  <body class="requires-auth">
+    <header>
+      <h1>PullPilot</h1>
+      <p>
+        Administra los parámetros del script de actualización y revisa los últimos logs directamente desde
+        tu navegador. Introduce el token bearer que protege la API para habilitar la interfaz y recuerda el
+        token solo en dispositivos de confianza.
+      </p>
+      <button type="button" class="secondary logout-button" id="logout-button">Olvidar token actual</button>
+    </header>
+    <section id="login-screen">
+      <form id="token-form" autocomplete="off">
+        <label for="token-input">
+          Token bearer
+          <input
+            id="token-input"
+            name="token"
+            type="password"
+            placeholder="Introduce tu token"
+            aria-describedby="login-status"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+            required
+          />
+        </label>
+        <label for="remember-token" class="remember-token">
+          <input type="checkbox" id="remember-token" name="remember-token" />
+          <span class="remember-token-text">
+            <strong>Recordar token en este navegador</strong>
+            <span>Evita marcar esta opción en equipos compartidos o públicos.</span>
+          </span>
+        </label>
+        <div class="login-actions">
+          <button type="submit" class="primary">Iniciar sesión</button>
+          <button type="button" class="secondary" id="clear-token">Olvidar token</button>
+        </div>
+        <span class="login-status" id="login-status" role="status" aria-live="polite"></span>
+      </form>
+    </section>
+    <main>
+      <section id="config-section">
+        <h2>Configuración del updater</h2>
+        <form id="config-form">
+          <div class="config-grid" id="config-fields"></div>
+          <div class="form-actions">
+            <button type="submit" class="primary">Guardar cambios</button>
+            <button type="button" class="secondary" id="reset-config">Descartar cambios</button>
+          </div>
+        </form>
+        <div class="status" id="config-status" role="status" aria-live="polite" hidden></div>
+      </section>
+
+      <section id="logs-section">
+        <h2>Logs recientes</h2>
+        <div class="logs-header">
+          <label for="log-select">Archivo</label>
+          <select id="log-select"></select>
+          <button type="button" class="secondary" id="refresh-logs">Actualizar</button>
+          <span class="log-meta" id="log-meta"></span>
+        </div>
+        <div class="status" id="logs-status" role="status" aria-live="polite" hidden></div>
+        <pre class="log-output" id="log-content">Cargando logs…</pre>
+      </section>
+    </main>
+  </body>
+</html>
