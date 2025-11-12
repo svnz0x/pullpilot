@@ -48,6 +48,24 @@ class ScheduleValidationError(Exception):
         return {"field": self.field, "message": self.message}
 
 
+class SchedulePersistenceError(Exception):
+    """Raised when persisting the scheduler configuration fails."""
+
+    def __init__(self, *, path: Path, operation: str, error: OSError) -> None:
+        message_text = error.strerror or str(error)
+        message = f"Unable to {operation} at '{path}': {message_text}"
+        super().__init__(message)
+        detail: MutableMapping[str, Any] = {
+            "path": str(path),
+            "operation": operation,
+            "message": message_text,
+        }
+        errno = getattr(error, "errno", None)
+        if errno is not None:
+            detail["errno"] = errno
+        self.details = [detail]
+
+
 class ScheduleStore:
     """Persist the scheduler configuration in a shared JSON file."""
 
@@ -90,6 +108,14 @@ class ScheduleStore:
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(temp_path, self.schedule_path)
+        except OSError as exc:
+            try:
+                os.unlink(temp_path)
+            except FileNotFoundError:
+                pass
+            raise SchedulePersistenceError(
+                path=self.schedule_path, operation="write", error=exc
+            ) from exc
         except Exception:
             try:
                 os.unlink(temp_path)

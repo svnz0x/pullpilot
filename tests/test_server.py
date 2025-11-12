@@ -1,8 +1,9 @@
+import errno
 import os
 import stat
 from http import HTTPStatus
 from pathlib import Path
-from typing import Mapping
+from typing import Any, Mapping
 
 
 import pytest
@@ -637,6 +638,38 @@ def test_schedule_put_accepts_datetime(
     assert status == HTTPStatus.OK
     assert body["mode"] == "once"
     assert body["datetime"].endswith("+00:00")
+
+
+def test_schedule_put_returns_persistence_errors(
+    auth_headers: Mapping[str, str],
+    schedule_store: ScheduleStore,
+    store: ConfigStore,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = create_app(store=store, schedule_store=schedule_store)
+
+    permission_error = PermissionError(errno.EACCES, os.strerror(errno.EACCES))
+
+    def fail(_: Mapping[str, Any]) -> None:
+        raise permission_error
+
+    monkeypatch.setattr(schedule_store, "save", fail)
+
+    status, body = api.handle_request(
+        "PUT",
+        "/schedule",
+        {"mode": "cron", "expression": "30 1 * * *"},
+        headers=auth_headers,
+    )
+
+    assert status == HTTPStatus.BAD_REQUEST
+    assert body["error"] == "write failed"
+    assert body["details"]
+    detail = body["details"][0]
+    assert detail["path"] == str(schedule_store.schedule_path)
+    assert detail["operation"] == "write"
+    assert detail["message"] == os.strerror(errno.EACCES)
+    assert detail["errno"] == errno.EACCES
 
 
 def test_fastapi_get_propagates_error(
