@@ -34,6 +34,8 @@ pullpilot = [
   "resources/config/*",
   "resources/scripts/*",
   "resources/ui/*",
+  "resources/ui/manifest.json",
+  "resources/ui/dist/**/*",
 ]
 
 [tool.ruff]
