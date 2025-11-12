@@ -127,7 +127,7 @@ def _load_token_from_file_env() -> Optional[str]:
     if not normalized_path:
         return None
 
-    token_path = Path(normalized_path)
+    token_path = Path(normalized_path).expanduser()
     try:
         file_stat = token_path.lstat()
     except FileNotFoundError:

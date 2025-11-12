@@ -1,4 +1,5 @@
 import os
+import uuid
 import stat
 from http import HTTPStatus
 from pathlib import Path
@@ -80,6 +81,29 @@ def test_load_token_from_file_env_accepts_secure_permissions(
 
     assert token == "secure-token"
     assert os.environ.get("PULLPILOT_TOKEN") == "secure-token"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX file permissions not supported on Windows")
+def test_load_token_from_file_env_expands_user_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    token_name = f".pullpilot-token-{uuid.uuid4().hex}"
+    token_path = Path.home() / token_name
+    token_path.write_text("expanded-token\n", encoding="utf-8")
+    os.chmod(token_path, stat.S_IRUSR | stat.S_IWUSR)
+
+    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
+    monkeypatch.setenv("PULLPILOT_TOKEN_FILE", f"~/{token_name}")
+
+    try:
+        token = _load_token_from_file_env()
+        assert token == "expanded-token"
+        assert os.environ.get("PULLPILOT_TOKEN") == "expanded-token"
+    finally:
+        try:
+            token_path.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def test_get_returns_defaults(
