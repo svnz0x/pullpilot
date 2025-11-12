@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import sys
 from pathlib import Path
 from typing import Iterable, Optional
@@ -19,7 +20,10 @@ from pullpilot.resources import get_resource_path
 def _resolve_path(value: Optional[str], default: Path) -> Path:
     if value is None:
         return default
-    return Path(value).expanduser().resolve()
+    path = Path(value).expanduser()
+    if not path.exists():
+        raise FileNotFoundError(errno.ENOENT, "No such file or directory", str(path))
+    return path.resolve()
 
 
 def main(argv: Iterable[str] | None = None) -> int:
@@ -42,10 +46,9 @@ def main(argv: Iterable[str] | None = None) -> int:
     )
     args = parser.parse_args(list(argv) if argv is not None else None)
 
-    schema_path = _resolve_path(args.schema, get_resource_path("config/schema.json"))
-    config_path = _resolve_path(args.config, get_resource_path("config/updater.conf"))
-
     try:
+        schema_path = _resolve_path(args.schema, get_resource_path("config/schema.json"))
+        config_path = _resolve_path(args.config, get_resource_path("config/updater.conf"))
         validate_conf(config_path, schema_path)
     except ValidationError as exc:
         for error in exc.errors:
@@ -57,7 +60,10 @@ def main(argv: Iterable[str] | None = None) -> int:
         print(f"ERROR: {exc}")
         return 1
     except OSError as exc:
-        print(f"ERROR: {exc}")
+        if isinstance(exc, FileNotFoundError) and exc.filename:
+            print(f"ERROR: Ruta no encontrada: {exc.filename}")
+        else:
+            print(f"ERROR: {exc}")
         return 1
 
     print(f"Configuración válida según {schema_path}")
