@@ -1,4 +1,5 @@
 import { createTokenStorage } from "./token-storage.js";
+import { createApiUrlBuilder } from "./api-url.js";
 
 (() => {
   const body = document.body;
@@ -23,73 +24,7 @@ import { createTokenStorage } from "./token-storage.js";
   let storedToken = null;
   const tokenStorage = createTokenStorage(window);
 
-  const buildApiUrl = (() => {
-    let cachedBase = null;
-
-    const hasProtocol = (value) => /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(value);
-
-    const resolveBase = () => {
-      if (cachedBase) {
-        return cachedBase;
-      }
-
-      const baseElement = document.querySelector("base[href]");
-      if (baseElement) {
-        const href = baseElement.getAttribute("href");
-        if (href) {
-          try {
-            cachedBase = new URL(href, window.location.href);
-            return cachedBase;
-          } catch (error) {
-            console.warn("Base href inválido; se ignorará.", error);
-          }
-        }
-      }
-
-      const { origin, pathname } = window.location;
-      const marker = "/ui/";
-      let basePath = "/";
-
-      if (pathname.endsWith("/ui")) {
-        basePath = `${pathname}/`;
-      } else if (pathname.includes(marker)) {
-        basePath = pathname.slice(0, pathname.indexOf(marker) + marker.length);
-      } else if (pathname.endsWith("/")) {
-        basePath = pathname;
-      } else {
-        const lastSlashIndex = pathname.lastIndexOf("/");
-        basePath = lastSlashIndex >= 0 ? pathname.slice(0, lastSlashIndex + 1) : "/";
-      }
-
-      try {
-        cachedBase = new URL(basePath, origin);
-      } catch (error) {
-        console.warn("No se pudo resolver la base a partir de window.location.", error);
-        cachedBase = new URL("/", origin);
-      }
-      return cachedBase;
-    };
-
-    return (path = "") => {
-      if (path instanceof URL) {
-        return path.toString();
-      }
-
-      const normalized = typeof path === "string" ? path.trim() : "";
-      if (!normalized) {
-        return resolveBase().toString();
-      }
-
-      if (hasProtocol(normalized)) {
-        return normalized;
-      }
-
-      const relative = normalized.startsWith("/")
-        ? normalized.slice(1)
-        : normalized;
-      return new URL(relative, resolveBase()).toString();
-    };
-  })();
+  const buildApiUrl = createApiUrlBuilder(window);
 
   const showLoginMessage = (message, tone = "info") => {
     if (!loginStatus) return;
