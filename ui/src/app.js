@@ -7,7 +7,21 @@ import {
 } from "./auth-errors.js";
 import { buildUnauthorizedTokenMessage } from "./unauthorized-message.js";
 
-(() => {
+export const formatLogMetadata = ({ logDir, modified, size }) => {
+  const segments = [];
+  if (logDir) {
+    segments.push(`Directorio: ${logDir}`);
+  }
+  if (modified) {
+    segments.push(`Última modificación: ${modified}`);
+  }
+  if (size !== undefined && size !== null) {
+    segments.push(`Tamaño: ${size} bytes`);
+  }
+  return segments.join(" · ");
+};
+
+const initializeApp = () => {
   const body = document.body;
   const loginForm = document.getElementById("token-form");
   const tokenInput = document.getElementById("token-input");
@@ -1344,10 +1358,14 @@ import { buildUnauthorizedTokenMessage } from "./unauthorized-message.js";
     }
 
     const size = data.selected?.size;
-    const modified = data.selected?.modified ? new Date(data.selected.modified).toLocaleString() : "";
-    logMeta.textContent = `${data.log_dir ? `Directorio: ${data.log_dir}` : ""}${
-      modified ? ` · Última modificación: ${modified}` : ""
-    }${size ? ` · Tamaño: ${size} bytes` : ""}`;
+    const modified = data.selected?.modified
+      ? new Date(data.selected.modified).toLocaleString()
+      : "";
+    logMeta.textContent = formatLogMetadata({
+      logDir: data.log_dir,
+      modified,
+      size,
+    });
   };
 
   const handleSuccessfulLogin = async ({
@@ -1529,4 +1547,8 @@ import { buildUnauthorizedTokenMessage } from "./unauthorized-message.js";
       showLoginPrompt();
     }
   }
-})();
+};
+
+if (typeof document !== "undefined") {
+  initializeApp();
+}
