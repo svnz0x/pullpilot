@@ -184,7 +184,7 @@ def _load_token_from_file_env() -> Optional[str]:
 
     try:
         content = token_path.read_text(encoding="utf-8")
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         LOGGER.warning(
             "Failed to read token file '%s': %s; falling back to other configuration sources.",
             token_path,
