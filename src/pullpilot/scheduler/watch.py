@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import shlex
@@ -20,6 +21,11 @@ DEFAULT_SCHEDULE_FILE = DEFAULT_SCHEDULE_PATH
 DEFAULT_CRON_FILE = Path("/tmp/pullpilot.cron")
 DEFAULT_COMMAND = "/app/updater.sh"
 DEFAULT_INTERVAL = 5.0
+
+
+logger = logging.getLogger("pullpilot.scheduler.watch")
+
+
 class SchedulerWatcher:
     """Monitor the schedule file and spawn the right worker process."""
 
@@ -46,7 +52,7 @@ class SchedulerWatcher:
                     schedule = self.store.load().to_dict()
                     signature = json.dumps(schedule, sort_keys=True)
                 except (ScheduleValidationError, json.JSONDecodeError) as exc:
-                    _log(f"No se pudo interpretar la programación: {exc}")
+                    logger.warning("No se pudo interpretar la programación: %s", exc)
                     schedule = None
                     signature = self.current_signature
                     load_failed = True
@@ -55,7 +61,7 @@ class SchedulerWatcher:
                     code = self.process.returncode
                     mode = schedule.get("mode") if isinstance(schedule, dict) else None
                     if mode == "once" and code == 0:
-                        _log(
+                        logger.info(
                             "El proceso programador finalizó con código 0; ejecución única completada"
                         )
                         try:
@@ -63,8 +69,8 @@ class SchedulerWatcher:
                         finally:
                             self.process = None
                     else:
-                        _log(
-                            f"El proceso programador finalizó con código {code}; reiniciando"
+                        logger.warning(
+                            "El proceso programador finalizó con código %s; reiniciando", code
                         )
                         self._stop_process()
                         self.current_signature = None
@@ -86,7 +92,7 @@ class SchedulerWatcher:
                 else:
                     time.sleep(self.interval)
         except KeyboardInterrupt:  # pragma: no cover - manual interruption
-            _log("Interrumpido, deteniendo programador")
+            logger.info("Interrumpido, deteniendo programador")
         finally:
             self._stop_process()
 
@@ -96,31 +102,31 @@ class SchedulerWatcher:
         if mode == "cron":
             expression = schedule.get("expression")
             if not isinstance(expression, str):
-                _log("Expresión cron inválida; omitiendo")
+                logger.warning("Expresión cron inválida; omitiendo")
                 return True
             try:
                 self._write_cron_file(expression)
             except OSError as exc:
-                _log(f"No se pudo preparar el archivo cron: {exc}")
+                logger.error("No se pudo preparar el archivo cron: %s", exc)
                 return False
-            _log(f"Iniciando supercronic con expresión '{expression}'")
+            logger.info("Iniciando supercronic con expresión '%s'", expression)
             try:
                 self.process = subprocess.Popen(["supercronic", "-quiet", str(self.cron_path)])
             except (FileNotFoundError, OSError) as exc:
-                _log(f"No se pudo iniciar supercronic: {exc}")
+                logger.error("No se pudo iniciar supercronic: %s", exc)
                 self.process = None
                 return False
             return True
         if mode == "once":
             datetime_value = schedule.get("datetime")
             if not isinstance(datetime_value, str):
-                _log("Fecha/hora inválida; omitiendo")
+                logger.warning("Fecha/hora inválida; omitiendo")
                 return True
             try:
                 command_args = shlex.split(self.updater_command)
             except ValueError:
                 command_args = [self.updater_command]
-            _log(f"Planificando ejecución única para {datetime_value}")
+            logger.info("Planificando ejecución única para %s", datetime_value)
             try:
                 self.process = subprocess.Popen(
                     [
@@ -134,11 +140,11 @@ class SchedulerWatcher:
                     ]
                 )
             except (FileNotFoundError, OSError) as exc:
-                _log(f"No se pudo iniciar la ejecución única: {exc}")
+                logger.error("No se pudo iniciar la ejecución única: %s", exc)
                 self.process = None
                 return False
             return True
-        _log(f"Modo desconocido '{mode}'; no se inicia ningún proceso")
+        logger.warning("Modo desconocido '%s'; no se inicia ningún proceso", mode)
         return True
 
     _ASSIGNMENT_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
@@ -174,10 +180,7 @@ class SchedulerWatcher:
             try:
                 os.replace(temp_path, self.cron_path)
             except OSError as exc:
-                _log(
-                    "No se pudo reemplazar el archivo cron temporal: "
-                    f"{exc}"
-                )
+                logger.error("No se pudo reemplazar el archivo cron temporal: %s", exc)
                 raise
         except Exception:
             try:
@@ -200,7 +203,7 @@ class SchedulerWatcher:
                 pass
             return
 
-        _log("Deteniendo proceso programador actual")
+        logger.info("Deteniendo proceso programador actual")
         try:
             process.terminate()
         except ProcessLookupError:
@@ -213,20 +216,13 @@ class SchedulerWatcher:
         try:
             process.wait(timeout=10)
         except subprocess.TimeoutExpired:
-            _log("El proceso no respondió; enviando señal SIGKILL")
+            logger.warning("El proceso no respondió; enviando señal SIGKILL")
             try:
                 process.kill()
             except ProcessLookupError:
                 pass
             else:
                 process.wait()
-
-
-def _log(message: str) -> None:
-    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{timestamp}] {message}", flush=True)
-
-
 def _project_root() -> Path:
     """Return the project root path used for resolving helper resources."""
 
