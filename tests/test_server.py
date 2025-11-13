@@ -86,6 +86,27 @@ def test_load_token_from_file_env_accepts_secure_permissions(
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX file permissions not supported on Windows")
+def test_load_token_from_file_env_handles_unicode_decode_error(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    token_path = tmp_path / "token.txt"
+    token_path.write_bytes(b"\xff\xfe\xfd")
+    os.chmod(token_path, stat.S_IRUSR | stat.S_IWUSR)
+
+    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
+    monkeypatch.setenv("PULLPILOT_TOKEN_FILE", str(token_path))
+
+    with caplog.at_level("WARNING"):
+        token = _load_token_from_file_env()
+
+    assert token is None
+    assert "PULLPILOT_TOKEN" not in os.environ
+    assert any("Failed to read token file" in message for message in caplog.messages)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX file permissions not supported on Windows")
 def test_load_token_from_file_env_expands_user_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
