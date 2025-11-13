@@ -6,7 +6,7 @@ export const createScheduleApi = ({ authorizedFetch, buildApiUrl }) => {
     throw new TypeError("buildApiUrl must be a function");
   }
 
-  const resolveUrl = () => buildApiUrl("schedule");
+  const resolveUrl = () => buildApiUrl("/schedule");
 
   return {
     load() {
