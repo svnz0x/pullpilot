@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import sys
 import threading
 from pathlib import Path
@@ -138,7 +139,7 @@ def test_write_cron_file_quotes_assignment_values_with_spaces(tmp_path: Path) ->
 
 
 def test_write_cron_file_replace_failure_keeps_existing_file(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     schedule_path = tmp_path / "schedule.json"
     schedule_path.write_text("{}", encoding="utf-8")
@@ -148,23 +149,22 @@ def test_write_cron_file_replace_failure_keeps_existing_file(
 
     watcher = SchedulerWatcher(schedule_path, cron_path, "echo hi", 1.0)
 
-    logs: List[str] = []
-
-    def capture(message: str) -> None:
-        logs.append(message)
-
-    monkeypatch.setattr("pullpilot.scheduler.watch._log", capture)
-
     def failing_replace(src: Any, dst: Any) -> None:
         raise OSError("boom")
 
     monkeypatch.setattr("pullpilot.scheduler.watch.os.replace", failing_replace)
 
-    with pytest.raises(OSError):
-        watcher._write_cron_file("* * * * *")
+    with caplog.at_level(logging.INFO, logger="pullpilot.scheduler.watch"):
+        with pytest.raises(OSError):
+            watcher._write_cron_file("* * * * *")
 
     assert cron_path.read_text(encoding="utf-8") == "ORIGINAL\n"
-    assert any("No se pudo reemplazar el archivo cron temporal" in entry for entry in logs)
+    messages = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "pullpilot.scheduler.watch"
+    ]
+    assert any("No se pudo reemplazar el archivo cron temporal" in entry for entry in messages)
 
 
 def test_watcher_default_schedule_path_matches_store_default() -> None:
@@ -224,7 +224,7 @@ def test_scheduler_package_reexports_watcher() -> None:
 
 
 def test_cron_write_error_is_logged_and_loop_continues(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     schedule_path = tmp_path / "schedule.json"
     cron_path = tmp_path / "cron" / "pullpilot.cron"
@@ -242,13 +242,6 @@ def test_cron_write_error_is_logged_and_loop_continues(
 
     watcher.store = DummyStore()  # type: ignore[assignment]
 
-    logs: List[str] = []
-
-    def capture_log(message: str) -> None:
-        logs.append(message)
-
-    monkeypatch.setattr("pullpilot.scheduler.watch._log", capture_log)
-
     def failing_replace(src: Any, dst: Any) -> None:
         raise OSError("disk full")
 
@@ -261,13 +254,22 @@ def test_cron_write_error_is_logged_and_loop_continues(
         def wait(self, interval: float) -> bool:
             return True
 
-    watcher.run(stop_event=SingleLoopEvent())
+    with caplog.at_level(logging.INFO, logger="pullpilot.scheduler.watch"):
+        watcher.run(stop_event=SingleLoopEvent())
 
     assert watcher.current_signature is None
     assert watcher.process is None
-    assert any("No se pudo preparar el archivo cron" in entry for entry in logs)
-    assert any("No se pudo reemplazar el archivo cron temporal" in entry for entry in logs)
-    assert all("Iniciando supercronic" not in entry for entry in logs)
+    module_messages = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "pullpilot.scheduler.watch"
+    ]
+    assert any("No se pudo preparar el archivo cron" in entry for entry in module_messages)
+    assert any(
+        "No se pudo reemplazar el archivo cron temporal" in entry
+        for entry in module_messages
+    )
+    assert all("Iniciando supercronic" not in entry for entry in module_messages)
 
 
 def test_run_logs_permission_error_and_continues(
@@ -288,13 +290,6 @@ def test_run_logs_permission_error_and_continues(
 
     monkeypatch.setattr(Path, "read_text", failing_read_text)
 
-    logs: List[str] = []
-
-    def capture_log(message: str) -> None:
-        logs.append(message)
-
-    monkeypatch.setattr("pullpilot.scheduler.watch._log", capture_log)
-
     class SingleLoopEvent:
         def is_set(self) -> bool:
             return False
@@ -302,13 +297,22 @@ def test_run_logs_permission_error_and_continues(
         def wait(self, interval: float) -> bool:
             return True
 
-    with caplog.at_level("WARNING", logger="pullpilot.schedule"):
-        watcher.run(stop_event=SingleLoopEvent())
+    with caplog.at_level(logging.INFO, logger="pullpilot.scheduler.watch"):
+        with caplog.at_level(logging.WARNING, logger="pullpilot.schedule"):
+            watcher.run(stop_event=SingleLoopEvent())
 
     assert watcher.current_signature is None
     assert watcher.process is None
-    assert any("No se pudo interpretar la programación" in entry for entry in logs)
-    assert any("Permission denied" in record.getMessage() for record in caplog.records)
+    module_messages = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "pullpilot.scheduler.watch"
+    ]
+    assert any("No se pudo interpretar la programación" in entry for entry in module_messages)
+    assert any(
+        record.name == "pullpilot.schedule" and "Permission denied" in record.getMessage()
+        for record in caplog.records
+    )
 
 
 def test_once_completion_keeps_signature(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -372,7 +376,11 @@ def test_once_completion_keeps_signature(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert process.wait_calls == 1
 
 
-def test_run_handles_missing_subprocess(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_run_handles_missing_subprocess(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     schedule_data = {"mode": "once", "datetime": "2023-09-01T10:00:00Z"}
 
     watcher = SchedulerWatcher(
@@ -405,11 +413,16 @@ def test_run_handles_missing_subprocess(monkeypatch: pytest.MonkeyPatch, tmp_pat
 
     monkeypatch.setattr("pullpilot.scheduler.watch.time.sleep", fake_sleep)
 
-    with pytest.raises(StopLoop):
-        watcher.run()
+    with caplog.at_level(logging.INFO, logger="pullpilot.scheduler.watch"):
+        with pytest.raises(StopLoop):
+            watcher.run()
 
-    captured = capsys.readouterr()
-    assert "No se pudo iniciar la ejecución única" in captured.out
+    module_messages = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "pullpilot.scheduler.watch"
+    ]
+    assert any("No se pudo iniciar la ejecución única" in entry for entry in module_messages)
     assert watcher.process is None
     assert watcher.current_signature is None
 
