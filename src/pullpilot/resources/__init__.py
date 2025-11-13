@@ -4,6 +4,8 @@ from __future__ import annotations
 from importlib import resources
 from pathlib import Path
 
+from typing import Dict, Tuple
+
 import logging
 import shutil
 import tempfile
@@ -41,12 +43,58 @@ def _ensure_cached(relative: str) -> Path:
     origin = resources.files(__name__).joinpath(relative)
     target = _CACHE_DIR / relative
     if origin.is_dir():
+        with resources.as_file(origin) as resolved:
+            if _is_directory_cache_valid(resolved, target):
+                _log_cache_state(relative, target)
+                return target
         _copy_directory(origin, target)
         _log_cache_state(relative, target)
         return target
+    with resources.as_file(origin) as resolved:
+        if _is_file_cache_valid(resolved, target):
+            _log_cache_state(relative, target)
+            return target
     _copy_file(origin, target)
     _log_cache_state(relative, target)
     return target
+
+
+def _is_file_cache_valid(source: Path, destination: Path) -> bool:
+    if not destination.exists() or not destination.is_file():
+        return False
+    try:
+        source_stat = source.stat()
+        dest_stat = destination.stat()
+    except OSError:
+        return False
+    return (
+        dest_stat.st_mtime_ns == source_stat.st_mtime_ns
+        and dest_stat.st_size == source_stat.st_size
+    )
+
+
+def _is_directory_cache_valid(source: Path, destination: Path) -> bool:
+    if not destination.exists() or not destination.is_dir():
+        return False
+    try:
+        source_snapshot = _snapshot_directory(source)
+        destination_snapshot = _snapshot_directory(destination)
+    except OSError:
+        return False
+    return source_snapshot == destination_snapshot
+
+
+def _snapshot_directory(base: Path) -> Tuple[Dict[str, Tuple[int, int]], Tuple[str, ...]]:
+    files: Dict[str, Tuple[int, int]] = {}
+    directories = set()
+    for path in base.rglob("*"):
+        relative = path.relative_to(base).as_posix()
+        if path.is_file():
+            stats = path.stat()
+            files[relative] = (stats.st_size, stats.st_mtime_ns)
+        elif path.is_dir():
+            directories.add(relative)
+    return files, tuple(sorted(directories))
 
 
 def _log_cache_state(relative: str, target: Path) -> None:
