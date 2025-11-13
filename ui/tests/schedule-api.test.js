@@ -9,7 +9,10 @@ test("createScheduleApi load usa authorizedFetch con la ruta de schedule", async
     calls.push({ url, options });
     return { ok: true, json: async () => ({}) };
   };
-  const buildApiUrl = (path) => `https://example.test/${path}`;
+  const buildApiUrl = (path) => {
+    assert.equal(path, "/schedule");
+    return `https://example.test${path}`;
+  };
 
   const api = createScheduleApi({ authorizedFetch, buildApiUrl });
   await api.load();
@@ -25,7 +28,10 @@ test("createScheduleApi save envía una petición PUT con JSON", async () => {
     calls.push({ url, options });
     return { ok: true, json: async () => ({}) };
   };
-  const buildApiUrl = (path) => `https://example.test/${path}`;
+  const buildApiUrl = (path) => {
+    assert.equal(path, "/schedule");
+    return `https://example.test${path}`;
+  };
   const payload = { mode: "cron", expression: "0 4 * * *" };
 
   const api = createScheduleApi({ authorizedFetch, buildApiUrl });
