@@ -385,7 +385,14 @@ class ConfigAPI:
 
         if path == "/config":
             if method == "GET":
-                return HTTPStatus.OK, self._serialize(self.store.load())
+                try:
+                    data = self.store.load()
+                except Exception as exc:
+                    return HTTPStatus.INTERNAL_SERVER_ERROR, {
+                        "error": "failed to load configuration",
+                        "details": str(exc),
+                    }
+                return HTTPStatus.OK, self._serialize(data)
             if method == "PUT":
                 return self._handle_put(payload)
             return HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method not allowed"}
@@ -882,8 +889,6 @@ def create_app(
     @app.get("/config", dependencies=[Depends(_require_auth)])
     def get_config(request: Request):
         status, body = api.handle_request("GET", "/config", headers=request.headers)
-        if status != HTTPStatus.OK:
-            raise HTTPException(status_code=status, detail=body)
         return JSONResponse(body, status_code=status)
 
     @app.put("/config", dependencies=[Depends(_require_auth)])
