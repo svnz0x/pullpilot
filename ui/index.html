@@ -59,6 +59,64 @@
         <div class="status" id="config-status" role="status" aria-live="polite" hidden></div>
       </section>
 
+      <section id="schedule-section">
+        <h2>Programación</h2>
+        <form id="schedule-form">
+          <div class="config-grid" id="schedule-fields">
+            <div class="config-field" data-name="mode">
+              <label for="schedule-mode">Modo de ejecución</label>
+              <div class="field-input">
+                <select id="schedule-mode" class="value-input" aria-describedby="schedule-mode-description">
+                  <option value="cron">Repetir según cron</option>
+                  <option value="once">Ejecutar una sola vez</option>
+                </select>
+              </div>
+              <p class="field-description" id="schedule-mode-description">
+                Selecciona si el updater debe repetirse de forma recurrente mediante cron o ejecutarse una sola vez en una fecha concreta.
+              </p>
+            </div>
+            <div class="config-field" data-name="expression">
+              <label for="schedule-expression">Expresión cron</label>
+              <div class="field-input">
+                <input
+                  id="schedule-expression"
+                  class="value-input"
+                  type="text"
+                  placeholder="Ej.: 0 4 * * * o @daily"
+                  aria-describedby="schedule-expression-description"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
+              <p class="field-description" id="schedule-expression-description">
+                Define la planificación usando una expresión cron de cinco campos o macros como <code>@daily</code>. También puedes emplear <code>@every</code> con duraciones válidas.
+              </p>
+            </div>
+            <div class="config-field" data-name="datetime" hidden>
+              <label for="schedule-datetime">Fecha y hora exactas</label>
+              <div class="field-input">
+                <input
+                  id="schedule-datetime"
+                  class="value-input"
+                  type="text"
+                  placeholder="Ej.: 2030-05-10T12:30:00+02:00"
+                  aria-describedby="schedule-datetime-description"
+                  autocomplete="off"
+                />
+              </div>
+              <p class="field-description" id="schedule-datetime-description">
+                Introduce una fecha y hora con zona horaria en formato ISO 8601. El updater se ejecutará una única vez en el instante indicado.
+              </p>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="primary" id="save-schedule">Guardar programación</button>
+            <button type="button" class="secondary" id="reset-schedule">Descartar cambios</button>
+          </div>
+        </form>
+        <div class="status" id="schedule-status" role="status" aria-live="polite" hidden></div>
+      </section>
+
       <section id="logs-section">
         <h2>Logs recientes</h2>
         <div class="logs-header">

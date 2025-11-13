@@ -1,5 +1,6 @@
 import { createTokenStorage } from "./token-storage.js";
 import { createApiUrlBuilder } from "./api-url.js";
+import { createScheduleApi } from "./schedule-api.js";
 import {
   buildMissingCredentialsMessage,
   resolveUnauthorizedDetails,
@@ -18,6 +19,17 @@ import { buildUnauthorizedTokenMessage } from "./unauthorized-message.js";
   const fieldsContainer = document.getElementById("config-fields");
   const resetButton = document.getElementById("reset-config");
   const configStatus = document.getElementById("config-status");
+  const scheduleForm = document.getElementById("schedule-form");
+  const scheduleFieldsContainer = document.getElementById("schedule-fields");
+  const scheduleModeSelect = document.getElementById("schedule-mode");
+  const scheduleExpressionField =
+    scheduleFieldsContainer?.querySelector('[data-name="expression"]') ?? null;
+  const scheduleExpressionInput = document.getElementById("schedule-expression");
+  const scheduleDatetimeField =
+    scheduleFieldsContainer?.querySelector('[data-name="datetime"]') ?? null;
+  const scheduleDatetimeInput = document.getElementById("schedule-datetime");
+  const scheduleStatus = document.getElementById("schedule-status");
+  const scheduleResetButton = document.getElementById("reset-schedule");
   const logSelect = document.getElementById("log-select");
   const logContent = document.getElementById("log-content");
   const logMeta = document.getElementById("log-meta");
@@ -25,6 +37,7 @@ import { buildUnauthorizedTokenMessage } from "./unauthorized-message.js";
   const refreshLogs = document.getElementById("refresh-logs");
 
   let lastConfigSnapshot = null;
+  let lastScheduleSnapshot = null;
   let memoryToken = null;
   let storedToken = null;
   const tokenStorage = createTokenStorage(window);
@@ -154,6 +167,44 @@ import { buildUnauthorizedTokenMessage } from "./unauthorized-message.js";
       fieldsContainer.innerHTML = "";
     }
     lastConfigSnapshot = null;
+    if (scheduleForm) {
+      scheduleForm.reset();
+    }
+    if (scheduleFieldsContainer) {
+      scheduleFieldsContainer
+        .querySelectorAll(".config-field.is-error")
+        .forEach((field) => {
+          field.classList.remove("is-error");
+          field
+            .querySelectorAll(".value-input, textarea[data-multiline]")
+            .forEach((control) => control.removeAttribute("aria-invalid"));
+        });
+    }
+    if (scheduleModeSelect) {
+      scheduleModeSelect.value = "cron";
+    }
+    if (scheduleExpressionField) {
+      scheduleExpressionField.hidden = false;
+    }
+    if (scheduleExpressionInput) {
+      scheduleExpressionInput.disabled = false;
+      scheduleExpressionInput.value = "";
+      scheduleExpressionInput.removeAttribute("aria-invalid");
+    }
+    if (scheduleDatetimeField) {
+      scheduleDatetimeField.hidden = true;
+    }
+    if (scheduleDatetimeInput) {
+      scheduleDatetimeInput.disabled = true;
+      scheduleDatetimeInput.value = "";
+      scheduleDatetimeInput.removeAttribute("aria-invalid");
+    }
+    if (scheduleStatus) {
+      scheduleStatus.hidden = true;
+      scheduleStatus.classList.remove("success", "error");
+      scheduleStatus.textContent = "";
+    }
+    lastScheduleSnapshot = null;
     if (configStatus) {
       configStatus.hidden = true;
       configStatus.classList.remove("success", "error");
@@ -364,6 +415,8 @@ import { buildUnauthorizedTokenMessage } from "./unauthorized-message.js";
     return response;
   };
 
+  const scheduleApi = createScheduleApi({ authorizedFetch, buildApiUrl });
+
   const escapeSelector = (value) => {
     const stringValue = String(value);
     if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
@@ -437,9 +490,9 @@ import { buildUnauthorizedTokenMessage } from "./unauthorized-message.js";
     element.textContent = "";
   };
 
-  const clearFieldErrors = () => {
-    if (!fieldsContainer) return;
-    fieldsContainer.querySelectorAll(".config-field.is-error").forEach((field) => {
+  const clearFieldErrors = (container = fieldsContainer) => {
+    if (!container) return;
+    container.querySelectorAll(".config-field.is-error").forEach((field) => {
       field.classList.remove("is-error");
       field
         .querySelectorAll(".value-input, textarea[data-multiline]")
@@ -536,8 +589,8 @@ import { buildUnauthorizedTokenMessage } from "./unauthorized-message.js";
     return results;
   };
 
-  const applyFieldErrorHighlights = (details) => {
-    if (!fieldsContainer) return [];
+  const applyFieldErrorHighlights = (details, container = fieldsContainer) => {
+    if (!container) return [];
     const entries = normalizeDetailEntries(details);
     const messages = [];
     entries.forEach((entry) => {
@@ -563,7 +616,7 @@ import { buildUnauthorizedTokenMessage } from "./unauthorized-message.js";
             : String(rawMessage);
         if (fieldName) {
           const selector = `.config-field[data-name="${escapeSelector(fieldName)}"]`;
-          const field = fieldsContainer.querySelector(selector);
+          const field = container.querySelector(selector);
           if (field) {
             field.classList.add("is-error");
             field
@@ -662,8 +715,10 @@ import { buildUnauthorizedTokenMessage } from "./unauthorized-message.js";
     return null;
   };
 
-  const buildErrorStatusPayload = (data) => {
-    const defaultSummary = "No se pudo guardar la configuración.";
+  const buildErrorStatusPayload = (
+    data,
+    { defaultSummary = "No se pudo guardar la configuración.", container = fieldsContainer } = {},
+  ) => {
     const detailSource = selectDetailSource(data);
     const normalizedDetails = normalizeDetailEntries(detailSource);
 
@@ -683,8 +738,205 @@ import { buildUnauthorizedTokenMessage } from "./unauthorized-message.js";
     const summary =
       summaryCandidates.map((candidate) => extractFirstText(candidate)).find((text) => text?.length) ||
       defaultSummary;
-    const details = applyFieldErrorHighlights(detailSource);
+    const details = applyFieldErrorHighlights(detailSource, container);
     return { summary, details };
+  };
+
+  const normalizeScheduleData = (data) => {
+    const mode = data?.mode === "once" ? "once" : "cron";
+    const expression =
+      typeof data?.expression === "string" ? data.expression.trim() : "";
+    const datetime =
+      typeof data?.datetime === "string" ? data.datetime.trim() : "";
+    if (mode === "cron") {
+      return { mode, expression, datetime: "" };
+    }
+    return { mode, expression: "", datetime };
+  };
+
+  const updateScheduleModeUI = (mode) => {
+    const normalized = mode === "once" ? "once" : "cron";
+    if (scheduleModeSelect) {
+      scheduleModeSelect.value = normalized;
+    }
+    if (scheduleExpressionField) {
+      scheduleExpressionField.hidden = normalized !== "cron";
+    }
+    if (scheduleExpressionInput) {
+      scheduleExpressionInput.disabled = normalized !== "cron";
+      if (normalized !== "cron") {
+        scheduleExpressionInput.removeAttribute("aria-invalid");
+      }
+    }
+    if (scheduleDatetimeField) {
+      scheduleDatetimeField.hidden = normalized !== "once";
+    }
+    if (scheduleDatetimeInput) {
+      scheduleDatetimeInput.disabled = normalized !== "once";
+      if (normalized !== "once") {
+        scheduleDatetimeInput.removeAttribute("aria-invalid");
+      }
+    }
+  };
+
+  const populateSchedule = (data) => {
+    const normalized = normalizeScheduleData(data);
+    if (scheduleModeSelect) {
+      scheduleModeSelect.value = normalized.mode;
+    }
+    updateScheduleModeUI(normalized.mode);
+    clearFieldErrors(scheduleFieldsContainer);
+    if (scheduleExpressionInput) {
+      scheduleExpressionInput.value = normalized.expression;
+    }
+    if (scheduleDatetimeInput) {
+      scheduleDatetimeInput.value = normalized.datetime;
+    }
+    lastScheduleSnapshot = normalized;
+  };
+
+  const prepareSchedulePayload = () => {
+    const errors = [];
+    const rawMode = scheduleModeSelect?.value ?? "";
+    const normalizedMode = rawMode === "once" ? "once" : rawMode === "cron" ? "cron" : null;
+    const payload = {};
+
+    if (!normalizedMode) {
+      errors.push({ field: "mode", message: "Selecciona un modo válido." });
+      return { payload: null, errors };
+    }
+
+    payload.mode = normalizedMode;
+
+    if (normalizedMode === "cron") {
+      const trimmedExpression = (scheduleExpressionInput?.value ?? "").trim();
+      if (!trimmedExpression) {
+        errors.push({ field: "expression", message: "Indica una expresión cron." });
+      } else {
+        payload.expression = trimmedExpression;
+      }
+    } else {
+      const trimmedDatetime = (scheduleDatetimeInput?.value ?? "").trim();
+      if (!trimmedDatetime) {
+        errors.push({ field: "datetime", message: "Indica una fecha y hora válidas." });
+      } else if (Number.isNaN(Date.parse(trimmedDatetime))) {
+        errors.push({
+          field: "datetime",
+          message: "Usa un formato ISO 8601 válido (ej.: 2030-05-10T12:30:00+02:00).",
+        });
+      } else {
+        payload.datetime = trimmedDatetime;
+      }
+    }
+
+    return { payload, errors };
+  };
+
+  const fetchSchedule = async () => {
+    hideStatus(scheduleStatus);
+    clearFieldErrors(scheduleFieldsContainer);
+    try {
+      const response = await scheduleApi.load();
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        const requestError = new Error("REQUEST_FAILED");
+        requestError.status = response.status;
+        requestError.data = data;
+        throw requestError;
+      }
+      if (data) {
+        populateSchedule(data);
+      } else {
+        populateSchedule({ mode: "cron", expression: "", datetime: "" });
+      }
+      showStatus(scheduleStatus, "Programación cargada correctamente.", "success");
+      setTimeout(() => hideStatus(scheduleStatus), 2500);
+      return true;
+    } catch (error) {
+      console.error(error);
+      if (error?.message === "UNAUTHORIZED") {
+        showStatus(
+          scheduleStatus,
+          "No se pudo cargar la programación: introduce un token válido.",
+          "error",
+        );
+      } else {
+        showStatus(scheduleStatus, "No se pudo cargar la programación.", "error");
+      }
+      return false;
+    }
+  };
+
+  const submitSchedule = async (event) => {
+    event.preventDefault();
+    hideStatus(scheduleStatus);
+    clearFieldErrors(scheduleFieldsContainer);
+    const { payload, errors } = prepareSchedulePayload();
+    if (errors.length) {
+      const detailMessages = applyFieldErrorHighlights(errors, scheduleFieldsContainer);
+      showStatus(
+        scheduleStatus,
+        {
+          summary: "Revisa la programación antes de guardar.",
+          details: detailMessages,
+        },
+        "error",
+      );
+      return;
+    }
+    try {
+      const response = await scheduleApi.save(payload);
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        const requestError = new Error("REQUEST_FAILED");
+        requestError.status = response.status;
+        requestError.data = data;
+        throw requestError;
+      }
+      if (data) {
+        populateSchedule(data);
+      } else if (payload) {
+        populateSchedule(payload);
+      }
+      showStatus(scheduleStatus, "Programación guardada.", "success");
+      setTimeout(() => hideStatus(scheduleStatus), 2500);
+    } catch (error) {
+      console.error(error);
+      if (error?.message === "UNAUTHORIZED") {
+        showStatus(
+          scheduleStatus,
+          "No se pudo guardar la programación porque falta un token válido.",
+          "error",
+        );
+        return;
+      }
+      if (error?.data) {
+        const statusPayload = buildErrorStatusPayload(error.data, {
+          defaultSummary: "No se pudo guardar la programación.",
+          container: scheduleFieldsContainer,
+        });
+        showStatus(scheduleStatus, statusPayload, "error");
+        return;
+      }
+      showStatus(
+        scheduleStatus,
+        "No se pudo guardar la programación. Revisa los datos e inténtalo de nuevo.",
+        "error",
+      );
+    }
+  };
+
+  const resetSchedule = () => {
+    clearFieldErrors(scheduleFieldsContainer);
+    if (!lastScheduleSnapshot) {
+      scheduleForm?.reset();
+      updateScheduleModeUI(scheduleModeSelect?.value ?? "cron");
+      hideStatus(scheduleStatus);
+      return;
+    }
+    populateSchedule(lastScheduleSnapshot);
+    showStatus(scheduleStatus, "Se restauró la programación cargada.");
+    setTimeout(() => hideStatus(scheduleStatus), 2500);
   };
 
   const booleanValue = (value) => {
@@ -1104,20 +1356,29 @@ import { buildUnauthorizedTokenMessage } from "./unauthorized-message.js";
   } = {}) => {
     setAuthState(true);
     hideStatus(configStatus);
+    hideStatus(scheduleStatus);
     hideStatus(logsStatus);
     if (loginForm) {
       loginForm.reset();
     }
-    const configLoaded = await fetchConfig();
+    const [configLoaded, scheduleLoaded] = await Promise.all([fetchConfig(), fetchSchedule()]);
     await fetchLogs();
     const storageOutcome = processStorageStatus(storageStatus, { silent: true });
     const storageMessage = storageOutcome.handled ? storageOutcome.message : "";
+    const missingSections = [];
     if (!configLoaded) {
-      const baseMessage =
-        "Token validado, pero no se pudo cargar la configuración. Revisa el servicio e inténtalo de nuevo.";
-      const combinedMessage = storageMessage
-        ? `${baseMessage} ${storageMessage}`
-        : baseMessage;
+      missingSections.push("la configuración");
+    }
+    if (!scheduleLoaded) {
+      missingSections.push("la programación");
+    }
+    if (missingSections.length) {
+      const missingSummary =
+        missingSections.length === 1
+          ? missingSections[0]
+          : `${missingSections[0]} y ${missingSections[1]}`;
+      const baseMessage = `Token validado, pero no se pudo cargar ${missingSummary}. Revisa el servicio e inténtalo de nuevo.`;
+      const combinedMessage = storageMessage ? `${baseMessage} ${storageMessage}` : baseMessage;
       showLoginMessage(combinedMessage, "error");
     } else if (storageOutcome.handled) {
       showLoginMessage(storageMessage, storageOutcome.tone || "error");
@@ -1196,6 +1457,17 @@ import { buildUnauthorizedTokenMessage } from "./unauthorized-message.js";
   logoutButton?.addEventListener("click", () => {
     clearSession("Sesión cerrada. Introduce un token válido para continuar.");
   });
+
+  updateScheduleModeUI(scheduleModeSelect?.value ?? "cron");
+
+  scheduleModeSelect?.addEventListener("change", (event) => {
+    updateScheduleModeUI(event.target?.value ?? "cron");
+    clearFieldErrors(scheduleFieldsContainer);
+    hideStatus(scheduleStatus);
+  });
+
+  scheduleForm?.addEventListener("submit", submitSchedule);
+  scheduleResetButton?.addEventListener("click", resetSchedule);
 
   form.addEventListener("submit", submitConfig);
   resetButton.addEventListener("click", resetConfig);
