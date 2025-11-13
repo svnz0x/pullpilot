@@ -1383,10 +1383,15 @@ const initializeApp = () => {
     if (loginForm) {
       loginForm.reset();
     }
-    const [configLoaded, scheduleLoaded] = await Promise.all([fetchConfig(), fetchSchedule()]);
-    await fetchLogs();
+    const [configLoaded, scheduleLoaded, logsLoaded] = await Promise.all([
+      fetchConfig(),
+      fetchSchedule(),
+      fetchLogs(),
+    ]);
     const storageOutcome = processStorageStatus(storageStatus, { silent: true });
-    const storageMessage = storageOutcome.handled ? storageOutcome.message : "";
+    const storageMessage = storageOutcome.handled
+      ? (storageOutcome.message || "").trim()
+      : "";
     const missingSections = [];
     if (!configLoaded) {
       missingSections.push("la configuración");
@@ -1394,11 +1399,19 @@ const initializeApp = () => {
     if (!scheduleLoaded) {
       missingSections.push("la programación");
     }
+    if (!logsLoaded) {
+      missingSections.push("los logs");
+    }
     if (missingSections.length) {
-      const missingSummary =
-        missingSections.length === 1
-          ? missingSections[0]
-          : `${missingSections[0]} y ${missingSections[1]}`;
+      const formatMissingSummary = (sections) => {
+        if (sections.length === 1) {
+          return sections[0];
+        }
+        const head = sections.slice(0, -1).join(", ");
+        const tail = sections[sections.length - 1];
+        return `${head} y ${tail}`;
+      };
+      const missingSummary = formatMissingSummary(missingSections);
       const baseMessage = `Token validado, pero no se pudo cargar ${missingSummary}. Revisa el servicio e inténtalo de nuevo.`;
       const combinedMessage = storageMessage ? `${baseMessage} ${storageMessage}` : baseMessage;
       showLoginMessage(combinedMessage, "error");
