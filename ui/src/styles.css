@@ -230,7 +230,12 @@ section h2 {
 
 .config-field {
   display: grid;
-  gap: 0.4rem;
+  gap: 0.5rem;
+  padding: 0.9rem 1rem;
+  background: rgba(255, 255, 255, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 0.9rem;
+  backdrop-filter: blur(14px);
 }
 
 .config-field label {
@@ -251,14 +256,15 @@ section h2 {
 .config-field select,
 .config-field textarea {
   width: min(100%, 30rem);
-  padding: 0.6rem 0.75rem;
-  border-radius: 0.5rem;
-  border: 1px solid rgba(120, 124, 131, 0.4);
-  background: #ffffff;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(124, 132, 150, 0.28);
+  background: rgba(255, 255, 255, 0.55);
   color: inherit;
   font: inherit;
-  transition: border-color 0.2s ease, outline-color 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
   resize: vertical;
+  backdrop-filter: blur(6px);
 }
 
 .config-field textarea.multiline-input {
@@ -276,10 +282,9 @@ section h2 {
 .config-field input:focus,
 .config-field select:focus,
 .config-field textarea:focus {
-  outline: 2px solid rgba(120, 124, 131, 0.35);
-  outline-offset: 0;
-  border-color: rgba(120, 124, 131, 0.75);
-  box-shadow: none;
+  outline: none;
+  border-color: rgba(124, 140, 255, 0.45);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .config-field .field-description {
@@ -307,57 +312,57 @@ section h2 {
 
 button {
   appearance: none;
-  border: 1px solid rgba(120, 124, 131, 0.35);
-  border-radius: 0.55rem;
-  padding: 0.65rem 1.35rem;
+  border: 1px solid rgba(124, 132, 150, 0.28);
+  border-radius: 0.6rem;
+  padding: 0.65rem 1.4rem;
   font-weight: 600;
   cursor: pointer;
-  background: #ffffff;
-  color: inherit;
-  transition: transform 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+  background: rgba(255, 255, 255, 0.45);
+  color: var(--text);
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  backdrop-filter: blur(8px);
 }
 
 button.primary {
-  background: var(--accent);
-  border-color: rgba(124, 140, 255, 0.6);
+  background: rgba(124, 140, 255, 0.32);
+  border-color: rgba(124, 140, 255, 0.5);
   color: #ffffff;
 }
 
 button.primary:hover {
-  background: var(--accent-strong);
+  background: rgba(124, 140, 255, 0.42);
+  border-color: rgba(124, 140, 255, 0.6);
 }
 
 button.secondary {
-  background: rgba(120, 124, 131, 0.08);
-  color: inherit;
+  background: rgba(124, 132, 150, 0.12);
+  color: rgba(25, 32, 45, 0.85);
 }
 
 button.secondary:hover {
-  background: rgba(120, 124, 131, 0.12);
+  background: rgba(124, 132, 150, 0.18);
 }
 
 button:hover {
-  transform: translateY(-1px);
-  border-color: rgba(120, 124, 131, 0.6);
-}
-
-button:active {
-  transform: translateY(1px);
+  border-color: rgba(124, 140, 255, 0.4);
 }
 
 button:focus-visible {
-  outline: 2px solid rgba(120, 124, 131, 0.45);
-  outline-offset: 2px;
+  outline: none;
+  border-color: rgba(124, 140, 255, 0.55);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .status {
   margin-top: 1rem;
   padding: 0.85rem 1rem;
-  border-radius: 0.9rem;
+  border-radius: 0.95rem;
   font-size: 0.95rem;
-  background: rgba(120, 124, 131, 0.1);
-  border: 1px solid rgba(120, 124, 131, 0.2);
-  color: var(--text-secondary);
+  background: rgba(124, 132, 150, 0.12);
+  border: 1px solid rgba(124, 132, 150, 0.22);
+  color: rgba(25, 32, 45, 0.82);
+  font-weight: 600;
+  backdrop-filter: blur(12px);
 }
 
 .status ul {
@@ -374,15 +379,15 @@ button:focus-visible {
 }
 
 .status.success {
-  background: rgba(107, 169, 132, 0.18);
+  background: rgba(107, 169, 132, 0.2);
   border-color: rgba(107, 169, 132, 0.35);
-  color: var(--success);
+  color: rgba(48, 112, 76, 0.9);
 }
 
 .status.error {
-  background: rgba(210, 113, 113, 0.18);
+  background: rgba(210, 113, 113, 0.2);
   border-color: rgba(210, 113, 113, 0.35);
-  color: var(--danger);
+  color: rgba(143, 54, 54, 0.9);
 }
 
 .config-field.is-error label {
@@ -414,18 +419,20 @@ button:focus-visible {
 }
 
 .log-output {
-  background: var(--surface-strong);
+  background: rgba(16, 21, 32, 0.12);
   border-radius: 1rem;
-  border: 1px solid var(--surface-border);
-  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 1.05rem 1.15rem;
   margin-top: 1rem;
   max-height: 24rem;
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
   font-family: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  font-size: 0.85rem;
-  line-height: 1.45;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: rgba(20, 27, 40, 0.92);
+  backdrop-filter: blur(14px);
 }
 
 @media (max-width: 768px) {
