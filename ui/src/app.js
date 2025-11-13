@@ -4,6 +4,7 @@ import {
   buildMissingCredentialsMessage,
   resolveUnauthorizedDetails,
 } from "./auth-errors.js";
+import { buildUnauthorizedTokenMessage } from "./unauthorized-message.js";
 
 (() => {
   const body = document.body;
@@ -190,18 +191,42 @@ import {
       memoryToken = trimmed || null;
 
       if (!memoryToken) {
+        storedToken = null;
         return tokenStorage.clearToken("remove");
       }
 
       if (persist) {
-        return tokenStorage.persistToken(memoryToken);
+        const persistStatus = tokenStorage.persistToken(memoryToken);
+        if (persistStatus?.ok) {
+          storedToken = memoryToken;
+        }
+        return persistStatus;
       }
 
+      storedToken = null;
       return tokenStorage.clearToken("remove");
     },
-    clearToken: () => {
+    clearToken: ({ forgetPersisted = true } = {}) => {
       memoryToken = null;
-      return tokenStorage.clearToken("clear");
+      if (!forgetPersisted) {
+        return {
+          ok: true,
+          operation: "memory-clear",
+          storage: null,
+          storageLabel: null,
+          persisted: false,
+          fallbackUsed: false,
+          attempts: [],
+          errors: [],
+          hadErrors: false,
+        };
+      }
+
+      const clearStatus = tokenStorage.clearToken("clear");
+      if (clearStatus?.ok) {
+        storedToken = null;
+      }
+      return clearStatus;
     },
   };
 
@@ -279,12 +304,21 @@ import {
       return;
     }
 
-    const clearStatus = auth.clearToken();
+    const hadMemoryToken = memoryToken != null;
+    const storedTokenStatus = tokenStorage.readToken();
+    storedToken = storedTokenStatus?.token ?? null;
+    const reusableToken = Boolean(storedTokenStatus?.token);
+    const clearStatus = auth.clearToken({ forgetPersisted: !reusableToken });
     const storageOutcome = processStorageStatus(clearStatus, { silent: true });
     loginForm?.reset();
-    const finalMessage = storageOutcome.handled
-      ? `${message} ${storageOutcome.message}`
-      : message;
+    if (reusableToken && tokenInput) {
+      tokenInput.value = storedTokenStatus.token;
+    }
+    const finalMessage = buildUnauthorizedTokenMessage(message, {
+      reusableToken,
+      hadMemoryToken,
+      storageOutcome,
+    });
     showLoginPrompt("error", finalMessage);
   };
 
