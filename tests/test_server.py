@@ -131,6 +131,25 @@ def test_get_includes_schema_metadata(
     assert body.get("meta", {}).get("multiline_fields") == ["COMPOSE_PROJECTS_FILE"]
 
 
+def test_get_returns_error_when_store_load_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    auth_headers: Mapping[str, str],
+    store: ConfigStore,
+    schedule_store: ScheduleStore,
+) -> None:
+    api = ConfigAPI(store=store, schedule_store=schedule_store)
+
+    def fail() -> None:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(store, "load", fail)
+
+    status, body = api.handle_request("GET", "/config", headers=auth_headers)
+
+    assert status == HTTPStatus.INTERNAL_SERVER_ERROR
+    assert body == {"error": "failed to load configuration", "details": "boom"}
+
+
 def test_put_updates_config_and_multiline(
     auth_headers: Mapping[str, str],
     tmp_path: Path,
@@ -728,6 +747,31 @@ def test_fastapi_get_propagates_error(
     headers = {"Authorization": "Bearer fast-error"}
     response = client.get("/config", headers=headers)
     assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+def test_fastapi_get_returns_error_body_when_store_load_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    store: ConfigStore,
+    schedule_store: ScheduleStore,
+) -> None:
+    pytest.importorskip("fastapi")
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+
+    def fail() -> None:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(store, "load", fail)
+    monkeypatch.setenv("PULLPILOT_TOKEN", "fast-failure")
+
+    app = create_app(store=store, schedule_store=schedule_store)
+    client = TestClient(app)
+
+    headers = {"Authorization": "Bearer fast-failure"}
+    response = client.get("/config", headers=headers)
+
+    assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+    assert response.json() == {"error": "failed to load configuration", "details": "boom"}
 
 
 def test_fastapi_ui_routes_require_auth(
