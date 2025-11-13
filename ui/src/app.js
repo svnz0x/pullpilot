@@ -1306,9 +1306,23 @@ const initializeApp = () => {
     } catch (error) {
       console.error(error);
       if (error?.message === "UNAUTHORIZED") {
+        if (logSelect) {
+          logSelect.innerHTML = "";
+          logSelect.disabled = true;
+        }
+        if (logMeta) {
+          logMeta.textContent = "";
+        }
         showStatus(logsStatus, "Introduce un token válido para consultar los logs.", "error");
         logContent.textContent = "Introduce un token válido para ver los logs.";
       } else {
+        if (logSelect) {
+          logSelect.innerHTML = "";
+          logSelect.disabled = true;
+        }
+        if (logMeta) {
+          logMeta.textContent = "";
+        }
         showStatus(logsStatus, "No se pudieron cargar los logs.", "error");
         logContent.textContent = "Sin datos disponibles.";
       }
