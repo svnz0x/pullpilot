@@ -26,18 +26,24 @@ DEFAULT_INTERVAL = 5.0
 logger = logging.getLogger("pullpilot.scheduler.watch")
 
 
+def _derive_cron_path(schedule_path: Path) -> Path:
+    """Return the cron file path derived from the schedule file location."""
+
+    return schedule_path.with_name(f"{schedule_path.name}.cron")
+
+
 class SchedulerWatcher:
     """Monitor the schedule file and spawn the right worker process."""
 
     def __init__(
         self,
         schedule_path: Path,
-        cron_path: Path,
+        cron_path: Path | None,
         updater_command: str,
         interval: float,
     ) -> None:
         self.store = ScheduleStore(schedule_path)
-        self.cron_path = cron_path
+        self.cron_path = cron_path if cron_path is not None else _derive_cron_path(schedule_path)
         self.updater_command = updater_command
         self.interval = interval
         self.current_signature: Optional[str] = None
@@ -259,7 +265,7 @@ def resolve_default_updater_command() -> str:
 def build_watcher(
     schedule_path: Path = DEFAULT_SCHEDULE_FILE,
     *,
-    cron_path: Path = DEFAULT_CRON_FILE,
+    cron_path: Path | None = None,
     updater_command: str | None = None,
     interval: float = DEFAULT_INTERVAL,
 ) -> SchedulerWatcher:

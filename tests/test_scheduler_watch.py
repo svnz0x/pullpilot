@@ -13,7 +13,6 @@ import pytest
 from pullpilot.resources import get_resource_path
 from pullpilot.scheduler.watch import (
     DEFAULT_COMMAND,
-    DEFAULT_CRON_FILE,
     DEFAULT_INTERVAL,
     DEFAULT_SCHEDULE_FILE,
     DEFAULT_SCHEDULE_PATH,
@@ -561,9 +560,16 @@ def test_build_watcher_uses_defaults(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     watcher = build_watcher(schedule_path=schedule_path)
 
     assert watcher.store.schedule_path == schedule_path
-    assert watcher.cron_path == DEFAULT_CRON_FILE
+    assert watcher.cron_path == schedule_path.with_name(f"{schedule_path.name}.cron")
     assert watcher.updater_command == expected_command
     assert watcher.interval == DEFAULT_INTERVAL
+
+
+def test_scheduler_watcher_derives_cron_path(tmp_path: Path) -> None:
+    schedule_path = tmp_path / "schedule.json"
+    watcher = SchedulerWatcher(schedule_path, None, "echo hi", DEFAULT_INTERVAL)
+
+    assert watcher.cron_path == schedule_path.with_name(f"{schedule_path.name}.cron")
 
 
 def test_stop_process_handles_finished_process(tmp_path: Path) -> None:
