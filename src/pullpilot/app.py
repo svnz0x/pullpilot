@@ -320,6 +320,8 @@ MAX_UI_LOG_LINES = 400
 class ConfigAPI:
     """Lightweight request handler used both for tests and WSGI bridges."""
 
+    Response = Tuple[int, Dict[str, Any], Dict[str, str]]
+
     def __init__(
         self,
         store: Optional[ConfigStore] = None,
@@ -333,6 +335,23 @@ class ConfigAPI:
         else:
             self.authenticator = Authenticator.from_env()
 
+    @staticmethod
+    def _build_response(
+        status: HTTPStatus | int,
+        body: Dict[str, Any],
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> Response:
+        normalized_headers = dict(headers) if headers else {}
+        return int(status), body, normalized_headers
+
+    def _method_not_allowed(self, *allowed_methods: str) -> Response:
+        allow_value = ", ".join(sorted({method.upper() for method in allowed_methods}))
+        return self._build_response(
+            HTTPStatus.METHOD_NOT_ALLOWED,
+            {"error": "method not allowed"},
+            {"Allow": allow_value},
+        )
+
     # ------------------------------------------------------------------
     # Request helpers
     def handle_request(
@@ -341,7 +360,7 @@ class ConfigAPI:
         path: str,
         payload: Optional[Mapping[str, Any]] = None,
         headers: Optional[Mapping[str, str]] = None,
-    ) -> Tuple[int, Dict[str, Any]]:
+    ) -> Response:
         method = method.upper()
         ui_public_paths = {
             "/",
@@ -365,7 +384,7 @@ class ConfigAPI:
         )
         if requires_auth:
             if not self.authenticator or not self.authenticator.configured:
-                return (
+                return self._build_response(
                     HTTPStatus.UNAUTHORIZED,
                     {
                         "error": "missing credentials",
@@ -376,32 +395,44 @@ class ConfigAPI:
                     },
                 )
             if not self.authenticator.authorize(headers):
-                return HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"}
+                return self._build_response(
+                    HTTPStatus.UNAUTHORIZED,
+                    {"error": "unauthorized"},
+                )
 
         if is_ui_request:
             return self._handle_ui_request(method, path, payload)
         if path not in {"/config", "/schedule"}:
-            return HTTPStatus.NOT_FOUND, {"error": "not found"}
+            return self._build_response(
+                HTTPStatus.NOT_FOUND,
+                {"error": "not found"},
+            )
 
         if path == "/config":
             if method == "GET":
-                return HTTPStatus.OK, self._serialize(self.store.load())
+                return self._build_response(
+                    HTTPStatus.OK,
+                    self._serialize(self.store.load()),
+                )
             if method == "PUT":
                 return self._handle_put(payload)
-            return HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method not allowed"}
+            return self._method_not_allowed("GET", "PUT")
 
         if method == "GET":
             try:
                 data = self.schedule_store.load()
             except (ScheduleValidationError, json.JSONDecodeError) as exc:
-                return HTTPStatus.INTERNAL_SERVER_ERROR, {
-                    "error": "failed to load schedule",
-                    "details": str(exc),
-                }
-            return HTTPStatus.OK, data.to_dict()
+                return self._build_response(
+                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                    {
+                        "error": "failed to load schedule",
+                        "details": str(exc),
+                    },
+                )
+            return self._build_response(HTTPStatus.OK, data.to_dict())
         if method == "PUT":
             return self._handle_schedule_put(payload)
-        return HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method not allowed"}
+        return self._method_not_allowed("GET", "PUT")
 
     # ------------------------------------------------------------------
     # UI helpers
@@ -410,57 +441,75 @@ class ConfigAPI:
         method: str,
         path: str,
         payload: Optional[Mapping[str, Any]] = None,
-    ) -> Tuple[int, Dict[str, Any]]:
+    ) -> Response:
         if path == "/ui/config":
             if method == "GET":
                 try:
                     data = self.store.load()
                 except Exception as exc:
-                    return HTTPStatus.INTERNAL_SERVER_ERROR, {
-                        "error": "failed to load configuration",
-                        "details": str(exc),
-                    }
-                return HTTPStatus.OK, self._serialize(data)
+                    return self._build_response(
+                        HTTPStatus.INTERNAL_SERVER_ERROR,
+                        {
+                            "error": "failed to load configuration",
+                            "details": str(exc),
+                        },
+                    )
+                return self._build_response(
+                    HTTPStatus.OK,
+                    self._serialize(data),
+                )
             if method in {"POST", "PUT"}:
                 return self._handle_put(payload)
-            return HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method not allowed"}
+            return self._method_not_allowed("GET", "POST", "PUT")
 
         if path == "/ui/auth-check":
             if method == "GET":
-                return HTTPStatus.NO_CONTENT, {}
-            return HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method not allowed"}
+                return self._build_response(HTTPStatus.NO_CONTENT, {})
+            return self._method_not_allowed("GET")
 
         if path == "/ui/logs":
             if method not in {"GET", "POST"}:
-                return HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method not allowed"}
+                return self._method_not_allowed("GET", "POST")
             if payload is not None and not isinstance(payload, Mapping):
-                return HTTPStatus.BAD_REQUEST, {"error": "payload must be an object"}
+                return self._build_response(
+                    HTTPStatus.BAD_REQUEST,
+                    {"error": "payload must be an object"},
+                )
             selected_name = None
             if payload is not None:
                 candidate = payload.get("name")
                 if candidate is not None and not isinstance(candidate, str):
-                    return HTTPStatus.BAD_REQUEST, {"error": "'name' must be a string"}
+                    return self._build_response(
+                        HTTPStatus.BAD_REQUEST,
+                        {"error": "'name' must be a string"},
+                    )
                 selected_name = candidate
             try:
                 logs_payload = self._gather_logs(selected_name)
             except ConfigError as exc:
                 LOGGER.warning("Configuration error while gathering logs", exc_info=True)
-                return HTTPStatus.INTERNAL_SERVER_ERROR, {
-                    "error": "failed to load logs",
-                    "details": str(exc),
-                }
+                return self._build_response(
+                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                    {
+                        "error": "failed to load logs",
+                        "details": str(exc),
+                    },
+                )
             except Exception as exc:
                 LOGGER.warning("Unexpected error while gathering logs", exc_info=True)
-                return HTTPStatus.INTERNAL_SERVER_ERROR, {
-                    "error": "failed to load logs",
-                    "details": str(exc),
-                }
-            return HTTPStatus.OK, logs_payload
+                return self._build_response(
+                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                    {
+                        "error": "failed to load logs",
+                        "details": str(exc),
+                    },
+                )
+            return self._build_response(HTTPStatus.OK, logs_payload)
 
         if path in {"/", "/ui", "/ui/"}:
-            return HTTPStatus.OK, {"message": "ui"}
+            return self._build_response(HTTPStatus.OK, {"message": "ui"})
 
-        return HTTPStatus.NOT_FOUND, {"error": "not found"}
+        return self._build_response(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
     def _gather_logs(self, selected_name: Optional[str] = None) -> Dict[str, Any]:
         data = self.store.load()
@@ -569,17 +618,26 @@ class ConfigAPI:
 
         return "".join(lines)
 
-    def _handle_put(self, payload: Optional[Mapping[str, Any]]) -> Tuple[int, Dict[str, Any]]:
+    def _handle_put(self, payload: Optional[Mapping[str, Any]]) -> Response:
         if payload is None:
-            return HTTPStatus.BAD_REQUEST, {"error": "missing payload"}
+            return self._build_response(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "missing payload"},
+            )
         values = payload.get("values")
         if not isinstance(values, Mapping):
-            return HTTPStatus.BAD_REQUEST, {"error": "'values' must be an object"}
+            return self._build_response(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "'values' must be an object"},
+            )
         multiline = payload.get("multiline")
         sanitized_multiline: Dict[str, str] = {}
         if multiline is not None:
             if not isinstance(multiline, Mapping):
-                return HTTPStatus.BAD_REQUEST, {"error": "'multiline' must be an object"}
+                return self._build_response(
+                    HTTPStatus.BAD_REQUEST,
+                    {"error": "'multiline' must be an object"},
+                )
 
             errors = []
             for key, value in multiline.items():
@@ -594,17 +652,23 @@ class ConfigAPI:
                 )
 
             if errors:
-                return HTTPStatus.BAD_REQUEST, {
-                    "error": "validation failed",
-                    "details": errors,
-                }
+                return self._build_response(
+                    HTTPStatus.BAD_REQUEST,
+                    {
+                        "error": "validation failed",
+                        "details": errors,
+                    },
+                )
         else:
             sanitized_multiline = {}
 
         try:
             sanitized_values = self.store._validate(values)
         except ValidationError as exc:
-            return HTTPStatus.BAD_REQUEST, {"error": "validation failed", "details": exc.errors}
+            return self._build_response(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "validation failed", "details": exc.errors},
+            )
 
         directory_error = self._ensure_required_directories(
             ConfigData(sanitized_values, sanitized_multiline)
@@ -615,25 +679,43 @@ class ConfigAPI:
         try:
             data = self.store.save(values, sanitized_multiline if multiline is not None else None)
         except ValidationError as exc:
-            return HTTPStatus.BAD_REQUEST, {"error": "validation failed", "details": exc.errors}
+            return self._build_response(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "validation failed", "details": exc.errors},
+            )
         except PersistenceError as exc:
-            return HTTPStatus.BAD_REQUEST, {"error": "write failed", "details": exc.details}
-        return HTTPStatus.OK, self._serialize(data)
+            return self._build_response(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "write failed", "details": exc.details},
+            )
+        return self._build_response(HTTPStatus.OK, self._serialize(data))
 
-    def _handle_schedule_put(self, payload: Optional[Mapping[str, Any]]) -> Tuple[int, Dict[str, Any]]:
+    def _handle_schedule_put(self, payload: Optional[Mapping[str, Any]]) -> Response:
         if payload is None:
-            return HTTPStatus.BAD_REQUEST, {"error": "missing payload"}
+            return self._build_response(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "missing payload"},
+            )
         if not isinstance(payload, Mapping):
-            return HTTPStatus.BAD_REQUEST, {"error": "payload must be an object"}
+            return self._build_response(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "payload must be an object"},
+            )
         try:
             data = self.schedule_store.save(payload)
         except ScheduleValidationError as exc:
-            return HTTPStatus.BAD_REQUEST, {
-                "error": "validation failed",
-                "details": [exc.as_payload()],
-            }
+            return self._build_response(
+                HTTPStatus.BAD_REQUEST,
+                {
+                    "error": "validation failed",
+                    "details": [exc.as_payload()],
+                },
+            )
         except SchedulePersistenceError as exc:
-            return HTTPStatus.BAD_REQUEST, {"error": "write failed", "details": exc.details}
+            return self._build_response(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "write failed", "details": exc.details},
+            )
         except OSError as exc:
             message = exc.strerror or str(exc)
             detail = {
@@ -644,8 +726,11 @@ class ConfigAPI:
             errno = getattr(exc, "errno", None)
             if errno is not None:
                 detail["errno"] = errno
-            return HTTPStatus.BAD_REQUEST, {"error": "write failed", "details": [detail]}
-        return HTTPStatus.OK, data.to_dict()
+            return self._build_response(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "write failed", "details": [detail]},
+            )
+        return self._build_response(HTTPStatus.OK, data.to_dict())
 
     # ------------------------------------------------------------------
     def _serialize(self, data: ConfigData) -> Dict[str, Any]:
@@ -656,7 +741,7 @@ class ConfigAPI:
 
     def _ensure_required_directories(
         self, data: ConfigData
-    ) -> Optional[Tuple[int, Dict[str, Any]]]:
+    ) -> Optional[Response]:
         """Ensure updater directories exist inside the persistent volume.
 
         ``scripts/updater.sh`` expects the configuration provided via the UI to
@@ -673,8 +758,8 @@ class ConfigAPI:
         except OSError:
             persistent_root = self.store.config_path.parent
 
-        def _error(field: str, message: str) -> Tuple[int, Dict[str, Any]]:
-            return (
+        def _error(field: str, message: str) -> Response:
+            return self._build_response(
                 HTTPStatus.BAD_REQUEST,
                 {
                     "error": "invalid directory",
@@ -834,80 +919,128 @@ def create_app(
 
     @app.get("/ui/config", dependencies=[Depends(_require_auth)])
     def get_ui_config(request: Request):
-        status, body = api.handle_request("GET", "/ui/config", headers=request.headers)
+        status, body, headers = api.handle_request(
+            "GET", "/ui/config", headers=request.headers
+        )
         if status != HTTPStatus.OK:
-            raise HTTPException(status_code=status, detail=body)
-        return JSONResponse(body, status_code=status)
+            raise HTTPException(
+                status_code=status,
+                detail=body,
+                headers=headers or None,
+            )
+        return JSONResponse(body, status_code=status, headers=headers or None)
 
     @app.get("/ui/auth-check", dependencies=[Depends(_require_auth)])
     def get_ui_auth_check(request: Request):
-        status, body = api.handle_request("GET", "/ui/auth-check", headers=request.headers)
+        status, body, headers = api.handle_request(
+            "GET", "/ui/auth-check", headers=request.headers
+        )
         if status == HTTPStatus.NO_CONTENT:
-            return Response(status_code=status)
+            return Response(status_code=status, headers=headers or None)
         if status != HTTPStatus.OK:
-            raise HTTPException(status_code=status, detail=body)
-        return JSONResponse(body, status_code=status)
+            raise HTTPException(
+                status_code=status,
+                detail=body,
+                headers=headers or None,
+            )
+        return JSONResponse(body, status_code=status, headers=headers or None)
 
     @app.post("/ui/config", dependencies=[Depends(_require_auth)])
     async def post_ui_config(request: Request):
         payload = await request.json()
-        status, body = api.handle_request(
+        status, body, headers = api.handle_request(
             "POST", "/ui/config", payload, request.headers
         )
         if status != HTTPStatus.OK:
-            raise HTTPException(status_code=status, detail=body)
-        return JSONResponse(body, status_code=status)
+            raise HTTPException(
+                status_code=status,
+                detail=body,
+                headers=headers or None,
+            )
+        return JSONResponse(body, status_code=status, headers=headers or None)
 
     @app.get("/ui/logs", dependencies=[Depends(_require_auth)])
     def get_ui_logs(request: Request):
         name = request.query_params.get("name")
         payload = {"name": name} if name is not None else None
-        status, body = api.handle_request(
+        status, body, headers = api.handle_request(
             "GET", "/ui/logs", payload, request.headers
         )
         if status != HTTPStatus.OK:
-            raise HTTPException(status_code=status, detail=body)
-        return JSONResponse(body, status_code=status)
+            raise HTTPException(
+                status_code=status,
+                detail=body,
+                headers=headers or None,
+            )
+        return JSONResponse(body, status_code=status, headers=headers or None)
 
     @app.post("/ui/logs", dependencies=[Depends(_require_auth)])
     async def post_ui_logs(request: Request):
         payload = await request.json()
-        status, body = api.handle_request(
+        status, body, headers = api.handle_request(
             "POST", "/ui/logs", payload, request.headers
         )
         if status != HTTPStatus.OK:
-            raise HTTPException(status_code=status, detail=body)
-        return JSONResponse(body, status_code=status)
+            raise HTTPException(
+                status_code=status,
+                detail=body,
+                headers=headers or None,
+            )
+        return JSONResponse(body, status_code=status, headers=headers or None)
 
     @app.get("/config", dependencies=[Depends(_require_auth)])
     def get_config(request: Request):
-        status, body = api.handle_request("GET", "/config", headers=request.headers)
+        status, body, headers = api.handle_request(
+            "GET", "/config", headers=request.headers
+        )
         if status != HTTPStatus.OK:
-            raise HTTPException(status_code=status, detail=body)
-        return JSONResponse(body, status_code=status)
+            raise HTTPException(
+                status_code=status,
+                detail=body,
+                headers=headers or None,
+            )
+        return JSONResponse(body, status_code=status, headers=headers or None)
 
     @app.put("/config", dependencies=[Depends(_require_auth)])
     async def put_config(request: Request):
         payload = await request.json()
-        status, body = api.handle_request("PUT", "/config", payload, request.headers)
+        status, body, headers = api.handle_request(
+            "PUT", "/config", payload, request.headers
+        )
         if status != HTTPStatus.OK:
-            raise HTTPException(status_code=status, detail=body)
-        return JSONResponse(body)
+            raise HTTPException(
+                status_code=status,
+                detail=body,
+                headers=headers or None,
+            )
+        return JSONResponse(body, headers=headers or None)
 
     @app.get("/schedule", dependencies=[Depends(_require_auth)])
     def get_schedule(request: Request):
-        status, body = api.handle_request("GET", "/schedule", headers=request.headers)
+        status, body, headers = api.handle_request(
+            "GET", "/schedule", headers=request.headers
+        )
         if status != HTTPStatus.OK:
-            raise HTTPException(status_code=status, detail=body)
-        return JSONResponse(body, status_code=status)
+            raise HTTPException(
+                status_code=status,
+                detail=body,
+                headers=headers or None,
+            )
+        return JSONResponse(body, status_code=status, headers=headers or None)
 
     @app.put("/schedule", dependencies=[Depends(_require_auth)])
     async def put_schedule(request: Request):
         payload = await request.json()
-        status, body = api.handle_request("PUT", "/schedule", payload, request.headers)
+        status, body, headers = api.handle_request(
+            "PUT", "/schedule", payload, request.headers
+        )
         if status != HTTPStatus.OK:
-            raise HTTPException(status_code=status, detail=body)
-        return JSONResponse(body)
+            raise HTTPException(
+                status_code=status,
+                detail=body,
+                headers=headers or None,
+            )
+        return JSONResponse(body, headers=headers or None)
 
     def handle_request(
         method: str,

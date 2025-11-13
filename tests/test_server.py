@@ -112,7 +112,7 @@ def test_get_returns_defaults(
     auth_headers: Mapping[str, str], store: ConfigStore, schedule_store: ScheduleStore
 ) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("GET", "/config", headers=auth_headers)
+    status, body, _ = api.handle_request("GET", "/config", headers=auth_headers)
     assert status == HTTPStatus.OK
     assert body["values"]["BASE_DIR"] == ""
     assert body["values"]["LOG_DIR"] == ""
@@ -122,7 +122,7 @@ def test_get_includes_schema_metadata(
     auth_headers: Mapping[str, str], store: ConfigStore, schedule_store: ScheduleStore
 ) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("GET", "/config", headers=auth_headers)
+    status, body, _ = api.handle_request("GET", "/config", headers=auth_headers)
     assert status == HTTPStatus.OK
     schema = body.get("schema", {})
     variables = {entry["name"]: entry for entry in schema.get("variables", [])}
@@ -138,7 +138,7 @@ def test_put_updates_config_and_multiline(
     schedule_store: ScheduleStore,
 ) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("GET", "/config", headers=auth_headers)
+    status, body, _ = api.handle_request("GET", "/config", headers=auth_headers)
     assert status == HTTPStatus.OK
 
     values = dict(body["values"])
@@ -154,7 +154,7 @@ def test_put_updates_config_and_multiline(
     values["COMPOSE_PROJECTS_FILE"] = str(projects_path)
     multiline = {"COMPOSE_PROJECTS_FILE": "/tmp/alpha\n/tmp/beta\n"}
 
-    status, response = api.handle_request(
+    status, response, _ = api.handle_request(
         "PUT", "/config", {"values": values, "multiline": multiline}, headers=auth_headers
     )
     assert status == HTTPStatus.OK
@@ -176,7 +176,7 @@ def test_put_returns_validation_errors(
     values["BASE_DIR"] = ""
     values["LOG_DIR"] = ""
     values["LOG_RETENTION_DAYS"] = 0
-    status, body = api.handle_request(
+    status, body, _ = api.handle_request(
         "PUT",
         "/config",
         {"values": values},
@@ -194,7 +194,7 @@ def test_put_rejects_non_string_multiline(
     schedule_store: ScheduleStore,
 ) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("GET", "/config", headers=auth_headers)
+    status, body, _ = api.handle_request("GET", "/config", headers=auth_headers)
     assert status == HTTPStatus.OK
 
     values = dict(body["values"])
@@ -207,7 +207,7 @@ def test_put_rejects_non_string_multiline(
     values["COMPOSE_PROJECTS_FILE"] = str(tmp_path / "projects.txt")
     multiline = {"COMPOSE_PROJECTS_FILE": ["/tmp/app"]}
 
-    status, response = api.handle_request(
+    status, response, _ = api.handle_request(
         "PUT",
         "/config",
         {"values": values, "multiline": multiline},
@@ -230,7 +230,7 @@ def test_put_rejects_multiline_paths_outside_allowed_directory(
     schedule_store: ScheduleStore,
 ) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("GET", "/config", headers=auth_headers)
+    status, body, _ = api.handle_request("GET", "/config", headers=auth_headers)
     assert status == HTTPStatus.OK
 
     values = dict(body["values"])
@@ -243,7 +243,7 @@ def test_put_rejects_multiline_paths_outside_allowed_directory(
     values["COMPOSE_PROJECTS_FILE"] = str(tmp_path.parent / "escape.txt")
     multiline = {"COMPOSE_PROJECTS_FILE": "/tmp/app\n"}
 
-    status, response = api.handle_request(
+    status, response, _ = api.handle_request(
         "PUT", "/config", {"values": values, "multiline": multiline}, headers=auth_headers
     )
 
@@ -258,7 +258,7 @@ def test_put_creates_required_directories(
     schedule_store: ScheduleStore,
 ) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("GET", "/config", headers=auth_headers)
+    status, body, _ = api.handle_request("GET", "/config", headers=auth_headers)
     assert status == HTTPStatus.OK
 
     values = dict(body["values"])
@@ -269,7 +269,7 @@ def test_put_creates_required_directories(
     values["BASE_DIR"] = str(base_dir)
     values["LOG_DIR"] = str(log_dir)
 
-    status, response = api.handle_request(
+    status, response, _ = api.handle_request(
         "PUT",
         "/config",
         {"values": values},
@@ -290,7 +290,7 @@ def test_put_rejects_directories_outside_volume(
     schedule_store: ScheduleStore,
 ) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("GET", "/config", headers=auth_headers)
+    status, body, _ = api.handle_request("GET", "/config", headers=auth_headers)
     assert status == HTTPStatus.OK
 
     values = dict(body["values"])
@@ -299,7 +299,7 @@ def test_put_rejects_directories_outside_volume(
     values["BASE_DIR"] = str(base_dir)
     values["LOG_DIR"] = str(log_dir)
 
-    status, response = api.handle_request(
+    status, response, _ = api.handle_request(
         "PUT",
         "/config",
         {"values": values},
@@ -320,7 +320,7 @@ def test_put_invalid_directory_does_not_modify_config(
     schedule_store: ScheduleStore,
 ) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("GET", "/config", headers=auth_headers)
+    status, body, _ = api.handle_request("GET", "/config", headers=auth_headers)
     assert status == HTTPStatus.OK
 
     values = dict(body["values"])
@@ -329,7 +329,7 @@ def test_put_invalid_directory_does_not_modify_config(
     values["BASE_DIR"] = str(base_dir)
     values["LOG_DIR"] = str(log_dir)
 
-    status, response = api.handle_request(
+    status, response, _ = api.handle_request(
         "PUT", "/config", {"values": values}, headers=auth_headers
     )
     assert status == HTTPStatus.OK
@@ -339,7 +339,7 @@ def test_put_invalid_directory_does_not_modify_config(
     invalid_values["BASE_DIR"] = str(tmp_path.parent / "escape-base")
     invalid_values["LOG_DIR"] = str(tmp_path.parent / "escape-logs")
 
-    status, error = api.handle_request(
+    status, error, _ = api.handle_request(
         "PUT", "/config", {"values": invalid_values}, headers=auth_headers
     )
 
@@ -359,7 +359,7 @@ def test_requests_rejected_without_credentials(
         authenticator=Authenticator(token=None),
     )
 
-    status, body = api.handle_request("GET", "/config")
+    status, body, _ = api.handle_request("GET", "/config")
     assert status == HTTPStatus.UNAUTHORIZED
     assert body["error"] == "missing credentials"
     assert (
@@ -367,7 +367,7 @@ def test_requests_rejected_without_credentials(
         == "Set the PULLPILOT_TOKEN environment variable and send an Authorization header."
     )
 
-    status, body = api.handle_request("PUT", "/config", {"values": {}})
+    status, body, _ = api.handle_request("PUT", "/config", {"values": {}})
     assert status == HTTPStatus.UNAUTHORIZED
     assert body["error"] == "missing credentials"
 
@@ -378,11 +378,13 @@ def test_token_auth_blocks_unauthenticated_access(
     monkeypatch.setenv("PULLPILOT_TOKEN", "super-secret")
     api = ConfigAPI(store=store, schedule_store=schedule_store)
 
-    status, body = api.handle_request("GET", "/config")
+    status, body, _ = api.handle_request("GET", "/config")
     assert status == HTTPStatus.UNAUTHORIZED
     assert body["error"] == "unauthorized"
 
-    status, body = api.handle_request("GET", "/config", headers={"Authorization": "Bearer super-secret"})
+    status, body, _ = api.handle_request(
+        "GET", "/config", headers={"Authorization": "Bearer super-secret"}
+    )
     assert status == HTTPStatus.OK
 
 
@@ -392,7 +394,7 @@ def test_token_auth_rejects_invalid_token(
     monkeypatch.setenv("PULLPILOT_TOKEN", "another-secret")
     api = ConfigAPI(store=store, schedule_store=schedule_store)
 
-    status, body = api.handle_request(
+    status, body, _ = api.handle_request(
         "GET", "/config", headers={"Authorization": "Bearer wrong-secret"}
     )
     assert status == HTTPStatus.UNAUTHORIZED
@@ -405,7 +407,7 @@ def test_token_auth_allows_token_scheme(
     monkeypatch.setenv("PULLPILOT_TOKEN", "token-scheme")
     api = ConfigAPI(store=store, schedule_store=schedule_store)
 
-    status, body = api.handle_request(
+    status, body, _ = api.handle_request(
         "GET", "/config", headers={"Authorization": "Token token-scheme"}
     )
     assert status == HTTPStatus.OK
@@ -429,7 +431,9 @@ def test_token_auth_allows_headers_with_ows(
     monkeypatch.setenv("PULLPILOT_TOKEN", "super-secret")
     api = ConfigAPI(store=store, schedule_store=schedule_store)
 
-    status, body = api.handle_request("GET", "/config", headers={"Authorization": header_value})
+    status, body, _ = api.handle_request(
+        "GET", "/config", headers={"Authorization": header_value}
+    )
     assert status == HTTPStatus.OK
 
 
@@ -478,19 +482,19 @@ def test_ui_endpoints_require_auth_when_token_set(
     monkeypatch.setenv("PULLPILOT_TOKEN", "secret")
     api = ConfigAPI(store=store, schedule_store=schedule_store)
 
-    status, body = api.handle_request("GET", "/ui/config")
+    status, body, _ = api.handle_request("GET", "/ui/config")
     assert status == HTTPStatus.UNAUTHORIZED
     assert body["error"] == "unauthorized"
 
-    status, body = api.handle_request("GET", "/ui/logs")
+    status, body, _ = api.handle_request("GET", "/ui/logs")
     assert status == HTTPStatus.UNAUTHORIZED
     assert body["error"] == "unauthorized"
 
     headers = {"Authorization": "Bearer secret"}
-    status, body = api.handle_request("GET", "/ui/config", headers=headers)
+    status, body, _ = api.handle_request("GET", "/ui/config", headers=headers)
     assert status == HTTPStatus.OK
 
-    status, body = api.handle_request("GET", "/ui/logs", headers=headers)
+    status, body, _ = api.handle_request("GET", "/ui/logs", headers=headers)
     assert status == HTTPStatus.OK
 
 
@@ -544,7 +548,7 @@ def test_ui_logs_returns_internal_error_when_store_fails(
 
     monkeypatch.setattr(api.store, "load", failing_load)
 
-    status, body = api.handle_request("GET", "/ui/logs", headers=auth_headers)
+    status, body, _ = api.handle_request("GET", "/ui/logs", headers=auth_headers)
     assert status == HTTPStatus.INTERNAL_SERVER_ERROR
     assert body == {"error": "failed to load logs", "details": "boom"}
 
@@ -565,12 +569,12 @@ def test_ui_auth_check_allows_token_validation_when_config_fails(
 
     monkeypatch.setattr(api.store, "load", failing_load)
 
-    status, body = api.handle_request("GET", "/ui/auth-check", headers=auth_headers)
+    status, body, _ = api.handle_request("GET", "/ui/auth-check", headers=auth_headers)
     assert status in {HTTPStatus.NO_CONTENT, HTTPStatus.OK}
     assert body == {}
     assert calls["count"] == 0
 
-    status, body = api.handle_request("GET", "/ui/config", headers=auth_headers)
+    status, body, _ = api.handle_request("GET", "/ui/config", headers=auth_headers)
     assert status == HTTPStatus.INTERNAL_SERVER_ERROR
     assert calls["count"] == 1
     assert body["error"] == "failed to load configuration"
@@ -587,15 +591,15 @@ def test_ui_root_allows_anonymous_access(
         authenticator=Authenticator(token=None),
     )
 
-    status, body = api.handle_request("GET", "/")
+    status, body, _ = api.handle_request("GET", "/")
     assert status == HTTPStatus.OK
     assert body == {"message": "ui"}
 
-    status, body = api.handle_request("GET", "/ui")
+    status, body, _ = api.handle_request("GET", "/ui")
     assert status == HTTPStatus.OK
     assert body == {"message": "ui"}
 
-    status, body = api.handle_request("GET", "/ui/config")
+    status, body, _ = api.handle_request("GET", "/ui/config")
     assert status == HTTPStatus.UNAUTHORIZED
     assert body["error"] == "missing credentials"
 
@@ -606,12 +610,12 @@ def test_token_env_whitespace_trimmed(
     monkeypatch.setenv("PULLPILOT_TOKEN", "  my-token \n")
     api = ConfigAPI(store=store, schedule_store=schedule_store)
 
-    status, body = api.handle_request("GET", "/config")
+    status, body, _ = api.handle_request("GET", "/config")
     assert status == HTTPStatus.UNAUTHORIZED
     assert body["error"] == "unauthorized"
 
     headers = {"Authorization": "Bearer my-token"}
-    status, body = api.handle_request("GET", "/config", headers=headers)
+    status, body, _ = api.handle_request("GET", "/config", headers=headers)
     assert status == HTTPStatus.OK
 
 
@@ -619,7 +623,7 @@ def test_schedule_get_returns_defaults(
     auth_headers: Mapping[str, str], schedule_store: ScheduleStore, store: ConfigStore
 ) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("GET", "/schedule", headers=auth_headers)
+    status, body, _ = api.handle_request("GET", "/schedule", headers=auth_headers)
     assert status == HTTPStatus.OK
     assert body["mode"] == "cron"
     assert body["expression"] == "0 4 * * *"
@@ -629,7 +633,7 @@ def test_schedule_put_accepts_valid_cron(
     auth_headers: Mapping[str, str], schedule_store: ScheduleStore, store: ConfigStore
 ) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request(
+    status, body, _ = api.handle_request(
         "PUT", "/schedule", {"mode": "cron", "expression": "15 2 * * 1"}, headers=auth_headers
     )
     assert status == HTTPStatus.OK
@@ -642,7 +646,7 @@ def test_schedule_put_rejects_invalid_expression(
     auth_headers: Mapping[str, str], schedule_store: ScheduleStore, store: ConfigStore
 ) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request(
+    status, body, _ = api.handle_request(
         "PUT", "/schedule", {"mode": "cron", "expression": "bad"}, headers=auth_headers
     )
     assert status == HTTPStatus.BAD_REQUEST
@@ -654,7 +658,7 @@ def test_schedule_put_accepts_datetime(
     auth_headers: Mapping[str, str], schedule_store: ScheduleStore, store: ConfigStore
 ) -> None:
     api = create_app(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request(
+    status, body, _ = api.handle_request(
         "PUT",
         "/schedule",
         {"mode": "once", "datetime": "2030-05-10T12:30:00+02:00"},
@@ -680,7 +684,7 @@ def test_schedule_put_returns_persistence_errors(
 
     monkeypatch.setattr(schedule_store, "save", fail)
 
-    status, body = api.handle_request(
+    status, body, _ = api.handle_request(
         "PUT",
         "/schedule",
         {"mode": "cron", "expression": "30 1 * * *"},
@@ -695,6 +699,30 @@ def test_schedule_put_returns_persistence_errors(
     assert detail["operation"] == "write"
     assert detail["message"] == os.strerror(errno.EACCES)
     assert detail["errno"] == errno.EACCES
+
+
+def test_config_api_method_not_allowed_exposes_allow_header(
+    auth_headers: Mapping[str, str], store: ConfigStore, schedule_store: ScheduleStore
+) -> None:
+    api = ConfigAPI(store=store, schedule_store=schedule_store)
+
+    status, body, headers = api.handle_request("PATCH", "/config", headers=auth_headers)
+
+    assert status == HTTPStatus.METHOD_NOT_ALLOWED
+    assert body["error"] == "method not allowed"
+    assert headers == {"Allow": "GET, PUT"}
+
+
+def test_ui_logs_method_not_allowed_exposes_allow_header(
+    auth_headers: Mapping[str, str], store: ConfigStore, schedule_store: ScheduleStore
+) -> None:
+    api = ConfigAPI(store=store, schedule_store=schedule_store)
+
+    status, body, headers = api.handle_request("DELETE", "/ui/logs", headers=auth_headers)
+
+    assert status == HTTPStatus.METHOD_NOT_ALLOWED
+    assert body["error"] == "method not allowed"
+    assert headers == {"Allow": "GET, POST"}
 
 
 def test_fastapi_get_propagates_error(
@@ -716,7 +744,7 @@ def test_fastapi_get_propagates_error(
         headers=None,
     ):
         if method == "GET" and path == "/config":
-            return HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "boom"}
+            return HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "boom"}, {}
         return original_handle_request(self, method, path, payload, headers)
 
     monkeypatch.setattr(ConfigAPI, "handle_request", fake_handle_request)
@@ -728,6 +756,43 @@ def test_fastapi_get_propagates_error(
     headers = {"Authorization": "Bearer fast-error"}
     response = client.get("/config", headers=headers)
     assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+def test_fastapi_wrappers_include_allow_header(
+    monkeypatch: pytest.MonkeyPatch, store: ConfigStore, schedule_store: ScheduleStore
+) -> None:
+    fastapi = pytest.importorskip("fastapi")
+    pytest.importorskip("httpx")
+    from starlette.requests import Request
+
+    allow_headers = {"Allow": "GET, PUT"}
+
+    def fake_handle_request(
+        self: ConfigAPI,
+        method: str,
+        path: str,
+        payload: Any = None,
+        headers: Mapping[str, str] | None = None,
+    ) -> ConfigAPI.Response:
+        return HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method not allowed"}, allow_headers
+
+    monkeypatch.setenv("PULLPILOT_TOKEN", "fast-secret")
+    app = create_app(store=store, schedule_store=schedule_store)
+    monkeypatch.setattr(ConfigAPI, "handle_request", fake_handle_request)
+
+    get_config_route = next(
+        route
+        for route in app.router.routes
+        if getattr(route, "path", None) == "/config" and "GET" in getattr(route, "methods", set())
+    )
+
+    request = Request({"type": "http", "headers": []})
+
+    with pytest.raises(fastapi.HTTPException) as excinfo:
+        get_config_route.endpoint(request)
+
+    assert excinfo.value.status_code == HTTPStatus.METHOD_NOT_ALLOWED
+    assert excinfo.value.headers == allow_headers
 
 
 def test_fastapi_ui_routes_require_auth(
@@ -766,7 +831,7 @@ def test_ui_config_rejected_without_credentials(
         authenticator=Authenticator(token=None),
     )
 
-    status, body = api.handle_request("GET", "/ui/config")
+    status, body, _ = api.handle_request("GET", "/ui/config")
     assert status == HTTPStatus.UNAUTHORIZED
     assert body["error"] == "missing credentials"
 
@@ -778,7 +843,7 @@ def test_ui_config_put_updates_values(
     schedule_store: ScheduleStore,
 ) -> None:
     api = ConfigAPI(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("GET", "/ui/config", headers=auth_headers)
+    status, body, _ = api.handle_request("GET", "/ui/config", headers=auth_headers)
     assert status == HTTPStatus.OK
 
     values = dict(body["values"])
@@ -793,7 +858,7 @@ def test_ui_config_put_updates_values(
     values["COMPOSE_PROJECTS_FILE"] = str(projects_file)
     multiline = {"COMPOSE_PROJECTS_FILE": "/data/app\n"}
 
-    status, updated = api.handle_request(
+    status, updated, _ = api.handle_request(
         "POST", "/ui/config", {"values": values, "multiline": multiline}, headers=auth_headers
     )
     assert status == HTTPStatus.OK
@@ -808,7 +873,7 @@ def test_ui_logs_listing_and_selection(
     schedule_store: ScheduleStore,
 ) -> None:
     api = ConfigAPI(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("GET", "/ui/config", headers=auth_headers)
+    status, body, _ = api.handle_request("GET", "/ui/config", headers=auth_headers)
     assert status == HTTPStatus.OK
 
     values = dict(body["values"])
@@ -816,7 +881,9 @@ def test_ui_logs_listing_and_selection(
     base_dir.mkdir()
     values["BASE_DIR"] = str(base_dir)
     values["LOG_DIR"] = str(tmp_path)
-    status, _ = api.handle_request("POST", "/ui/config", {"values": values}, headers=auth_headers)
+    status, _, _ = api.handle_request(
+        "POST", "/ui/config", {"values": values}, headers=auth_headers
+    )
     assert status == HTTPStatus.OK
 
     rotated_log = tmp_path / "uno.log.1"
@@ -834,7 +901,7 @@ def test_ui_logs_listing_and_selection(
     first_log = tmp_path / "uno.log"
     first_log.write_text("linea 1\nlinea 2\n", encoding="utf-8")
 
-    status, logs = api.handle_request("GET", "/ui/logs", headers=auth_headers)
+    status, logs, _ = api.handle_request("GET", "/ui/logs", headers=auth_headers)
     assert status == HTTPStatus.OK
     expected_names = {
         "uno.log",
@@ -846,14 +913,16 @@ def test_ui_logs_listing_and_selection(
     assert {entry["name"] for entry in logs["files"]} == expected_names
     assert logs["selected"] is None or logs["selected"]["name"] in expected_names
 
-    status, selected = api.handle_request(
+    status, selected, _ = api.handle_request(
         "GET", "/ui/logs", {"name": "uno.log"}, headers=auth_headers
     )
     assert status == HTTPStatus.OK
     assert selected["selected"]["name"] == "uno.log"
     assert "linea 1" in selected["selected"]["content"]
 
-    status, error = api.handle_request("POST", "/ui/logs", {"name": 123}, headers=auth_headers)
+    status, error, _ = api.handle_request(
+        "POST", "/ui/logs", {"name": 123}, headers=auth_headers
+    )
     assert status == HTTPStatus.BAD_REQUEST
     assert error["error"] == "'name' must be a string"
 
@@ -865,7 +934,7 @@ def test_ui_logs_reads_compressed_content(
     schedule_store: ScheduleStore,
 ) -> None:
     api = ConfigAPI(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("GET", "/ui/config", headers=auth_headers)
+    status, body, _ = api.handle_request("GET", "/ui/config", headers=auth_headers)
     assert status == HTTPStatus.OK
 
     values = dict(body["values"])
@@ -873,7 +942,9 @@ def test_ui_logs_reads_compressed_content(
     base_dir.mkdir()
     values["BASE_DIR"] = str(base_dir)
     values["LOG_DIR"] = str(tmp_path)
-    status, _ = api.handle_request("POST", "/ui/config", {"values": values}, headers=auth_headers)
+    status, _, _ = api.handle_request(
+        "POST", "/ui/config", {"values": values}, headers=auth_headers
+    )
     assert status == HTTPStatus.OK
 
     compressed_log = tmp_path / "service.log.gz"
@@ -881,7 +952,7 @@ def test_ui_logs_reads_compressed_content(
         handle.write("línea A\n")
         handle.write("línea B\n")
 
-    status, logs = api.handle_request(
+    status, logs, _ = api.handle_request(
         "POST",
         "/ui/logs",
         {"name": compressed_log.name},

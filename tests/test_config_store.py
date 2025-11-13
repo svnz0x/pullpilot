@@ -183,7 +183,7 @@ def test_api_returns_bad_request_when_multiline_path_inaccessible(
     )
     headers = {"Authorization": "Bearer secret-token"}
 
-    status, body = api.handle_request(
+    status, body, _ = api.handle_request(
         "POST",
         "/ui/config",
         {"values": values, "multiline": multiline},
@@ -218,7 +218,7 @@ def test_api_returns_persistence_error_payload(
     )
     headers = {"Authorization": "Bearer secret-token"}
 
-    status, body = api.handle_request(
+    status, body, _ = api.handle_request(
         "POST",
         "/ui/config",
         {"values": values, "multiline": multiline},
