@@ -21,6 +21,16 @@ export const formatLogMetadata = ({ logDir, modified, size }) => {
   return segments.join(" · ");
 };
 
+export const resolveLogContentText = (selected) => {
+  if (!selected) {
+    return "No hay contenido disponible para el archivo seleccionado.";
+  }
+  if (Object.prototype.hasOwnProperty.call(selected, "content")) {
+    return selected.content ?? "";
+  }
+  return "Archivo sin contenido o no legible.";
+};
+
 const initializeApp = () => {
   const body = document.body;
   const loginForm = document.getElementById("token-form");
@@ -1349,13 +1359,7 @@ const initializeApp = () => {
       logSelect.value = selectedName;
     }
 
-    if (data.selected?.content) {
-      logContent.textContent = data.selected.content;
-    } else if (data.selected) {
-      logContent.textContent = "Archivo sin contenido o no legible.";
-    } else {
-      logContent.textContent = "No hay contenido disponible para el archivo seleccionado.";
-    }
+    logContent.textContent = resolveLogContentText(data.selected);
 
     const size = data.selected?.size;
     const modified = data.selected?.modified
