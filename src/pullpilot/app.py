@@ -472,9 +472,20 @@ class ConfigAPI:
 
         files_payload: list[Dict[str, Any]] = []
         selected_payload: Optional[Dict[str, Any]] = None
-        entries: list[Tuple[Path, os.stat_result]] = []
+        entries: list[Tuple[Path, Path, os.stat_result]] = []
+        ignored_entries: list[str] = []
+        try:
+            log_dir_root = log_dir_path.resolve()
+        except OSError:
+            log_dir_root = log_dir_path
         try:
             for entry in log_dir_path.iterdir():
+                try:
+                    if entry.is_symlink():
+                        ignored_entries.append(entry.name)
+                        continue
+                except OSError:
+                    continue
                 try:
                     if not entry.is_file():
                         continue
@@ -484,22 +495,32 @@ class ConfigAPI:
                 if not suffixes or suffixes[0].lower() != ".log":
                     continue
                 try:
-                    stat_result = entry.stat()
+                    resolved_entry = entry.resolve(strict=True)
+                except OSError:
+                    ignored_entries.append(entry.name)
+                    continue
+                try:
+                    resolved_entry.relative_to(log_dir_root)
+                except ValueError:
+                    ignored_entries.append(entry.name)
+                    continue
+                try:
+                    stat_result = resolved_entry.stat()
                 except OSError:
                     continue
-                entries.append((entry, stat_result))
+                entries.append((entry, resolved_entry, stat_result))
         except OSError:
             entries = []
 
-        entries.sort(key=lambda item: item[1].st_mtime, reverse=True)
-        available_names = {entry.name for entry, _ in entries}
+        entries.sort(key=lambda item: item[2].st_mtime, reverse=True)
+        available_names = {entry.name for entry, _, _ in entries}
         target_name = (
             selected_name
             if selected_name and selected_name in available_names
             else (entries[0][0].name if entries else None)
         )
 
-        for entry, stat_result in entries:
+        for entry, resolved_entry, stat_result in entries:
             file_payload = {
                 "name": entry.name,
                 "size": stat_result.st_size,
@@ -507,19 +528,44 @@ class ConfigAPI:
             }
             files_payload.append(file_payload)
             if target_name and entry.name == target_name and selected_payload is None:
-                content = self._read_log_tail(entry)
+                content = self._read_log_tail(resolved_entry, base_dir=log_dir_root)
                 selected_payload = dict(file_payload)
                 selected_payload["content"] = content
 
-        return {
+        payload: Dict[str, Any] = {
             "log_dir": str(log_dir_path),
             "files": files_payload,
             "selected": selected_payload,
         }
+        if ignored_entries:
+            ignored_entries.sort()
+            payload["notice"] = (
+                "Se ignoraron entradas de log no válidas: " + ", ".join(ignored_entries)
+            )
+        return payload
 
-    def _read_log_tail(self, path: Path, max_lines: int = MAX_UI_LOG_LINES) -> str:
+    def _read_log_tail(
+        self,
+        path: Path,
+        *,
+        base_dir: Optional[Path] = None,
+        max_lines: int = MAX_UI_LOG_LINES,
+    ) -> str:
         try:
-            with path.open("r", encoding="utf-8", errors="replace") as handle:
+            resolved_path = path.resolve(strict=True)
+        except OSError:
+            return ""
+        if base_dir is not None:
+            try:
+                base_resolved = base_dir.resolve()
+            except OSError:
+                base_resolved = base_dir
+            try:
+                resolved_path.relative_to(base_resolved)
+            except ValueError:
+                return ""
+        try:
+            with resolved_path.open("r", encoding="utf-8", errors="replace") as handle:
                 lines = deque(handle, maxlen=max_lines)
         except OSError:
             return ""

@@ -853,3 +853,50 @@ def test_ui_logs_listing_and_selection(
     status, error = api.handle_request("POST", "/ui/logs", {"name": 123}, headers=auth_headers)
     assert status == HTTPStatus.BAD_REQUEST
     assert error["error"] == "'name' must be a string"
+
+
+@pytest.mark.skipif(not hasattr(os, "symlink"), reason="symlinks not supported")
+def test_ui_logs_rejects_symlink_outside_root(
+    auth_headers: Mapping[str, str],
+    tmp_path: Path,
+    store: ConfigStore,
+    schedule_store: ScheduleStore,
+) -> None:
+    api = ConfigAPI(store=store, schedule_store=schedule_store)
+    status, body = api.handle_request("GET", "/ui/config", headers=auth_headers)
+    assert status == HTTPStatus.OK
+
+    values = dict(body["values"])
+    base_dir = tmp_path / "compose"
+    base_dir.mkdir()
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    values["BASE_DIR"] = str(base_dir)
+    values["LOG_DIR"] = str(log_dir)
+
+    status, _ = api.handle_request("POST", "/ui/config", {"values": values}, headers=auth_headers)
+    assert status == HTTPStatus.OK
+
+    outside_file = tmp_path / "externo.log"
+    outside_file.write_text("contenido secreto\n", encoding="utf-8")
+    safe_log = log_dir / "seguro.log"
+    safe_log.write_text("linea segura\n", encoding="utf-8")
+    malicious_link = log_dir / "ataque.log"
+    malicious_link.symlink_to(outside_file)
+
+    status, logs = api.handle_request("GET", "/ui/logs", headers=auth_headers)
+    assert status == HTTPStatus.OK
+    names = {entry["name"] for entry in logs["files"]}
+    assert "ataque.log" not in names
+    assert "seguro.log" in names
+    notice = logs.get("notice")
+    if notice:
+        assert "ataque.log" in notice
+
+    status, selected = api.handle_request(
+        "GET", "/ui/logs", {"name": "ataque.log"}, headers=auth_headers
+    )
+    assert status == HTTPStatus.OK
+    if selected["selected"] is not None:
+        assert selected["selected"]["name"] != "ataque.log"
+        assert "contenido secreto" not in selected["selected"].get("content", "")
