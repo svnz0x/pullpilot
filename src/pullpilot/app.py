@@ -9,6 +9,7 @@ import logging
 import lzma
 import os
 import stat
+import re
 from collections import deque
 from datetime import datetime, timezone
 from http import HTTPStatus
@@ -64,6 +65,15 @@ _COMPRESSED_OPENERS = {
     ".xz": lzma.open,
     ".lzma": lzma.open,
 }
+
+_LOG_COMPRESSION_SUFFIX_PATTERN = "|".join(
+    re.escape(suffix.lstrip(".")) for suffix in sorted(_COMPRESSED_OPENERS)
+)
+
+_LOG_FILE_PATTERN = re.compile(
+    rf"\.log(?:[-_.]?\d+)*(?:\.(?:{_LOG_COMPRESSION_SUFFIX_PATTERN}))?\Z",
+    re.IGNORECASE,
+)
 
 
 def _normalize_env_value(value: Optional[str]) -> Optional[str]:
@@ -505,8 +515,7 @@ class ConfigAPI:
                         continue
                 except OSError:
                     continue
-                suffixes = entry.suffixes
-                if not suffixes or suffixes[0].lower() != ".log":
+                if not _LOG_FILE_PATTERN.search(entry.name):
                     continue
                 try:
                     stat_result = entry.stat()

@@ -892,6 +892,11 @@ def test_ui_logs_listing_and_selection(
     dated_log = tmp_path / "errores.log.20240101.gz"
     with gzip.open(dated_log, "wt", encoding="utf-8") as handle:
         handle.write("error 1\n")
+    dashed_log = tmp_path / "tres.log-20240101"
+    dashed_log.write_text("linea con fecha\n", encoding="utf-8")
+    dashed_compressed = tmp_path / "cuatro.log-20240101.gz"
+    with gzip.open(dashed_compressed, "wt", encoding="utf-8") as handle:
+        handle.write("linea comprimida reciente\n")
     second_log = tmp_path / "dos.log"
     second_log.write_text("hola\n", encoding="utf-8")
     ignored = tmp_path / "notes.txt"
@@ -907,6 +912,8 @@ def test_ui_logs_listing_and_selection(
         "uno.log.1.gz",
         "dos.log",
         "errores.log.20240101.gz",
+        "tres.log-20240101",
+        "cuatro.log-20240101.gz",
     }
     assert {entry["name"] for entry in logs["files"]} == expected_names
     assert logs["selected"] is None or logs["selected"]["name"] in expected_names
@@ -917,6 +924,25 @@ def test_ui_logs_listing_and_selection(
     assert status == HTTPStatus.OK
     assert selected["selected"]["name"] == "uno.log"
     assert "linea 1" in selected["selected"]["content"]
+
+    status, dashed_selected = api.handle_request(
+        "GET", "/ui/logs", {"name": "tres.log-20240101"}, headers=auth_headers
+    )
+    assert status == HTTPStatus.OK
+    assert dashed_selected["selected"]["name"] == "tres.log-20240101"
+    assert "linea con fecha" in dashed_selected["selected"]["content"]
+
+    status, dashed_compressed_selected = api.handle_request(
+        "GET",
+        "/ui/logs",
+        {"name": "cuatro.log-20240101.gz"},
+        headers=auth_headers,
+    )
+    assert status == HTTPStatus.OK
+    assert (
+        dashed_compressed_selected["selected"]["name"] == "cuatro.log-20240101.gz"
+    )
+    assert "linea comprimida reciente" in dashed_compressed_selected["selected"]["content"]
 
     status, error = api.handle_request("POST", "/ui/logs", {"name": 123}, headers=auth_headers)
     assert status == HTTPStatus.BAD_REQUEST
