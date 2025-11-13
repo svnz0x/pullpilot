@@ -1,4 +1,5 @@
 import errno
+import gzip
 import os
 import uuid
 import stat
@@ -821,9 +822,11 @@ def test_ui_logs_listing_and_selection(
     rotated_log = tmp_path / "uno.log.1"
     rotated_log.write_text("linea antigua\n", encoding="utf-8")
     compressed_log = tmp_path / "uno.log.1.gz"
-    compressed_log.write_text("linea comprimida\n", encoding="utf-8")
+    with gzip.open(compressed_log, "wt", encoding="utf-8") as handle:
+        handle.write("linea comprimida\n")
     dated_log = tmp_path / "errores.log.20240101.gz"
-    dated_log.write_text("error 1\n", encoding="utf-8")
+    with gzip.open(dated_log, "wt", encoding="utf-8") as handle:
+        handle.write("error 1\n")
     second_log = tmp_path / "dos.log"
     second_log.write_text("hola\n", encoding="utf-8")
     ignored = tmp_path / "notes.txt"
@@ -853,3 +856,40 @@ def test_ui_logs_listing_and_selection(
     status, error = api.handle_request("POST", "/ui/logs", {"name": 123}, headers=auth_headers)
     assert status == HTTPStatus.BAD_REQUEST
     assert error["error"] == "'name' must be a string"
+
+
+def test_ui_logs_reads_compressed_content(
+    auth_headers: Mapping[str, str],
+    tmp_path: Path,
+    store: ConfigStore,
+    schedule_store: ScheduleStore,
+) -> None:
+    api = ConfigAPI(store=store, schedule_store=schedule_store)
+    status, body = api.handle_request("GET", "/ui/config", headers=auth_headers)
+    assert status == HTTPStatus.OK
+
+    values = dict(body["values"])
+    base_dir = tmp_path / "compose"
+    base_dir.mkdir()
+    values["BASE_DIR"] = str(base_dir)
+    values["LOG_DIR"] = str(tmp_path)
+    status, _ = api.handle_request("POST", "/ui/config", {"values": values}, headers=auth_headers)
+    assert status == HTTPStatus.OK
+
+    compressed_log = tmp_path / "service.log.gz"
+    with gzip.open(compressed_log, "wt", encoding="utf-8") as handle:
+        handle.write("línea A\n")
+        handle.write("línea B\n")
+
+    status, logs = api.handle_request(
+        "POST",
+        "/ui/logs",
+        {"name": compressed_log.name},
+        headers=auth_headers,
+    )
+    assert status == HTTPStatus.OK
+    assert logs["selected"] is not None
+    assert logs["selected"]["name"] == compressed_log.name
+    assert logs["selected"].get("notice") is None
+    assert logs.get("notice") is None
+    assert logs["selected"]["content"] == "línea A\nlínea B\n"

@@ -1,9 +1,12 @@
 """Minimal API surface for exposing updater configuration endpoints."""
 from __future__ import annotations
 
+import bz2
+import gzip
 import hmac
 import json
 import logging
+import lzma
 import os
 import stat
 from collections import deque
@@ -47,6 +50,20 @@ TOKEN_ENV = "PULLPILOT_TOKEN"
 TOKEN_FILE_ENV = "PULLPILOT_TOKEN_FILE"
 
 LOGGER = logging.getLogger("pullpilot.app")
+
+
+class LogReadError(RuntimeError):
+    """Raised when a log file cannot be read."""
+
+
+_COMPRESSED_OPENERS = {
+    ".gz": gzip.open,
+    ".gzip": gzip.open,
+    ".bz2": bz2.open,
+    ".bzip2": bz2.open,
+    ".xz": lzma.open,
+    ".lzma": lzma.open,
+}
 
 
 def _normalize_env_value(value: Optional[str]) -> Optional[str]:
@@ -472,6 +489,7 @@ class ConfigAPI:
 
         files_payload: list[Dict[str, Any]] = []
         selected_payload: Optional[Dict[str, Any]] = None
+        notice_message: Optional[str] = None
         entries: list[Tuple[Path, os.stat_result]] = []
         try:
             for entry in log_dir_path.iterdir():
@@ -507,22 +525,48 @@ class ConfigAPI:
             }
             files_payload.append(file_payload)
             if target_name and entry.name == target_name and selected_payload is None:
-                content = self._read_log_tail(entry)
-                selected_payload = dict(file_payload)
-                selected_payload["content"] = content
+                try:
+                    content = self._read_log_tail(entry)
+                except LogReadError as exc:
+                    LOGGER.warning("Failed to read log '%s': %s", entry, exc, exc_info=True)
+                    notice_message = (
+                        f"No se pudo leer el archivo de log '{entry.name}': {exc}"
+                    )
+                    selected_payload = dict(file_payload)
+                    selected_payload["content"] = ""
+                    selected_payload["notice"] = notice_message
+                else:
+                    selected_payload = dict(file_payload)
+                    selected_payload["content"] = content
 
-        return {
+        result = {
             "log_dir": str(log_dir_path),
             "files": files_payload,
             "selected": selected_payload,
         }
 
+        if notice_message:
+            result["notice"] = notice_message
+
+        return result
+
     def _read_log_tail(self, path: Path, max_lines: int = MAX_UI_LOG_LINES) -> str:
+        opener = None
+        for suffix in reversed(path.suffixes):
+            opener = _COMPRESSED_OPENERS.get(suffix.lower())
+            if opener is not None:
+                break
+
         try:
-            with path.open("r", encoding="utf-8", errors="replace") as handle:
-                lines = deque(handle, maxlen=max_lines)
-        except OSError:
-            return ""
+            if opener is not None:
+                with opener(path, "rt", encoding="utf-8", errors="replace") as handle:
+                    lines = deque(handle, maxlen=max_lines)
+            else:
+                with path.open("r", encoding="utf-8", errors="replace") as handle:
+                    lines = deque(handle, maxlen=max_lines)
+        except (OSError, EOFError, gzip.BadGzipFile, lzma.LZMAError) as exc:
+            raise LogReadError(str(exc)) from exc
+
         return "".join(lines)
 
     def _handle_put(self, payload: Optional[Mapping[str, Any]]) -> Tuple[int, Dict[str, Any]]:
