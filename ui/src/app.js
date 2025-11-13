@@ -386,8 +386,13 @@ const initializeApp = () => {
     const clearStatus = auth.clearToken({ forgetPersisted: !reusableToken });
     const storageOutcome = processStorageStatus(clearStatus, { silent: true });
     loginForm?.reset();
-    if (reusableToken && tokenInput) {
-      tokenInput.value = storedTokenStatus.token;
+    if (reusableToken) {
+      if (tokenInput) {
+        tokenInput.value = storedTokenStatus.token;
+      }
+      if (rememberCheckbox) {
+        rememberCheckbox.checked = true;
+      }
     }
     const finalMessage = buildUnauthorizedTokenMessage(message, {
       reusableToken,
