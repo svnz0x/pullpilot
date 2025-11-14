@@ -129,6 +129,35 @@ def test_load_token_from_file_env_expands_user_path(
             pass
 
 
+def test_load_token_from_env_files_includes_repo_root(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_root = tmp_path / "repo"
+    app_path = repo_root / "src" / "pullpilot" / "app.py"
+    app_path.parent.mkdir(parents=True)
+    app_path.write_text("# fake app\n", encoding="utf-8")
+    (repo_root / ".env").write_text("PULLPILOT_TOKEN=repo-token\n", encoding="utf-8")
+
+    original_token = os.environ.get("PULLPILOT_TOKEN")
+    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
+    monkeypatch.setattr("pullpilot.app.__file__", str(app_path))
+
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+
+    try:
+        token = _load_token_from_env_files()
+
+        assert token == "repo-token"
+        assert os.environ.get("PULLPILOT_TOKEN") == "repo-token"
+    finally:
+        if original_token is None:
+            os.environ.pop("PULLPILOT_TOKEN", None)
+        else:
+            os.environ["PULLPILOT_TOKEN"] = original_token
+
+
 def test_get_returns_defaults(
     auth_headers: Mapping[str, str], store: ConfigStore, schedule_store: ScheduleStore
 ) -> None:

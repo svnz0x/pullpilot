@@ -95,7 +95,8 @@ def _iter_candidate_env_paths() -> Iterable[Path]:
     candidates = []
     package_root = Path(__file__).resolve().parent
     project_root = package_root.parent
-    for root in (Path.cwd(), package_root, project_root):
+    repo_root = project_root.parent
+    for root in (Path.cwd(), package_root, project_root, repo_root):
         try:
             resolved = root.resolve()
         except OSError:
