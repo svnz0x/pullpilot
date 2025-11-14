@@ -31,6 +31,37 @@ export const resolveLogContentText = (selected) => {
   return "Archivo sin contenido o no legible.";
 };
 
+export const createLogsRequestManager = () => {
+  let currentId = 0;
+  let activeController = null;
+
+  const start = () => {
+    currentId += 1;
+    if (activeController?.abort) {
+      activeController.abort();
+    }
+
+    let controller = null;
+    if (typeof AbortController !== "undefined") {
+      controller = new AbortController();
+    }
+    activeController = controller;
+
+    const release = () => {
+      if (activeController === controller) {
+        activeController = null;
+      }
+    };
+
+    return { id: currentId, controller, release };
+  };
+
+  const isLatest = (id) => id === currentId;
+  const getSignal = (controller) => controller?.signal;
+
+  return { start, isLatest, getSignal };
+};
+
 const initializeApp = () => {
   const body = document.body;
   const loginForm = document.getElementById("token-form");
@@ -1293,22 +1324,36 @@ const initializeApp = () => {
     }
   };
 
+  const logsRequestManager = createLogsRequestManager();
+
   const fetchLogs = async (selectedName = null) => {
     hideStatus(logsStatus);
+    const request = logsRequestManager.start();
+    const { id, controller, release } = request;
+    const signal = logsRequestManager.getSignal(controller);
     const logsUrl = new URL(buildApiUrl("logs"));
     if (selectedName) {
       logsUrl.searchParams.set("name", selectedName);
     }
     const url = logsUrl.toString();
     try {
-      const response = await authorizedFetch(url);
+      const response = await authorizedFetch(url, signal ? { signal } : {});
       if (!response.ok) {
         throw new Error(`Error HTTP ${response.status}`);
       }
       const data = await response.json();
+      if (!logsRequestManager.isLatest(id)) {
+        return false;
+      }
       renderLogs(data);
       return true;
     } catch (error) {
+      if (error?.name === "AbortError") {
+        return false;
+      }
+      if (!logsRequestManager.isLatest(id)) {
+        return false;
+      }
       console.error(error);
       if (error?.message === "UNAUTHORIZED") {
         if (logSelect) {
@@ -1332,6 +1377,8 @@ const initializeApp = () => {
         logContent.textContent = "Sin datos disponibles.";
       }
       return false;
+    } finally {
+      release?.();
     }
   };
 
