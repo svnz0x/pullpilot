@@ -111,6 +111,7 @@ const initializeApp = () => {
   const form = document.getElementById("config-form");
   const fieldsContainer = document.getElementById("config-fields");
   const resetButton = document.getElementById("reset-config");
+  const testConfigButton = document.getElementById("test-config");
   const configStatus = document.getElementById("config-status");
   const scheduleForm = document.getElementById("schedule-form");
   const scheduleFieldsContainer = document.getElementById("schedule-fields");
@@ -628,6 +629,19 @@ const initializeApp = () => {
     element.textContent = "";
   };
 
+  const setTestConfigButtonLoading = (isLoading) => {
+    if (!testConfigButton) return;
+    if (isLoading) {
+      testConfigButton.dataset.loading = "true";
+      testConfigButton.disabled = true;
+      testConfigButton.setAttribute("aria-disabled", "true");
+    } else {
+      delete testConfigButton.dataset.loading;
+      testConfigButton.disabled = false;
+      testConfigButton.removeAttribute("aria-disabled");
+    }
+  };
+
   const clearFieldErrors = (container = fieldsContainer) => {
     if (!container) return;
     container.querySelectorAll(".config-field.is-error").forEach((field) => {
@@ -878,6 +892,82 @@ const initializeApp = () => {
       defaultSummary;
     const details = applyFieldErrorHighlights(detailSource, container);
     return { summary, details };
+  };
+
+  const truncateProcessOutput = (value, maxLength = 400) => {
+    if (typeof value !== "string") {
+      return "";
+    }
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return "";
+    }
+    if (trimmed.length <= maxLength) {
+      return trimmed;
+    }
+    return `${trimmed.slice(0, maxLength).trimEnd()}…`;
+  };
+
+  const buildProcessStatusMessage = (data) => {
+    const result = { summary: "", details: [], tone: "info" };
+    if (!data || typeof data !== "object") {
+      result.summary = "La ejecución finalizó, pero no se recibió respuesta del backend.";
+      result.tone = "error";
+      return result;
+    }
+
+    const status = data.status === "success" ? "success" : data.status === "error" ? "error" : "info";
+    const messageSource =
+      typeof data.message === "string" && data.message.trim().length
+        ? data.message.trim()
+        : status === "success"
+        ? "El comando de prueba finalizó correctamente."
+        : status === "error"
+        ? "El comando de prueba finalizó con errores."
+        : "Resultado recibido.";
+
+    result.summary = messageSource;
+    result.tone = status === "success" ? "success" : status === "error" ? "error" : "info";
+
+    if (typeof data.exit_code === "number") {
+      result.details.push(`Código de salida: ${data.exit_code}`);
+    }
+
+    const stdout = truncateProcessOutput(data.stdout);
+    if (stdout) {
+      result.details.push(`STDOUT: ${stdout}`);
+    }
+
+    const stderr = truncateProcessOutput(data.stderr);
+    if (stderr) {
+      result.details.push(`STDERR: ${stderr}`);
+    }
+
+    const errors = Array.isArray(data.errors) ? data.errors : [];
+    errors
+      .map((entry) => {
+        if (typeof entry === "string") {
+          return entry.trim();
+        }
+        if (entry && typeof entry === "object") {
+          const text =
+            typeof entry.message === "string"
+              ? entry.message
+              : typeof entry.detail === "string"
+              ? entry.detail
+              : typeof entry.error === "string"
+              ? entry.error
+              : null;
+          return text ? text.trim() : null;
+        }
+        return null;
+      })
+      .filter((entry) => entry && entry.length)
+      .forEach((entry) => {
+        result.details.push(entry);
+      });
+
+    return result;
   };
 
   const normalizeScheduleData = (data) => {
@@ -1390,6 +1480,57 @@ const initializeApp = () => {
     }
   };
 
+  const runConfigTest = async () => {
+    hideStatus(configStatus);
+    setTestConfigButtonLoading(true);
+    showStatus(configStatus, "Ejecutando prueba del updater…");
+    try {
+      const response = await authorizedFetch(buildApiUrl("ui/run-test"), {
+        method: "POST",
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        const requestError = new Error("REQUEST_FAILED");
+        requestError.status = response.status;
+        requestError.data = data;
+        throw requestError;
+      }
+      const { summary, details, tone } = buildProcessStatusMessage(data);
+      showStatus(configStatus, { summary, details }, tone);
+    } catch (error) {
+      console.error(error);
+      if (error?.message === "UNAUTHORIZED") {
+        showStatus(
+          configStatus,
+          "No se pudo ejecutar la prueba porque falta un token válido.",
+          "error",
+        );
+        return;
+      }
+      if (error?.data) {
+        const statusPayload = buildErrorStatusPayload(error.data, {
+          defaultSummary: "No se pudo ejecutar la prueba del updater.",
+          container: null,
+        });
+        showStatus(configStatus, statusPayload, "error");
+        return;
+      }
+      if (typeof error?.status === "number") {
+        const summary =
+          "El backend devolvió un error (código " + error.status + ") al ejecutar la prueba.";
+        showStatus(configStatus, summary, "error");
+        return;
+      }
+      showStatus(
+        configStatus,
+        "No se pudo ejecutar la prueba del updater. Revisa los logs e inténtalo de nuevo.",
+        "error",
+      );
+    } finally {
+      setTestConfigButtonLoading(false);
+    }
+  };
+
   const resetConfig = () => {
     if (!lastConfigSnapshot) return;
     populateConfig(lastConfigSnapshot);
@@ -1676,6 +1817,7 @@ const initializeApp = () => {
 
   form.addEventListener("submit", submitConfig);
   resetButton.addEventListener("click", resetConfig);
+  testConfigButton?.addEventListener("click", runConfigTest);
   logSelect.addEventListener("change", (event) => {
     const { value } = event.target;
     if (!value || logSelect.disabled) return;

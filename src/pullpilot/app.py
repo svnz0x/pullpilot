@@ -10,11 +10,12 @@ import lzma
 import os
 import stat
 import re
+import subprocess
 from collections import deque
 from datetime import datetime, timezone
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, Mapping, Optional, Sequence, Tuple, Union
 
 try:  # pragma: no cover - optional dependency
     from fastapi import Depends, FastAPI, HTTPException, Request
@@ -46,6 +47,7 @@ from .schedule import (
     ScheduleStore,
     ScheduleValidationError,
 )
+from .scheduler.watch import resolve_default_updater_command
 
 TOKEN_ENV = "PULLPILOT_TOKEN"
 TOKEN_FILE_ENV = "PULLPILOT_TOKEN_FILE"
@@ -336,6 +338,11 @@ class ConfigAPI:
         store: Optional[ConfigStore] = None,
         schedule_store: Optional[ScheduleStore] = None,
         authenticator: Optional[Authenticator] = None,
+        *,
+        updater_command: Optional[Union[str, Sequence[str]]] = None,
+        process_runner: Optional[
+            Callable[..., subprocess.CompletedProcess[str]]
+        ] = None,
     ):
         self.store = store or ConfigStore(DEFAULT_CONFIG_PATH, DEFAULT_SCHEMA_PATH)
         self.schedule_store = schedule_store or ScheduleStore(DEFAULT_SCHEDULE_PATH)
@@ -343,6 +350,8 @@ class ConfigAPI:
             self.authenticator = authenticator
         else:
             self.authenticator = Authenticator.from_env()
+        self._updater_command = updater_command
+        self._process_runner = process_runner or subprocess.run
 
     # ------------------------------------------------------------------
     # Request helpers
@@ -478,6 +487,11 @@ class ConfigAPI:
         if path in {"/", "/ui", "/ui/"}:
             return HTTPStatus.OK, {"message": "ui"}
 
+        if path == "/ui/run-test":
+            if method != "POST":
+                return HTTPStatus.METHOD_NOT_ALLOWED, {"error": "method not allowed"}
+            return self._handle_run_test()
+
         return HTTPStatus.NOT_FOUND, {"error": "not found"}
 
     def _gather_logs(self, selected_name: Optional[str] = None) -> Dict[str, Any]:
@@ -566,6 +580,94 @@ class ConfigAPI:
             result["notice"] = notice_message
 
         return result
+
+    def _resolve_updater_command(self) -> list[str]:
+        command = self._updater_command
+        if command is None:
+            resolved = resolve_default_updater_command()
+            command_parts: Sequence[Union[str, os.PathLike[str]]] = [resolved]
+        elif isinstance(command, str):
+            command_parts = [command]
+        else:
+            command_parts = command
+
+        normalized = []
+        for part in command_parts:
+            if part is None:
+                continue
+            if isinstance(part, os.PathLike):
+                normalized.append(os.fspath(part))
+            else:
+                normalized.append(str(part))
+
+        if not normalized:
+            raise ValueError("updater command is empty")
+        return normalized
+
+    def _handle_run_test(self) -> Tuple[int, Dict[str, Any]]:
+        try:
+            command = self._resolve_updater_command()
+        except Exception as exc:
+            LOGGER.error("Failed to resolve updater command: %s", exc)
+            return (
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {
+                    "error": "execution failed",
+                    "details": [
+                        {
+                            "message": f"No se pudo preparar el comando de prueba: {exc}.",
+                        }
+                    ],
+                },
+            )
+
+        runner = self._process_runner
+        try:
+            completed = runner(  # type: ignore[call-arg]
+                command,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except FileNotFoundError as exc:
+            detail: Dict[str, Any] = {
+                "message": f"No se pudo iniciar el comando de prueba: {exc}.",
+                "command": command,
+            }
+            errno = getattr(exc, "errno", None)
+            if errno is not None:
+                detail["errno"] = errno
+            return (
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": "execution failed", "details": [detail]},
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            LOGGER.exception("Unexpected error while executing updater command")
+            return (
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {
+                    "error": "execution failed",
+                    "details": [
+                        {
+                            "message": f"Error inesperado al ejecutar el comando de prueba: {exc}.",
+                            "command": command,
+                        }
+                    ],
+                },
+            )
+
+        payload: Dict[str, Any] = {
+            "status": "success" if completed.returncode == 0 else "error",
+            "exit_code": completed.returncode,
+            "stdout": completed.stdout or "",
+            "stderr": completed.stderr or "",
+            "command": command,
+        }
+        if completed.returncode == 0:
+            payload["message"] = "El comando de prueba finalizó correctamente."
+        else:
+            payload["message"] = "El comando de prueba finalizó con errores."
+        return HTTPStatus.OK, payload
 
     def _read_log_tail(self, path: Path, max_lines: int = MAX_UI_LOG_LINES) -> str:
         opener = None
@@ -892,6 +994,13 @@ def create_app(
         status, body = api.handle_request(
             "POST", "/ui/logs", payload, request.headers
         )
+        if status != HTTPStatus.OK:
+            raise HTTPException(status_code=status, detail=body)
+        return JSONResponse(body, status_code=status)
+
+    @app.post("/ui/run-test", dependencies=[Depends(_require_auth)])
+    async def post_ui_run_test(request: Request):
+        status, body = api.handle_request("POST", "/ui/run-test", headers=request.headers)
         if status != HTTPStatus.OK:
             raise HTTPException(status_code=status, detail=body)
         return JSONResponse(body, status_code=status)

@@ -246,19 +246,23 @@ def resolve_default_updater_command() -> str:
     resource.
     """
 
-    scripts_path = _project_root() / "scripts" / "updater.sh"
+    project_root = _project_root()
+    scripts_path = project_root / "scripts" / "updater.sh"
     if scripts_path.exists():
         return str(scripts_path)
+
     packaged_wrapper = Path(DEFAULT_COMMAND)
     if packaged_wrapper.exists():
         return str(packaged_wrapper)
-    try:
-        bundled_wrapper = get_resource_path("scripts/updater.sh")
-    except FileNotFoundError:
-        bundled_wrapper = None
-    else:
-        if bundled_wrapper.exists():
-            return str(bundled_wrapper)
+
+    if project_root.exists():
+        try:
+            bundled_wrapper = get_resource_path("scripts/updater.sh")
+        except FileNotFoundError:
+            bundled_wrapper = None
+        else:
+            if bundled_wrapper.exists():
+                return str(bundled_wrapper)
     return DEFAULT_COMMAND
 
 
