@@ -62,6 +62,44 @@ export const createLogsRequestManager = () => {
   return { start, isLatest, getSignal };
 };
 
+export const toggleInitialLoadOnControl = (control, isLoading) => {
+  if (!control) return;
+  const dataset = control.dataset;
+  if (!dataset) {
+    if (isLoading && control.disabled !== true) {
+      control.disabled = true;
+    }
+    return;
+  }
+
+  if (isLoading) {
+    if (dataset.initialLoadDisabled === "true") {
+      control.disabled = true;
+      control.setAttribute?.("aria-disabled", "true");
+      return;
+    }
+    dataset.initialLoadDisabled = "true";
+    dataset.initialLoadWasDisabled = control.disabled ? "true" : "false";
+    control.setAttribute?.("aria-disabled", "true");
+    if (!control.disabled) {
+      control.disabled = true;
+    }
+    return;
+  }
+
+  if (dataset.initialLoadDisabled === "true") {
+    const wasDisabled = dataset.initialLoadWasDisabled === "true";
+    delete dataset.initialLoadDisabled;
+    delete dataset.initialLoadWasDisabled;
+    if (wasDisabled) {
+      control.setAttribute?.("aria-disabled", "true");
+    } else {
+      control.disabled = false;
+      control.removeAttribute?.("aria-disabled");
+    }
+  }
+};
+
 const initializeApp = () => {
   const body = document.body;
   const loginForm = document.getElementById("token-form");
@@ -90,11 +128,14 @@ const initializeApp = () => {
   const logMeta = document.getElementById("log-meta");
   const logsStatus = document.getElementById("logs-status");
   const refreshLogs = document.getElementById("refresh-logs");
+  const main = document.querySelector("main");
+  const initialLoadingBanner = document.getElementById("initial-loading-banner");
 
   let lastConfigSnapshot = null;
   let lastScheduleSnapshot = null;
   let memoryToken = null;
   let storedToken = null;
+  let isInitialDataLoading = false;
   const tokenStorage = createTokenStorage(window);
 
   const buildApiUrl = createApiUrlBuilder(window);
@@ -211,6 +252,42 @@ const initializeApp = () => {
     return { handled: false, status };
   };
 
+  const applyInitialLoadingStateToForm = (element, isLoading) => {
+    if (!element) return;
+    if (isLoading) {
+      element.setAttribute("data-initial-loading", "true");
+      element.setAttribute("aria-busy", "true");
+    } else {
+      element.removeAttribute("data-initial-loading");
+      element.removeAttribute("aria-busy");
+    }
+    element
+      .querySelectorAll("input, select, textarea, button")
+      .forEach((control) => toggleInitialLoadOnControl(control, isLoading));
+  };
+
+  const setInitialDataLoading = (isLoading) => {
+    if (isInitialDataLoading === isLoading) {
+      return;
+    }
+    isInitialDataLoading = isLoading;
+    body.classList.toggle("initial-loading", isLoading);
+    if (isLoading) {
+      main?.setAttribute("aria-busy", "true");
+      if (initialLoadingBanner) {
+        initialLoadingBanner.hidden = false;
+        initialLoadingBanner.textContent = "Cargando datos iniciales…";
+      }
+    } else {
+      main?.removeAttribute("aria-busy");
+      if (initialLoadingBanner) {
+        initialLoadingBanner.hidden = true;
+      }
+    }
+    applyInitialLoadingStateToForm(form, isLoading);
+    applyInitialLoadingStateToForm(scheduleForm, isLoading);
+  };
+
   const storedTokenStatus = tokenStorage.readToken();
   storedToken = storedTokenStatus?.token ?? null;
   const initialStorageOutcome = processStorageStatus(storedTokenStatus, {
@@ -286,6 +363,7 @@ const initializeApp = () => {
     body.classList.toggle("authenticated", isAuthenticated);
     body.classList.toggle("requires-auth", !isAuthenticated);
     if (!isAuthenticated) {
+      setInitialDataLoading(false);
       resetPortalState();
     }
   };
@@ -892,9 +970,13 @@ const initializeApp = () => {
     return { payload, errors };
   };
 
-  const fetchSchedule = async () => {
-    hideStatus(scheduleStatus);
+  const fetchSchedule = async ({ showLoadingStatus = false } = {}) => {
     clearFieldErrors(scheduleFieldsContainer);
+    if (showLoadingStatus) {
+      showStatus(scheduleStatus, "Cargando programación…");
+    } else {
+      hideStatus(scheduleStatus);
+    }
     try {
       const response = await scheduleApi.load();
       const data = await response.json().catch(() => null);
@@ -1202,8 +1284,12 @@ const initializeApp = () => {
     return payload;
   };
 
-  const fetchConfig = async () => {
-    hideStatus(configStatus);
+  const fetchConfig = async ({ showLoadingStatus = false } = {}) => {
+    if (showLoadingStatus) {
+      showStatus(configStatus, "Cargando configuración inicial…");
+    } else {
+      hideStatus(configStatus);
+    }
     try {
       const response = await authorizedFetch(buildApiUrl("config"));
       if (!response.ok) {
@@ -1326,8 +1412,18 @@ const initializeApp = () => {
 
   const logsRequestManager = createLogsRequestManager();
 
-  const fetchLogs = async (selectedName = null) => {
-    hideStatus(logsStatus);
+  const fetchLogs = async (selectedName = null, { showLoadingStatus = false } = {}) => {
+    if (showLoadingStatus) {
+      showStatus(logsStatus, "Cargando lista de logs…");
+      if (logSelect) {
+        logSelect.disabled = true;
+      }
+      if (logContent) {
+        logContent.textContent = "Cargando logs…";
+      }
+    } else {
+      hideStatus(logsStatus);
+    }
     const request = logsRequestManager.start();
     const { id, controller, release } = request;
     const signal = logsRequestManager.getSignal(controller);
@@ -1442,18 +1538,26 @@ const initializeApp = () => {
     showSuccessMessage = true,
     storageStatus = null,
   } = {}) => {
-    setAuthState(true);
+    setInitialDataLoading(true);
     hideStatus(configStatus);
     hideStatus(scheduleStatus);
     hideStatus(logsStatus);
     if (loginForm) {
       loginForm.reset();
     }
-    const [configLoaded, scheduleLoaded, logsLoaded] = await Promise.all([
-      fetchConfig(),
-      fetchSchedule(),
-      fetchLogs(),
-    ]);
+    setAuthState(true);
+    let configLoaded = false;
+    let scheduleLoaded = false;
+    let logsLoaded = false;
+    try {
+      [configLoaded, scheduleLoaded, logsLoaded] = await Promise.all([
+        fetchConfig({ showLoadingStatus: true }),
+        fetchSchedule({ showLoadingStatus: true }),
+        fetchLogs(null, { showLoadingStatus: true }),
+      ]);
+    } finally {
+      setInitialDataLoading(false);
+    }
     const storageOutcome = processStorageStatus(storageStatus, { silent: true });
     const storageMessage = storageOutcome.handled
       ? (storageOutcome.message || "").trim()

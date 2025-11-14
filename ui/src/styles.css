@@ -208,6 +208,43 @@ main {
   box-sizing: border-box;
 }
 
+body.initial-loading {
+  cursor: progress;
+}
+
+.initial-loading-banner {
+  display: none;
+  align-items: center;
+  gap: 0.65rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--surface-border);
+  border-radius: 1rem;
+  padding: 0.85rem 1.25rem;
+  color: var(--text-secondary);
+  box-shadow: 0 12px 28px var(--surface-shadow);
+  line-height: 1.4;
+}
+
+.initial-loading-banner::before {
+  content: "⏳";
+  font-size: 1.1rem;
+}
+
+body.initial-loading .initial-loading-banner {
+  display: inline-flex;
+}
+
+form[data-initial-loading="true"] {
+  opacity: 0.55;
+  transition: opacity 0.2s ease;
+}
+
+form[data-initial-loading="true"] .form-actions button,
+form[data-initial-loading="true"] .form-actions button:hover {
+  cursor: not-allowed;
+}
+
 section {
   background: var(--surface-strong);
   border-radius: 1.25rem;
