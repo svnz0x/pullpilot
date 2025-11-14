@@ -776,21 +776,15 @@ class ConfigAPI:
     def _ensure_required_directories(
         self, data: ConfigData
     ) -> Optional[Tuple[int, Dict[str, Any]]]:
-        """Ensure updater directories exist inside the persistent volume.
+        """Ensure updater directories exist and are accessible.
 
         ``scripts/updater.sh`` expects the configuration provided via the UI to
         point to ready-to-use directories.  This helper is invoked right after
         persisting the configuration to guarantee that both ``BASE_DIR`` and
-        ``LOG_DIR`` exist.  The persistent storage root is derived from
-        ``self.store.config_path.parent``; whenever a configured path resolves
-        outside that tree the request is rejected so operators know they must
-        mount it inside the volume beforehand.
+        ``LOG_DIR`` exist, creating them automatically when necessary.  When the
+        configured paths cannot be resolved or prepared an error is returned so
+        operators can adjust the configuration accordingly.
         """
-
-        try:
-            persistent_root = self.store.config_path.parent.resolve()
-        except OSError:
-            persistent_root = self.store.config_path.parent
 
         def _error(field: str, message: str) -> Tuple[int, Dict[str, Any]]:
             return (
@@ -812,7 +806,7 @@ class ConfigAPI:
                 return _error(field, f"No se pudo resolver la ruta '{candidate}': {exc}")
 
             try:
-                resolved_target = target_path.resolve()
+                target_path.resolve()
             except PermissionError as exc:
                 return _error(
                     field,
@@ -821,18 +815,7 @@ class ConfigAPI:
                     ),
                 )
             except OSError:
-                resolved_target = target_path
-
-            try:
-                resolved_target.relative_to(persistent_root)
-            except ValueError:
-                return _error(
-                    field,
-                    (
-                        f"La ruta debe vivir dentro del volumen persistente '{persistent_root}'. "
-                        "Monta el directorio en esa ubicación antes de guardar la configuración."
-                    ),
-                )
+                pass
 
             try:
                 target_path.mkdir(parents=True, exist_ok=True)
