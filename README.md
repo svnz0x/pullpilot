@@ -37,7 +37,7 @@ docker run --rm -p 8000:8000 ghcr.io/svnz0x/pullpilot:latest
 - Los ajustes relacionados con credenciales se definen mediante `PULLPILOT_TOKEN` (ver detalles más adelante). El resto de opciones se controlan desde la interfaz de usuario o modificando directamente los archivos persistidos en el volumen.
 - El esquema JSON empaquetado (`pullpilot.resources.get_resource_path("config/schema.json")`) documenta cada opción.
 - Para validación rápida: `python scripts/validate_config.py`
-- Los archivos auxiliares multilinea (p. ej. `COMPOSE_PROJECTS_FILE`) deben residir dentro del mismo directorio de configuración (por defecto `/app/config/`). La API rechazará rutas fuera de ese árbol o que incluyan `..`.
+- Puedes excluir proyectos concretos usando `EXCLUDE_PROJECTS`, introduciendo rutas absolutas (una por línea). Cualquier subdirectorio bajo esas rutas también se omitirá durante los escaneos.
 - Los campos `BASE_DIR` y `LOG_DIR` se definen desde la interfaz de usuario. Al guardar la configuración, el backend garantiza que los directorios existan (creándolos automáticamente si faltan) y conserva las rutas establecidas para reinicios futuros. La operación solo se rechazará cuando la ruta no pueda resolverse o prepararse (por ejemplo, por permisos insuficientes o porque ya exista un fichero con ese nombre).
 - Siempre que el contenedor tenga acceso de lectura y escritura, puedes apuntar `BASE_DIR` y `LOG_DIR` a cualquier ruta del filesystem. Ajusta los montajes de volumen de tu `docker-compose.yml` en caso de necesitar directorios ubicados fuera del volumen por defecto en `/app/config`.
 

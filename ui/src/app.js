@@ -309,7 +309,7 @@ const initializeApp = () => {
         .forEach((field) => {
           field.classList.remove("is-error");
           field
-            .querySelectorAll(".value-input, textarea[data-multiline]")
+            .querySelectorAll(".value-input")
             .forEach((control) => control.removeAttribute("aria-invalid"));
         });
     }
@@ -647,7 +647,7 @@ const initializeApp = () => {
     container.querySelectorAll(".config-field.is-error").forEach((field) => {
       field.classList.remove("is-error");
       field
-        .querySelectorAll(".value-input, textarea[data-multiline]")
+        .querySelectorAll(".value-input")
         .forEach((control) => control.removeAttribute("aria-invalid"));
     });
   };
@@ -772,7 +772,7 @@ const initializeApp = () => {
           if (field) {
             field.classList.add("is-error");
             field
-              .querySelectorAll(".value-input, textarea[data-multiline]")
+              .querySelectorAll(".value-input")
               .forEach((control) => control.setAttribute("aria-invalid", "true"));
           }
           messages.push(`${fieldName}: ${trimmedMessage}`);
@@ -1177,7 +1177,7 @@ const initializeApp = () => {
     return Boolean(value);
   };
 
-  const createField = (variable, values, multilineValues, multilineSet) => {
+  const createField = (variable, values) => {
     const wrapper = document.createElement("div");
     wrapper.className = "config-field";
     wrapper.dataset.name = variable.name;
@@ -1249,6 +1249,16 @@ const initializeApp = () => {
         }
         control.appendChild(opt);
       });
+    } else if (variable.name === "EXCLUDE_PROJECTS") {
+      control = document.createElement("textarea");
+      control.id = `field-${variable.name}`;
+      control.classList.add("value-input", "multiline-input");
+      control.dataset.type = variable.type;
+      control.placeholder =
+        "Introduce rutas absolutas a excluir, una por línea";
+      control.spellcheck = false;
+      control.rows = Math.max(3, String(defaultValue ?? "").split(/\n/).length);
+      control.value = defaultValue ?? "";
     } else {
       control = document.createElement(variable.multiline ? "textarea" : "input");
       if (variable.multiline) {
@@ -1272,18 +1282,6 @@ const initializeApp = () => {
     inputContainer.appendChild(control);
 
     const descriptionId = `field-${variable.name}-description`;
-
-    if (multilineSet.has(variable.name)) {
-      const area = document.createElement("textarea");
-      area.className = "multiline-input";
-      area.id = `field-${variable.name}-content`;
-      area.dataset.multiline = variable.name;
-      area.placeholder =
-        variable.description || `Introduce el contenido asociado a ${variable.name}`;
-      area.setAttribute("aria-labelledby", descriptionId);
-      area.value = multilineValues?.[variable.name] ?? "";
-      inputContainer.appendChild(area);
-    }
 
     wrapper.appendChild(inputContainer);
 
@@ -1321,6 +1319,15 @@ const initializeApp = () => {
       }
     } else {
       description.textContent = variable.description || "Sin descripción";
+      if (variable.name === "EXCLUDE_PROJECTS") {
+        description.textContent =
+          "Introduce rutas absolutas que no deban procesarse (se ignorarán subdirectorios).";
+        description.appendChild(document.createElement("br"));
+        const hint = document.createElement("span");
+        hint.textContent =
+          "Ejemplo: /srv/app para omitir tanto /srv/app como cualquier carpeta dentro.";
+        description.appendChild(hint);
+      }
     }
 
     if (variable.default !== undefined && variable.default !== null && String(variable.default).length) {
@@ -1336,18 +1343,17 @@ const initializeApp = () => {
   };
 
   const populateConfig = (data) => {
-    const { schema, values, multiline, meta } = data;
+    const { schema, values } = data;
     fieldsContainer.innerHTML = "";
-    const multilineSet = new Set(meta?.multiline_fields ?? []);
     schema?.variables?.forEach((variable) => {
-      const field = createField(variable, values, multiline, multilineSet);
+      const field = createField(variable, values);
       fieldsContainer.appendChild(field);
     });
     lastConfigSnapshot = data;
   };
 
   const readFormValues = () => {
-    const payload = { values: {}, multiline: {} };
+    const payload = { values: {} };
     fieldsContainer.querySelectorAll(".config-field").forEach((field) => {
       const name = field.dataset.name;
       if (!name) return;
@@ -1363,14 +1369,7 @@ const initializeApp = () => {
         payload.values[name] =
           name === "BASE_DIR" || name === "LOG_DIR" ? rawValue.trim() : rawValue;
       }
-      const multilineControl = field.querySelector("textarea[data-multiline]");
-      if (multilineControl) {
-        payload.multiline[name] = multilineControl.value;
-      }
     });
-    if (Object.keys(payload.multiline).length === 0) {
-      delete payload.multiline;
-    }
     return payload;
   };
 

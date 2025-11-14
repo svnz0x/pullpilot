@@ -1,5 +1,3 @@
-import logging
-import os
 from http import HTTPStatus
 from pathlib import Path
 
@@ -54,7 +52,7 @@ def test_roundtrip_preserves_comments_and_quotes(tmp_path: Path, schema_path: Pa
     values["SMTP_CMD"] = "mailx"
     values["SMTP_READ_ENVELOPE"] = False
 
-    store.save(values, data.multiline)
+    store.save(values)
 
     rendered = config_path.read_text(encoding="utf-8")
     assert "SMTP_CMD=\"mailx\"           # command" in rendered
@@ -86,115 +84,7 @@ def test_load_handles_crlf_line_endings(tmp_path: Path, schema_path: Path) -> No
     logs_dir = tmp_path / "logs"
     logs_dir.mkdir()
     data.values["LOG_DIR"] = str(logs_dir)
-    store.save(data.values, data.multiline)
-
-
-def test_multiline_file_roundtrip(tmp_path: Path, schema_path: Path) -> None:
-    projects_path = tmp_path / "projects.txt"
-    projects_path.write_text("/srv/app\n/srv/api\n", encoding="utf-8")
-    config_path = tmp_path / "updater.conf"
-    config_path.write_text(
-        f"COMPOSE_PROJECTS_FILE=\"{projects_path}\"\n",
-        encoding="utf-8",
-    )
-
-    store = ConfigStore(config_path, schema_path)
-    data = store.load()
-    assert data.multiline["COMPOSE_PROJECTS_FILE"] == "/srv/app\n/srv/api\n"
-
-    values = data.values.copy()
-    ensure_required_paths(values, tmp_path)
-    values["COMPOSE_PROJECTS_FILE"] = str(projects_path)
-    multiline = data.multiline.copy()
-    multiline["COMPOSE_PROJECTS_FILE"] = "/srv/ui\n"
-
-    store.save(values, multiline)
-    assert projects_path.read_text(encoding="utf-8") == "/srv/ui\n"
-
-
-def test_multiline_load_handles_permission_error(
-    tmp_path: Path,
-    schema_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    projects_path = tmp_path / "projects.txt"
-    projects_path.write_text("/srv/app\n", encoding="utf-8")
-    os.chmod(projects_path, 0)
-
-    config_path = tmp_path / "updater.conf"
-    config_path.write_text(
-        f'COMPOSE_PROJECTS_FILE="{projects_path}"\n',
-        encoding="utf-8",
-    )
-
-    store = ConfigStore(config_path, schema_path)
-
-    original_read_text = Path.read_text
-
-    def guarded_read_text(self: Path, *args: object, **kwargs: object) -> str:
-        if self == projects_path:
-            raise PermissionError("permission denied")
-        return original_read_text(self, *args, **kwargs)
-
-    monkeypatch.setattr(Path, "read_text", guarded_read_text)
-
-    caplog.set_level(logging.WARNING, logger="pullpilot.config")
-
-    try:
-        data = store.load()
-
-        assert data.multiline["COMPOSE_PROJECTS_FILE"] == ""
-        assert any(
-            "No se pudo leer el contenido multilinea" in record.getMessage()
-            for record in caplog.records
-        )
-    finally:
-        os.chmod(projects_path, 0o600)
-
-
-def test_api_returns_bad_request_when_multiline_path_inaccessible(
-    tmp_path: Path,
-    schema_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    store = ConfigStore(tmp_path / "updater.conf", schema_path)
-    data = store.load()
-    values = data.values.copy()
-    ensure_required_paths(values, tmp_path)
-    target_path = tmp_path / "restricted" / "projects.txt"
-    values["COMPOSE_PROJECTS_FILE"] = str(target_path)
-    multiline = data.multiline.copy()
-    multiline["COMPOSE_PROJECTS_FILE"] = "/srv/app\n"
-
-    original_resolve = Path.resolve
-
-    def guarded_resolve(self: Path, *args: object, **kwargs: object) -> Path:
-        if self == target_path:
-            raise PermissionError("permission denied")
-        return original_resolve(self, *args, **kwargs)
-
-    monkeypatch.setattr(Path, "resolve", guarded_resolve)
-
-    api = ConfigAPI(
-        store=store,
-        schedule_store=ScheduleStore(tmp_path / "schedule.json"),
-        authenticator=Authenticator(token="secret-token"),
-    )
-    headers = {"Authorization": "Bearer secret-token"}
-
-    status, body = api.handle_request(
-        "POST",
-        "/ui/config",
-        {"values": values, "multiline": multiline},
-        headers=headers,
-    )
-
-    assert status == HTTPStatus.BAD_REQUEST
-    assert {
-        "field": "COMPOSE_PROJECTS_FILE",
-        "message": "path is not accessible",
-    } in body.get("details", [])
+    store.save(data.values)
 
 
 def test_api_returns_persistence_error_payload(
@@ -204,8 +94,6 @@ def test_api_returns_persistence_error_payload(
     data = store.load()
     values = data.values.copy()
     ensure_required_paths(values, tmp_path)
-    multiline = data.multiline.copy()
-
     def fail_replace(src: str, dst: str) -> None:
         raise PermissionError("permission denied")
 
@@ -221,7 +109,7 @@ def test_api_returns_persistence_error_payload(
     status, body = api.handle_request(
         "POST",
         "/ui/config",
-        {"values": values, "multiline": multiline},
+        {"values": values},
         headers=headers,
     )
 
@@ -247,31 +135,11 @@ def test_validation_error_collects_all_fields(tmp_path: Path, schema_path: Path)
     values["BASE_DIR"] = ""
 
     with pytest.raises(ValidationError) as exc:
-        store.save(values, data.multiline)
+        store.save(values)
 
     messages = {error["field"] for error in exc.value.errors}
     assert "BASE_DIR" in messages
     assert "LOG_RETENTION_DAYS" in messages
-
-
-def test_save_does_not_touch_config_when_multiline_fails(
-    tmp_path: Path, schema_path: Path
-) -> None:
-    config_path = tmp_path / "updater.conf"
-    original_content = 'BASE_DIR="/srv/compose"\n'
-    config_path.write_text(original_content, encoding="utf-8")
-
-    store = ConfigStore(config_path, schema_path)
-    data = store.load()
-    values = data.values.copy()
-    ensure_required_paths(values, tmp_path)
-    multiline = data.multiline.copy()
-    multiline["COMPOSE_PROJECTS_FILE"] = "/srv/app\n"
-
-    with pytest.raises(ValidationError):
-        store.save(values, multiline)
-
-    assert config_path.read_text(encoding="utf-8") == original_content
 
 
 def test_save_does_not_truncate_config_when_write_fails(
@@ -295,7 +163,7 @@ def test_save_does_not_truncate_config_when_write_fails(
     monkeypatch.setattr("pullpilot.config.os.replace", fail_replace)
 
     with pytest.raises(PersistenceError) as exc:
-        store.save(values, data.multiline)
+        store.save(values)
 
     detail = exc.value.details[0]
     assert detail["path"] == str(config_path)
@@ -305,95 +173,37 @@ def test_save_does_not_truncate_config_when_write_fails(
     assert config_path.read_text(encoding="utf-8") == original_content
     entries = {path.name for path in tmp_path.iterdir()}
     assert "updater.conf" in entries
-    assert not any(
-        path.name.startswith(f".{config_path.name}.") and path.suffix == ".tmp"
-        for path in tmp_path.iterdir()
-    )
 
 
-def test_multiline_save_does_not_truncate_file_when_write_fails(
-    tmp_path: Path, schema_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    config_path = tmp_path / "updater.conf"
-    projects_path = tmp_path / "projects.txt"
-    original_projects = "/srv/app\n"
-    projects_path.write_text(original_projects, encoding="utf-8")
-    config_path.write_text(
-        f'COMPOSE_PROJECTS_FILE="{projects_path}"\n', encoding="utf-8"
-    )
-
-    store = ConfigStore(config_path, schema_path)
-    data = store.load()
-    values = data.values.copy()
-    ensure_required_paths(values, tmp_path)
-    multiline = data.multiline.copy()
-    multiline["COMPOSE_PROJECTS_FILE"] = "/srv/other\n"
-
-    original_replace = os.replace
-
-    def fail_replace(src: str, dst: str) -> None:
-        if Path(dst) == projects_path:
-            raise PermissionError("disk full")
-        original_replace(src, dst)
-
-    monkeypatch.setattr("pullpilot.config.os.replace", fail_replace)
-
-    with pytest.raises(PersistenceError) as exc:
-        store.save(values, multiline)
-
-    detail = exc.value.details[0]
-    assert detail["path"] == str(projects_path)
-    assert detail["operation"] == "write multiline content"
-    assert "disk full" in detail["message"].lower()
-
-    assert config_path.read_text(encoding="utf-8") == (
-        f'COMPOSE_PROJECTS_FILE="{projects_path}"\n'
-    )
-    assert projects_path.read_text(encoding="utf-8") == original_projects
-    entries = {path.name for path in tmp_path.iterdir()}
-    assert {"updater.conf", "projects.txt"}.issubset(entries)
-    assert not any(
-        path.name.startswith(f".{projects_path.name}.") and path.suffix == ".tmp"
-        for path in projects_path.parent.iterdir()
-    )
-
-
-def test_multiline_path_must_reside_in_allowed_directory(
-    tmp_path: Path, schema_path: Path
-) -> None:
-    config_path = tmp_path / "updater.conf"
-    config_path.write_text('COMPOSE_PROJECTS_FILE=""\n', encoding="utf-8")
-    store = ConfigStore(config_path, schema_path)
-
-    data = store.load()
-    values = data.values.copy()
-    ensure_required_paths(values, tmp_path)
-    values["COMPOSE_PROJECTS_FILE"] = str(tmp_path.parent / "escape.txt")
-    multiline = {"COMPOSE_PROJECTS_FILE": "/srv/app\n"}
-
-    with pytest.raises(ValidationError) as exc:
-        store.save(values, multiline)
-
-    assert any(error["field"] == "COMPOSE_PROJECTS_FILE" for error in exc.value.errors)
-    assert not (tmp_path.parent / "escape.txt").exists()
-
-
-def test_multiline_path_rejects_parent_segments(
+def test_exclude_projects_accepts_absolute_paths(
     tmp_path: Path, schema_path: Path
 ) -> None:
     store = ConfigStore(tmp_path / "updater.conf", schema_path)
     data = store.load()
     values = data.values.copy()
     ensure_required_paths(values, tmp_path)
-    multiline = data.multiline.copy()
 
-    values["COMPOSE_PROJECTS_FILE"] = "/tmp/../etc/passwd"
-    multiline["COMPOSE_PROJECTS_FILE"] = "/srv/app\n"
+    values["EXCLUDE_PROJECTS"] = " /srv/app \n\n/srv/app/legacy \n"
+    result = store.save(values)
+
+    assert result.values["EXCLUDE_PROJECTS"] == "/srv/app\n/srv/app/legacy"
+
+
+def test_exclude_projects_rejects_invalid_paths(
+    tmp_path: Path, schema_path: Path
+) -> None:
+    store = ConfigStore(tmp_path / "updater.conf", schema_path)
+    data = store.load()
+    values = data.values.copy()
+    ensure_required_paths(values, tmp_path)
+
+    values["EXCLUDE_PROJECTS"] = "relative/path\n/srv/app\n/srv/../etc"
 
     with pytest.raises(ValidationError) as exc:
-        store.save(values, multiline)
+        store.save(values)
 
-    assert any(error["field"] == "COMPOSE_PROJECTS_FILE" for error in exc.value.errors)
+    errors = {error["field"] for error in exc.value.errors}
+    assert "EXCLUDE_PROJECTS" in errors
 
 
 def test_list_constraints_accept_whitespace_separated_values(
@@ -405,7 +215,7 @@ def test_list_constraints_accept_whitespace_separated_values(
     ensure_required_paths(values, tmp_path)
 
     values["EXCLUDE_PATTERNS"] = "vendor tmp cache"
-    result = store.save(values, data.multiline)
+    result = store.save(values)
 
     assert result.values["EXCLUDE_PATTERNS"] == "vendor tmp cache"
 
@@ -425,7 +235,7 @@ def test_list_constraints_reject_invalid_values(
     values["EXCLUDE_PATTERNS"] = exclude_value
 
     with pytest.raises(ValidationError) as exc:
-        store.save(values, data.multiline)
+        store.save(values)
 
     assert any(error["field"] == "EXCLUDE_PATTERNS" for error in exc.value.errors)
 
@@ -437,25 +247,25 @@ def test_compose_bin_accepts_safe_values(tmp_path: Path, schema_path: Path) -> N
     ensure_required_paths(values, tmp_path)
 
     values["COMPOSE_BIN"] = " docker compose "
-    result = store.save(values, data.multiline)
+    result = store.save(values)
     assert result.values["COMPOSE_BIN"] == "docker compose"
 
     values = result.values.copy()
     ensure_required_paths(values, tmp_path)
     values["COMPOSE_BIN"] = "docker-compose"
-    result = store.save(values, data.multiline)
+    result = store.save(values)
     assert result.values["COMPOSE_BIN"] == "docker-compose"
 
     values = result.values.copy()
     ensure_required_paths(values, tmp_path)
     values["COMPOSE_BIN"] = "/usr/bin/docker compose"
-    result = store.save(values, data.multiline)
+    result = store.save(values)
     assert result.values["COMPOSE_BIN"] == "/usr/bin/docker compose"
 
     values = result.values.copy()
     ensure_required_paths(values, tmp_path)
     values["COMPOSE_BIN"] = "/opt/bin/docker-compose"
-    result = store.save(values, data.multiline)
+    result = store.save(values)
     assert result.values["COMPOSE_BIN"] == "/opt/bin/docker-compose"
 
 
@@ -480,7 +290,7 @@ def test_compose_bin_rejects_dangerous_values(
     values["COMPOSE_BIN"] = compose_value
 
     with pytest.raises(ValidationError) as exc:
-        store.save(values, data.multiline)
+        store.save(values)
 
     assert any(error["field"] == "COMPOSE_BIN" for error in exc.value.errors)
 

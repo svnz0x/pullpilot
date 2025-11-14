@@ -126,7 +126,16 @@ DRY_RUN=${DRY_RUN:-false}
 LOG_RETENTION_DAYS=${LOG_RETENTION_DAYS:-14}
 EXCLUDE_PATTERNS_RAW=${EXCLUDE_PATTERNS:-".git node_modules backup tmp"}
 read -r -a EXCLUDE_PATTERNS <<< "$EXCLUDE_PATTERNS_RAW"
-COMPOSE_PROJECTS_FILE=${COMPOSE_PROJECTS_FILE:-""}
+EXCLUDE_PROJECTS_RAW=${EXCLUDE_PROJECTS:-""}
+EXCLUDE_PROJECT_DIRS=()
+if [[ -n "$EXCLUDE_PROJECTS_RAW" ]]; then
+  while IFS= read -r line; do
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    [[ -z "$line" || $line == \#* ]] && continue
+    EXCLUDE_PROJECT_DIRS+=("$line")
+  done <<< "$EXCLUDE_PROJECTS_RAW"
+fi
 SMTP_CMD=${SMTP_CMD:-msmtp}                  # msmtp|mailx|sendmail
 SMTP_ACCOUNT=${SMTP_ACCOUNT:-default}
 SMTP_READ_ENVELOPE=${SMTP_READ_ENVELOPE:-true}
@@ -394,9 +403,15 @@ get_compose_file() {
   return 1
 }
 
-# ¿El directorio está excluido por patrón simple?
+# ¿El directorio está excluido por patrón simple o lista explícita?
 is_excluded() {
   local dir="$1"; local name="$(basename "$dir")"
+  for p in "${EXCLUDE_PROJECT_DIRS[@]}"; do
+    [[ -z "$p" ]] && continue
+    if [[ "$dir" == "$p" || "$dir" == "$p"/* ]]; then
+      return 0
+    fi
+  done
   for p in "${EXCLUDE_PATTERNS[@]}"; do
     [[ -z "$p" ]] && continue
     [[ "$dir" == *"/$p"* || "$name" == "$p" ]] && return 0
@@ -532,43 +547,40 @@ mkdir -p "$LOG_DIR"
 
 # Recolecta proyectos
 PROJECT_DIRS=()
-if [[ -n "$COMPOSE_PROJECTS_FILE" ]]; then
-  if [[ -r "$COMPOSE_PROJECTS_FILE" ]]; then
-    while IFS= read -r line; do
-      line="${line#"${line%%[![:space:]]*}"}"
-      line="${line%"${line##*[![:space:]]}"}"
-      [[ -z "$line" || $line == \#* ]] && continue
-      PROJECT_DIRS+=("$line")
-    done < "$COMPOSE_PROJECTS_FILE"
-  else
-    die "COMPOSE_PROJECTS_FILE ($COMPOSE_PROJECTS_FILE) no existe o no es legible"
-  fi
-else
-  usable_patterns=()
-  for pat in "${EXCLUDE_PATTERNS[@]}"; do
-    [[ -z "$pat" ]] && continue
-    usable_patterns+=("$pat")
+usable_patterns=()
+for pat in "${EXCLUDE_PATTERNS[@]}"; do
+  [[ -z "$pat" ]] && continue
+  usable_patterns+=("$pat")
+done
+
+# Importante: mantener la forma `find "$BASE_DIR" \( … \) -prune -o -type d -print0`
+# porque `find` es muy sensible a los paréntesis de agrupación.
+find_cmd=(find "$BASE_DIR")
+if ((${#usable_patterns[@]})); then
+  find_cmd+=('(')
+  for idx in "${!usable_patterns[@]}"; do
+    pat="${usable_patterns[$idx]}"
+    (( idx > 0 )) && find_cmd+=(-o)
+    find_cmd+=(-path "*/$pat")
   done
+  find_cmd+=(')')
+  find_cmd+=(-prune -o)
+fi
+find_cmd+=(-type d -print0)
 
-  # Importante: mantener la forma `find "$BASE_DIR" \( … \) -prune -o -type d -print0`
-  # porque `find` es muy sensible a los paréntesis de agrupación.
-  find_cmd=(find "$BASE_DIR")
-  if ((${#usable_patterns[@]})); then
-    find_cmd+=('(')
-    for idx in "${!usable_patterns[@]}"; do
-      pat="${usable_patterns[$idx]}"
-      (( idx > 0 )) && find_cmd+=(-o)
-      find_cmd+=(-path "*/$pat")
-    done
-    find_cmd+=(')')
-    find_cmd+=(-prune -o)
-  fi
-  find_cmd+=(-type d -print0)
+if ! is_excluded "$BASE_DIR"; then
+  PROJECT_DIRS+=("$BASE_DIR")
+fi
+while IFS= read -r -d '' d; do
+  [[ "$d" == "$BASE_DIR" ]] && continue
+  is_excluded "$d" && continue
+  PROJECT_DIRS+=("$d")
+done < <("${find_cmd[@]}")
 
-  while IFS= read -r -d '' d; do
-    is_excluded "$d" && continue
-    PROJECT_DIRS+=("$d")
-  done < <("${find_cmd[@]}")
+if [[ -n "${PULLPILOT_DEBUG_PROJECTS:-}" ]]; then
+  for project_dir in "${PROJECT_DIRS[@]}"; do
+    printf 'PROJECT_DIR:%s\n' "$project_dir"
+  done
 fi
 
 if [[ ${#PROJECT_DIRS[@]} -eq 0 ]]; then

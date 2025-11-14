@@ -3,8 +3,7 @@
 The configuration file follows a simple ``KEY=value`` format with optional
 comments. This module loads the schema definition, merges values with the
 defaults and allows rewriting the configuration while preserving comments and
-quoting where possible.  Additionally it manages auxiliary files that store
-multi line data such as ``COMPOSE_PROJECTS_FILE``.
+quoting where possible.
 """
 from __future__ import annotations
 
@@ -17,7 +16,7 @@ import tempfile
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
 from .resources import get_resource_path
 
@@ -92,7 +91,7 @@ ParsedLine = Tuple[Any, int]
 
 _BOOL_TRUE = {"1", "true", "yes", "on"}
 _BOOL_FALSE = {"0", "false", "no", "off"}
-_MULTILINE_FIELDS = {"COMPOSE_PROJECTS_FILE"}
+_MULTILINE_FIELDS: Set[str] = set()
 _SAFE_COMPOSE_TOKEN = re.compile(r"^[A-Za-z0-9._/-]+$")
 _ALLOWED_COMPOSE_SHORTCUTS = {("docker", "compose"), ("docker-compose",)}
 
@@ -269,6 +268,8 @@ class ConfigStore:
         # string fallback
         if variable.name == "COMPOSE_BIN":
             return self._normalize_compose_bin(value)
+        if variable.name == "EXCLUDE_PROJECTS":
+            return self._normalize_exclude_projects(value)
         if value is None:
             return ""
         return str(value)
@@ -293,6 +294,10 @@ class ConfigStore:
             if constraints.get("disallow_path_traversal") and string_value:
                 if ".." in Path(string_value).parts:
                     return "path cannot contain '..' segments"
+            if constraints.get("newline_separated_absolute_paths"):
+                violation = self._check_newline_path_constraint(string_value)
+                if violation is not None:
+                    return violation
             allowed_values = constraints.get("allowed_values")
             if allowed_values and string_value not in allowed_values:
                 return "value must be one of: " + ", ".join(map(str, allowed_values))
@@ -352,6 +357,20 @@ class ConfigStore:
                 return "list contains invalid values: " + ", ".join(map(str, invalid))
         return None
 
+    def _check_newline_path_constraint(self, string_value: str) -> Optional[str]:
+        if not string_value.strip():
+            return None
+        for raw_line in string_value.splitlines():
+            stripped = raw_line.strip()
+            if not stripped:
+                continue
+            path_obj = Path(stripped)
+            if not path_obj.is_absolute():
+                return "each path must be absolute"
+            if ".." in path_obj.parts:
+                return "paths cannot contain '..' segments"
+        return None
+
     def _normalize_compose_bin(self, value: Any) -> str:
         """Normalize the compose command to a vetted, space separated string."""
 
@@ -382,6 +401,21 @@ class ConfigStore:
         ):
             return " ".join(tokens)
         raise ValueError("unsupported compose command")
+
+    def _normalize_exclude_projects(self, value: Any) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            items = [line.strip() for line in value.splitlines() if line.strip()]
+            return "\n".join(items)
+        if isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
+            items = []
+            for entry in value:
+                text = str(entry).strip()
+                if text:
+                    items.append(text)
+            return "\n".join(items)
+        return str(value)
 
     # ------------------------------------------------------------------
     # Document helpers
