@@ -415,7 +415,7 @@ def test_put_creates_required_directories(
     assert log_dir.is_dir()
 
 
-def test_put_rejects_directories_outside_volume(
+def test_put_allows_directories_outside_persistent_root(
     auth_headers: Mapping[str, str],
     tmp_path: Path,
     store: ConfigStore,
@@ -438,11 +438,11 @@ def test_put_rejects_directories_outside_volume(
         headers=auth_headers,
     )
 
-    assert status == HTTPStatus.BAD_REQUEST
-    assert response["error"] == "invalid directory"
-    assert any(detail["field"] == "BASE_DIR" for detail in response.get("details", []))
-    assert not base_dir.exists()
-    assert not log_dir.exists()
+    assert status == HTTPStatus.OK
+    assert response["values"]["BASE_DIR"] == str(base_dir)
+    assert response["values"]["LOG_DIR"] == str(log_dir)
+    assert base_dir.is_dir()
+    assert log_dir.is_dir()
 
 
 def test_put_invalid_directory_does_not_modify_config(
@@ -468,8 +468,12 @@ def test_put_invalid_directory_does_not_modify_config(
     baseline = store.config_path.read_text(encoding="utf-8")
 
     invalid_values = dict(values)
-    invalid_values["BASE_DIR"] = str(tmp_path.parent / "escape-base")
-    invalid_values["LOG_DIR"] = str(tmp_path.parent / "escape-logs")
+    invalid_base_file = tmp_path / "compose-file"
+    invalid_log_file = tmp_path / "logs-file"
+    invalid_base_file.write_text("not-a-directory", encoding="utf-8")
+    invalid_log_file.write_text("not-a-directory", encoding="utf-8")
+    invalid_values["BASE_DIR"] = str(invalid_base_file)
+    invalid_values["LOG_DIR"] = str(invalid_log_file)
 
     status, error = api.handle_request(
         "PUT", "/config", {"values": invalid_values}, headers=auth_headers
@@ -478,6 +482,8 @@ def test_put_invalid_directory_does_not_modify_config(
     assert status == HTTPStatus.BAD_REQUEST
     assert error["error"] == "invalid directory"
     assert error.get("details")
+    assert invalid_base_file.exists()
+    assert invalid_log_file.exists()
     assert store.config_path.read_text(encoding="utf-8") == baseline
 
 

@@ -38,8 +38,8 @@ docker run --rm -p 8000:8000 ghcr.io/svnz0x/pullpilot:latest
 - El esquema JSON empaquetado (`pullpilot.resources.get_resource_path("config/schema.json")`) documenta cada opción.
 - Para validación rápida: `python scripts/validate_config.py`
 - Los archivos auxiliares multilinea (p. ej. `COMPOSE_PROJECTS_FILE`) deben residir dentro del mismo directorio de configuración (por defecto `/app/config/`). La API rechazará rutas fuera de ese árbol o que incluyan `..`.
-- Los campos `BASE_DIR` y `LOG_DIR` se definen desde la interfaz de usuario. Al guardar la configuración, el backend garantiza que existan como subdirectorios del volumen persistente (creándolos automáticamente si faltan) y conserva las rutas establecidas para reinicios futuros. Si la ruta apunta fuera del volumen montado, la API rechazará la petición para que montes ese directorio dentro del volumen antes de reintentar.
-- Si prefieres rutas distintas, ajusta los montajes de volumen en tu `docker-compose.yml` para que el directorio persistente del host coincida con el que expongas en `/app/config` (o el destino equivalente de la configuración).
+- Los campos `BASE_DIR` y `LOG_DIR` se definen desde la interfaz de usuario. Al guardar la configuración, el backend garantiza que los directorios existan (creándolos automáticamente si faltan) y conserva las rutas establecidas para reinicios futuros. La operación solo se rechazará cuando la ruta no pueda resolverse o prepararse (por ejemplo, por permisos insuficientes o porque ya exista un fichero con ese nombre).
+- Siempre que el contenedor tenga acceso de lectura y escritura, puedes apuntar `BASE_DIR` y `LOG_DIR` a cualquier ruta del filesystem. Ajusta los montajes de volumen de tu `docker-compose.yml` en caso de necesitar directorios ubicados fuera del volumen por defecto en `/app/config`.
 
 ### `COMPOSE_BIN`
 
@@ -85,8 +85,7 @@ services:
 ```
 
 > ℹ️ **¿Por qué los volúmenes son de lectura/escritura y se monta el socket de Docker?** La API expone endpoints para actualizar la configuración (`updater.conf`), por lo que necesita permisos de escritura sobre ese archivo y los directorios de proyectos y logs definidos desde la UI. Además, la aplicación debe comunicarse con el daemon de Docker para recrear servicios y comprobar imágenes, de ahí el montaje del socket `/var/run/docker.sock`. Si prefieres gestionar tus propios secretos o rutas (incluido el uso de un `.env` con `PULLPILOT_TOKEN`), edita los montajes del ejemplo anterior según tus necesidades.
-> Los directorios de proyectos (`BASE_DIR`) y logs (`LOG_DIR`) se definen desde la interfaz de PullPilot. Basta con montar un
-> volumen persistente en `/app/config`: el backend creará los subdirectorios necesarios al guardar la configuración.
+> Los directorios de proyectos (`BASE_DIR`) y logs (`LOG_DIR`) se definen desde la interfaz de PullPilot. El backend creará las rutas automáticamente siempre que el contenedor tenga permisos suficientes para resolverlas y escribir en ellas.
 
 ## Licencia
 
