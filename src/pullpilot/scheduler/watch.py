@@ -15,7 +15,13 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from ..resources import get_resource_path
-from ..schedule import DEFAULT_SCHEDULE_PATH, ScheduleStore, ScheduleValidationError
+from ..schedule import (
+    DEFAULT_CRON_EXPRESSION,
+    DEFAULT_SCHEDULE_PATH,
+    SchedulePersistenceError,
+    ScheduleStore,
+    ScheduleValidationError,
+)
 
 DEFAULT_SCHEDULE_FILE = DEFAULT_SCHEDULE_PATH
 DEFAULT_CRON_FILE = Path("/tmp/pullpilot.cron")
@@ -74,6 +80,21 @@ class SchedulerWatcher:
                             self.process.wait()
                         finally:
                             self.process = None
+                        try:
+                            default_schedule = self.store.save(
+                                {
+                                    "mode": "cron",
+                                    "expression": DEFAULT_CRON_EXPRESSION,
+                                }
+                            )
+                        except SchedulePersistenceError as exc:
+                            logger.warning(
+                                "No se pudo restablecer la programación predeterminada tras la ejecución única: %s",
+                                exc,
+                            )
+                        else:
+                            schedule = default_schedule.to_dict()
+                            signature = json.dumps(schedule, sort_keys=True)
                     else:
                         logger.warning(
                             "El proceso programador finalizó con código %s; reiniciando", code
@@ -246,12 +267,15 @@ def resolve_default_updater_command() -> str:
     resource.
     """
 
-    scripts_path = _project_root() / "scripts" / "updater.sh"
+    project_root = _project_root()
+    scripts_path = project_root / "scripts" / "updater.sh"
     if scripts_path.exists():
         return str(scripts_path)
     packaged_wrapper = Path(DEFAULT_COMMAND)
     if packaged_wrapper.exists():
         return str(packaged_wrapper)
+    if not project_root.exists():
+        return DEFAULT_COMMAND
     try:
         bundled_wrapper = get_resource_path("scripts/updater.sh")
     except FileNotFoundError:

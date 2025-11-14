@@ -20,6 +20,7 @@ from pullpilot.scheduler.watch import (
     build_watcher,
     resolve_default_updater_command,
 )
+from pullpilot.schedule import DEFAULT_CRON_EXPRESSION, SchedulePersistenceError
 
 
 class DummyProcess:
@@ -314,7 +315,9 @@ def test_run_logs_permission_error_and_continues(
     )
 
 
-def test_once_completion_keeps_signature(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_once_completion_resets_schedule_via_store(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     schedule_data = {"mode": "once", "datetime": "2023-09-01T10:00:00Z"}
     signature = json.dumps(schedule_data, sort_keys=True)
 
@@ -325,15 +328,28 @@ def test_once_completion_keeps_signature(monkeypatch: pytest.MonkeyPatch, tmp_pa
         0.1,
     )
 
+    default_schedule = {"mode": "cron", "expression": DEFAULT_CRON_EXPRESSION}
+
     class DummySchedule:
+        def __init__(self, data: Dict[str, Any]) -> None:
+            self.data = data
+
         def to_dict(self) -> Dict[str, Any]:
-            return schedule_data
+            return self.data
 
     class DummyStore:
+        def __init__(self) -> None:
+            self.saved: List[Dict[str, Any]] = []
+
         def load(self) -> DummySchedule:
-            return DummySchedule()
+            return DummySchedule(schedule_data)
+
+        def save(self, payload: Dict[str, Any]) -> DummySchedule:
+            self.saved.append(payload)
+            return DummySchedule(default_schedule)
 
     watcher.store = DummyStore()  # type: ignore[assignment]
+    store = watcher.store
     watcher.current_signature = signature
 
     class FinishedProcess:
@@ -353,8 +369,9 @@ def test_once_completion_keeps_signature(monkeypatch: pytest.MonkeyPatch, tmp_pa
 
     started: List[Dict[str, Any]] = []
 
-    def fake_start(self: SchedulerWatcher, schedule: Dict[str, Any]) -> None:
+    def fake_start(self: SchedulerWatcher, schedule: Dict[str, Any]) -> bool:
         started.append(schedule)
+        return True
 
     monkeypatch.setattr(SchedulerWatcher, "_start_process", fake_start)
 
@@ -369,6 +386,145 @@ def test_once_completion_keeps_signature(monkeypatch: pytest.MonkeyPatch, tmp_pa
     with pytest.raises(StopLoop):
         watcher.run()
 
+    assert store.saved == [default_schedule]
+    assert started == [default_schedule]
+    assert watcher.current_signature == json.dumps(default_schedule, sort_keys=True)
+    assert watcher.process is None
+    assert process.wait_calls == 1
+
+
+def test_once_completion_resets_schedule_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    schedule_path = tmp_path / "pullpilot.schedule"
+    cron_path = tmp_path / "pullpilot.cron"
+    schedule_data = {"mode": "once", "datetime": "2023-09-01T10:00:00Z"}
+    schedule_path.write_text(json.dumps(schedule_data), encoding="utf-8")
+
+    watcher = SchedulerWatcher(schedule_path, cron_path, "echo hi", 0.01)
+    once_signature = json.dumps(schedule_data, sort_keys=True)
+    watcher.current_signature = once_signature
+
+    class FinishedProcess:
+        def __init__(self) -> None:
+            self.returncode = 0
+
+        def poll(self) -> int:
+            return self.returncode
+
+        def wait(self, timeout: float | None = None) -> int:
+            return self.returncode
+
+    watcher.process = FinishedProcess()  # type: ignore[assignment]
+
+    started: List[Dict[str, Any]] = []
+
+    def fake_start(self: SchedulerWatcher, schedule: Dict[str, Any]) -> bool:
+        started.append(schedule)
+        return True
+
+    monkeypatch.setattr(SchedulerWatcher, "_start_process", fake_start)
+
+    class StopLoop(RuntimeError):
+        pass
+
+    sleep_calls = 0
+
+    def fake_sleep(_: float) -> None:
+        nonlocal sleep_calls
+        sleep_calls += 1
+        if sleep_calls >= 2:
+            raise StopLoop()
+
+    monkeypatch.setattr("pullpilot.scheduler.watch.time.sleep", fake_sleep)
+
+    with pytest.raises(StopLoop):
+        watcher.run()
+
+    saved_schedule = json.loads(schedule_path.read_text(encoding="utf-8"))
+    assert saved_schedule == {"mode": "cron", "expression": DEFAULT_CRON_EXPRESSION}
+    assert started == [{"mode": "cron", "expression": DEFAULT_CRON_EXPRESSION}]
+    assert watcher.current_signature == json.dumps(
+        {"mode": "cron", "expression": DEFAULT_CRON_EXPRESSION}, sort_keys=True
+    )
+
+
+def test_once_completion_reset_failure_logs_warning(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    schedule_data = {"mode": "once", "datetime": "2023-09-01T10:00:00Z"}
+    signature = json.dumps(schedule_data, sort_keys=True)
+
+    watcher = SchedulerWatcher(
+        tmp_path / "schedule.json",
+        tmp_path / "schedule.cron",
+        "echo hi",
+        0.1,
+    )
+    failing_path = watcher.store.schedule_path
+
+    class DummySchedule:
+        def to_dict(self) -> Dict[str, Any]:
+            return schedule_data
+
+    class DummyStore:
+        def __init__(self, path: Path) -> None:
+            self.path = path
+
+        def load(self) -> DummySchedule:
+            return DummySchedule()
+
+        def save(self, payload: Dict[str, Any]) -> DummySchedule:
+            raise SchedulePersistenceError(
+                path=self.path,
+                operation="write",
+                error=OSError("disk full"),
+            )
+
+    watcher.store = DummyStore(failing_path)  # type: ignore[assignment]
+    watcher.current_signature = signature
+
+    class FinishedProcess:
+        def __init__(self) -> None:
+            self.returncode = 0
+            self.wait_calls = 0
+
+        def poll(self) -> int:
+            return self.returncode
+
+        def wait(self, timeout: float | None = None) -> int:
+            self.wait_calls += 1
+            return self.returncode
+
+    process = FinishedProcess()
+    watcher.process = process  # type: ignore[assignment]
+
+    started: List[Dict[str, Any]] = []
+
+    def fake_start(self: SchedulerWatcher, schedule: Dict[str, Any]) -> bool:
+        started.append(schedule)
+        return True
+
+    monkeypatch.setattr(SchedulerWatcher, "_start_process", fake_start)
+
+    class StopLoop(RuntimeError):
+        pass
+
+    def fake_sleep(_: float) -> None:
+        raise StopLoop()
+
+    monkeypatch.setattr("pullpilot.scheduler.watch.time.sleep", fake_sleep)
+
+    with caplog.at_level(logging.WARNING, logger="pullpilot.scheduler.watch"):
+        with pytest.raises(StopLoop):
+            watcher.run()
+
+    module_messages = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "pullpilot.scheduler.watch"
+    ]
+    assert any("No se pudo restablecer la programación predeterminada" in entry for entry in module_messages)
     assert started == []
     assert watcher.current_signature == signature
     assert watcher.process is None
