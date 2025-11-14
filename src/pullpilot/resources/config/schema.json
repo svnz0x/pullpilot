@@ -7,7 +7,7 @@
       "name": "BASE_DIR",
       "type": "string",
       "default": "",
-      "description": "Directorio raíz donde se escanean proyectos Docker Compose de forma recursiva cuando no se define COMPOSE_PROJECTS_FILE. Debe configurarse a una ruta absoluta existente antes de ejecutar el script.",
+      "description": "Directorio raíz donde se escanean proyectos Docker Compose de forma recursiva. Debe configurarse a una ruta absoluta existente antes de ejecutar el script.",
       "constraints": {
         "pattern": "^/.*",
         "allow_empty": false
@@ -138,14 +138,13 @@
       }
     },
     {
-      "name": "COMPOSE_PROJECTS_FILE",
+      "name": "EXCLUDE_PROJECTS",
       "type": "string",
       "default": "",
-      "description": "Ruta opcional a un archivo con rutas absolutas de proyectos docker-compose, una por línea.",
+      "description": "Lista opcional de rutas absolutas a proyectos que deben omitirse, una por línea.",
       "constraints": {
         "allow_empty": true,
-        "pattern": "^$|^/.*",
-        "disallow_path_traversal": true
+        "newline_separated_absolute_paths": true
       }
     },
     {

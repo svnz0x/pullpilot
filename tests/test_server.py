@@ -179,7 +179,7 @@ def test_get_includes_schema_metadata(
     variables = {entry["name"]: entry for entry in schema.get("variables", [])}
     assert "PRUNE_VOLUMES" in variables
     assert variables["PRUNE_VOLUMES"]["description"]
-    assert body.get("meta", {}).get("multiline_fields") == ["COMPOSE_PROJECTS_FILE"]
+    assert body.get("meta", {}).get("multiline_fields") == []
 
 
 def test_get_returns_error_when_store_load_fails(
@@ -263,7 +263,7 @@ def test_run_test_endpoint_handles_missing_command(
     assert any("No se pudo iniciar el comando" in detail.get("message", "") for detail in details)
 
 
-def test_put_updates_config_and_multiline(
+def test_put_updates_config_and_exclusions(
     auth_headers: Mapping[str, str],
     tmp_path: Path,
     store: ConfigStore,
@@ -274,7 +274,6 @@ def test_put_updates_config_and_multiline(
     assert status == HTTPStatus.OK
 
     values = dict(body["values"])
-    projects_path = tmp_path / "projects.txt"
     base_dir = tmp_path / "compose"
     base_dir.mkdir()
     log_dir = tmp_path / "logs"
@@ -283,20 +282,19 @@ def test_put_updates_config_and_multiline(
     values["LOG_DIR"] = str(log_dir)
     values["LOG_RETENTION_DAYS"] = 30
     values["SMTP_READ_ENVELOPE"] = False
-    values["COMPOSE_PROJECTS_FILE"] = str(projects_path)
-    multiline = {"COMPOSE_PROJECTS_FILE": "/tmp/alpha\n/tmp/beta\n"}
+    values["EXCLUDE_PROJECTS"] = " /tmp/alpha \n/tmp/beta\n"
 
     status, response = api.handle_request(
-        "PUT", "/config", {"values": values, "multiline": multiline}, headers=auth_headers
+        "PUT", "/config", {"values": values}, headers=auth_headers
     )
     assert status == HTTPStatus.OK
     assert response["values"]["LOG_RETENTION_DAYS"] == 30
-    assert Path(values["COMPOSE_PROJECTS_FILE"]).read_text(encoding="utf-8") == multiline[
-        "COMPOSE_PROJECTS_FILE"
-    ]
+    assert response["values"]["EXCLUDE_PROJECTS"] == "/tmp/alpha\n/tmp/beta"
     text = store.config_path.read_text(encoding="utf-8")
     assert "SMTP_READ_ENVELOPE=false" in text
     assert "LOG_RETENTION_DAYS=30" in text
+    assert 'EXCLUDE_PROJECTS="/tmp/alpha' in text
+    assert '\n/tmp/beta"' in text
 
 
 def test_put_returns_validation_errors(
@@ -319,7 +317,7 @@ def test_put_returns_validation_errors(
     assert any(error["field"] == "LOG_DIR" for error in body["details"])
 
 
-def test_put_rejects_non_string_multiline(
+def test_put_rejects_invalid_exclude_projects(
     auth_headers: Mapping[str, str],
     tmp_path: Path,
     store: ConfigStore,
@@ -336,51 +334,14 @@ def test_put_rejects_non_string_multiline(
     log_dir.mkdir()
     values["BASE_DIR"] = str(base_dir)
     values["LOG_DIR"] = str(log_dir)
-    values["COMPOSE_PROJECTS_FILE"] = str(tmp_path / "projects.txt")
-    multiline = {"COMPOSE_PROJECTS_FILE": ["/tmp/app"]}
+    values["EXCLUDE_PROJECTS"] = "relative\n/srv/app\n"
 
     status, response = api.handle_request(
-        "PUT",
-        "/config",
-        {"values": values, "multiline": multiline},
-        headers=auth_headers,
+        "PUT", "/config", {"values": values}, headers=auth_headers
     )
 
     assert status == HTTPStatus.BAD_REQUEST
-    assert response["error"] == "validation failed"
-    assert any(
-        error["field"] == "COMPOSE_PROJECTS_FILE"
-        and "must be strings" in error["message"]
-        for error in response.get("details", [])
-    )
-
-
-def test_put_rejects_multiline_paths_outside_allowed_directory(
-    auth_headers: Mapping[str, str],
-    tmp_path: Path,
-    store: ConfigStore,
-    schedule_store: ScheduleStore,
-) -> None:
-    api = create_app(store=store, schedule_store=schedule_store)
-    status, body = api.handle_request("GET", "/config", headers=auth_headers)
-    assert status == HTTPStatus.OK
-
-    values = dict(body["values"])
-    base_dir = tmp_path / "compose"
-    base_dir.mkdir()
-    log_dir = tmp_path / "logs"
-    log_dir.mkdir()
-    values["BASE_DIR"] = str(base_dir)
-    values["LOG_DIR"] = str(log_dir)
-    values["COMPOSE_PROJECTS_FILE"] = str(tmp_path.parent / "escape.txt")
-    multiline = {"COMPOSE_PROJECTS_FILE": "/tmp/app\n"}
-
-    status, response = api.handle_request(
-        "PUT", "/config", {"values": values, "multiline": multiline}, headers=auth_headers
-    )
-
-    assert status == HTTPStatus.BAD_REQUEST
-    assert any(error["field"] == "COMPOSE_PROJECTS_FILE" for error in response["details"])
+    assert any(error["field"] == "EXCLUDE_PROJECTS" for error in response["details"])
 
 
 def test_put_creates_required_directories(
@@ -952,16 +913,14 @@ def test_ui_config_put_updates_values(
     values["BASE_DIR"] = str(base_dir)
     values["LOG_DIR"] = str(log_dir)
     values["LOG_RETENTION_DAYS"] = 7
-    projects_file = tmp_path / "projects.txt"
-    values["COMPOSE_PROJECTS_FILE"] = str(projects_file)
-    multiline = {"COMPOSE_PROJECTS_FILE": "/data/app\n"}
+    values["EXCLUDE_PROJECTS"] = "/data/app\n/data/legacy\n"
 
     status, updated = api.handle_request(
-        "POST", "/ui/config", {"values": values, "multiline": multiline}, headers=auth_headers
+        "POST", "/ui/config", {"values": values}, headers=auth_headers
     )
     assert status == HTTPStatus.OK
     assert updated["values"]["LOG_RETENTION_DAYS"] == 7
-    assert projects_file.read_text(encoding="utf-8") == multiline["COMPOSE_PROJECTS_FILE"]
+    assert updated["values"]["EXCLUDE_PROJECTS"] == "/data/app\n/data/legacy"
 
 
 def test_ui_logs_listing_and_selection(

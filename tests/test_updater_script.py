@@ -118,9 +118,6 @@ def base_environment(tmp_path: Path, docker_path: Path) -> dict[str, str]:
     compose_file = project_dir / "compose.yaml"
     compose_file.write_text("version: '3'\nservices:\n  web:\n    image: alpine\n", encoding="utf-8")
 
-    projects_list = tmp_path / "projects.txt"
-    projects_list.write_text(f"{project_dir}\n", encoding="utf-8")
-
     log_dir = tmp_path / "logs"
     log_dir.mkdir()
     lock_file = tmp_path / "lock"
@@ -143,7 +140,7 @@ def base_environment(tmp_path: Path, docker_path: Path) -> dict[str, str]:
             PULL_POLICY="always"
             PARALLEL_PULL=0
             EXCLUDE_PATTERNS=""
-            COMPOSE_PROJECTS_FILE="{projects_list}"
+            EXCLUDE_PROJECTS=""
             ATTACH_LOGS_ON="changes"
             PRUNE_ENABLED=false
             PRUNE_VOLUMES=false
@@ -192,7 +189,7 @@ def test_script_allows_empty_base_directory(tmp_path: Path, fake_docker: Path) -
             PULL_POLICY="always"
             PARALLEL_PULL=0
             EXCLUDE_PATTERNS=""
-            COMPOSE_PROJECTS_FILE=""
+            EXCLUDE_PROJECTS=""
             ATTACH_LOGS_ON="changes"
             PRUNE_ENABLED=false
             PRUNE_VOLUMES=false
@@ -227,6 +224,58 @@ def test_script_accepts_absolute_compose_path(tmp_path: Path, fake_docker: Path)
     result = run_updater(env)
 
     assert result.returncode == 0, result.stdout
+
+
+def test_script_respects_exclude_projects(tmp_path: Path, fake_docker: Path) -> None:
+    env = base_environment(tmp_path, fake_docker)
+
+    project_dir = tmp_path / "project"
+    env["PULLPILOT_DEBUG_PROJECTS"] = "1"
+
+    conf_path = Path(env["CONF_FILE"])
+    initial_text = conf_path.read_text(encoding="utf-8")
+    conf_path.write_text(
+        initial_text.replace('EXCLUDE_PATTERNS=""', 'EXCLUDE_PATTERNS="dummy"'),
+        encoding="utf-8",
+    )
+
+    baseline = run_updater(env)
+    assert baseline.returncode == 0, baseline.stdout
+    baseline_dirs = {
+        line.split("PROJECT_DIR:", 1)[1]
+        for line in baseline.stdout.splitlines()
+        if line.startswith("PROJECT_DIR:")
+    }
+    assert str(project_dir) in baseline_dirs
+
+    nested = project_dir / "nested"
+    nested.mkdir()
+    (nested / "docker-compose.yaml").write_text(
+        "services:\n  worker:\n    image: alpine\n", encoding="utf-8"
+    )
+    other = tmp_path / "other"
+    other.mkdir()
+    (other / "compose.yaml").write_text(
+        "version: '3'\nservices:\n  api:\n    image: alpine\n", encoding="utf-8"
+    )
+
+    original_text = conf_path.read_text(encoding="utf-8")
+    updated_text = original_text.replace(
+        'EXCLUDE_PROJECTS=""', f'EXCLUDE_PROJECTS="{nested}\n"'
+    )
+    conf_path.write_text(updated_text, encoding="utf-8")
+
+    result = run_updater(env)
+
+    assert result.returncode == 0, result.stdout
+    result_dirs = {
+        line.split("PROJECT_DIR:", 1)[1]
+        for line in result.stdout.splitlines()
+        if line.startswith("PROJECT_DIR:")
+    }
+    assert str(project_dir) in result_dirs
+    assert str(other) in result_dirs
+    assert all(str(nested) != entry and not entry.startswith(f"{nested}/") for entry in result_dirs)
 
 
 def test_script_rejects_injected_compose_value(tmp_path: Path, fake_docker: Path) -> None:
