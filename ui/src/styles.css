@@ -347,6 +347,35 @@ section h2 {
   flex-wrap: wrap;
 }
 
+#test-config {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  white-space: nowrap;
+}
+
+#test-config[data-loading="true"] {
+  cursor: progress;
+  opacity: 0.85;
+}
+
+#test-config[data-loading="true"]::before {
+  content: "";
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  border: 2px solid rgba(124, 132, 150, 0.4);
+  border-top-color: rgba(124, 140, 255, 0.8);
+  animation: test-config-spin 0.8s linear infinite;
+}
+
+@keyframes test-config-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 button {
   appearance: none;
   border: 1px solid rgba(124, 132, 150, 0.28);

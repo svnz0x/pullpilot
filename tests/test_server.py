@@ -1,8 +1,9 @@
 import errno
 import gzip
 import os
-import uuid
 import stat
+import sys
+import uuid
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Mapping
@@ -198,6 +199,68 @@ def test_get_returns_error_when_store_load_fails(
 
     assert status == HTTPStatus.INTERNAL_SERVER_ERROR
     assert body == {"error": "failed to load configuration", "details": "boom"}
+
+
+def test_run_test_endpoint_reports_success(
+    auth_headers: Mapping[str, str], store: ConfigStore, schedule_store: ScheduleStore
+) -> None:
+    command = [
+        sys.executable,
+        "-c",
+        "import sys; sys.stdout.write('listo\\n')",
+    ]
+    api = ConfigAPI(
+        store=store,
+        schedule_store=schedule_store,
+        updater_command=command,
+    )
+
+    status, body = api.handle_request("POST", "/ui/run-test", headers=auth_headers)
+
+    assert status == HTTPStatus.OK
+    assert body["status"] == "success"
+    assert body["exit_code"] == 0
+    assert "listo" in body["stdout"]
+    assert body["command"] == command
+
+
+def test_run_test_endpoint_reports_non_zero_exit(
+    auth_headers: Mapping[str, str], store: ConfigStore, schedule_store: ScheduleStore
+) -> None:
+    command = [
+        sys.executable,
+        "-c",
+        "import sys; sys.stderr.write('fallo\\n'); sys.exit(5)",
+    ]
+    api = ConfigAPI(
+        store=store,
+        schedule_store=schedule_store,
+        updater_command=command,
+    )
+
+    status, body = api.handle_request("POST", "/ui/run-test", headers=auth_headers)
+
+    assert status == HTTPStatus.OK
+    assert body["status"] == "error"
+    assert body["exit_code"] == 5
+    assert "fallo" in body["stderr"]
+
+
+def test_run_test_endpoint_handles_missing_command(
+    auth_headers: Mapping[str, str], store: ConfigStore, schedule_store: ScheduleStore
+) -> None:
+    api = ConfigAPI(
+        store=store,
+        schedule_store=schedule_store,
+        updater_command=["/path/that/does/not/exist"],
+    )
+
+    status, body = api.handle_request("POST", "/ui/run-test", headers=auth_headers)
+
+    assert status == HTTPStatus.INTERNAL_SERVER_ERROR
+    assert body["error"] == "execution failed"
+    details = body.get("details", [])
+    assert any("No se pudo iniciar el comando" in detail.get("message", "") for detail in details)
 
 
 def test_put_updates_config_and_multiline(
