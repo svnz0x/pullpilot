@@ -206,6 +206,7 @@ const initializeApp = () => {
   let memoryToken = null;
   let storedToken = null;
   let isInitialDataLoading = false;
+  let isLogsLoading = false;
   const tokenStorage = createTokenStorage(window);
 
   const buildApiUrl = createApiUrlBuilder(window);
@@ -356,6 +357,36 @@ const initializeApp = () => {
     }
     applyInitialLoadingStateToForm(form, isLoading);
     applyInitialLoadingStateToForm(scheduleForm, isLoading);
+  };
+
+  const setLogsLoadingState = (isLoading) => {
+    if (!refreshLogs || isLogsLoading === isLoading) {
+      isLogsLoading = isLoading;
+      return;
+    }
+
+    isLogsLoading = isLoading;
+    const dataset = refreshLogs.dataset ?? null;
+    if (isLoading) {
+      if (dataset) {
+        dataset.logsLoadingWasDisabled = refreshLogs.disabled ? "true" : "false";
+      }
+      refreshLogs.disabled = true;
+      refreshLogs.setAttribute?.("aria-disabled", "true");
+      return;
+    }
+
+    const wasDisabled = dataset?.logsLoadingWasDisabled === "true";
+    if (dataset) {
+      delete dataset.logsLoadingWasDisabled;
+    }
+    if (wasDisabled) {
+      refreshLogs.disabled = true;
+      refreshLogs.setAttribute?.("aria-disabled", "true");
+      return;
+    }
+    refreshLogs.disabled = false;
+    refreshLogs.removeAttribute?.("aria-disabled");
   };
 
   const storedTokenStatus = tokenStorage.readToken();
@@ -1782,6 +1813,15 @@ const initializeApp = () => {
   const logsRequestManager = createLogsRequestManager();
 
   const fetchLogs = async (selectedName = null, { showLoadingStatus = false } = {}) => {
+    const previousLogState = {
+      selection: logSelect?.value ?? null,
+      disabled: logSelect?.disabled ?? false,
+      content: logContent?.textContent ?? "",
+      meta: logMeta?.textContent ?? "",
+    };
+
+    setLogsLoadingState(true);
+
     if (showLoadingStatus) {
       showStatus(logsStatus, "Cargando lista de logs…");
       if (logSelect) {
@@ -1820,7 +1860,8 @@ const initializeApp = () => {
         return false;
       }
       console.error(error);
-      if (error?.message === "UNAUTHORIZED") {
+      const isUnauthorized = error?.message === "UNAUTHORIZED" || error?.status === 401;
+      if (isUnauthorized) {
         if (logSelect) {
           logSelect.innerHTML = "";
           logSelect.disabled = true;
@@ -1832,17 +1873,24 @@ const initializeApp = () => {
         logContent.textContent = "Introduce un token válido para ver los logs.";
       } else {
         if (logSelect) {
-          logSelect.innerHTML = "";
-          logSelect.disabled = true;
+          logSelect.disabled = previousLogState.disabled;
+          if (previousLogState.selection != null) {
+            logSelect.value = previousLogState.selection;
+          }
         }
         if (logMeta) {
-          logMeta.textContent = "";
+          logMeta.textContent = previousLogState.meta;
+        }
+        if (logContent) {
+          logContent.textContent = previousLogState.content;
         }
         showStatus(logsStatus, "No se pudieron cargar los logs.", "error");
-        logContent.textContent = "Sin datos disponibles.";
       }
       return false;
     } finally {
+      if (logsRequestManager.isLatest(id)) {
+        setLogsLoadingState(false);
+      }
       release?.();
     }
   };
@@ -2063,6 +2111,9 @@ const initializeApp = () => {
     fetchLogs(value);
   });
   refreshLogs.addEventListener("click", () => {
+    if (refreshLogs.disabled) {
+      return;
+    }
     const selected = logSelect.disabled ? null : logSelect.value;
     fetchLogs(selected || null);
   });

@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { Worker } from "node:worker_threads";
 
 import {
   createLogsRequestManager,
@@ -49,4 +50,28 @@ test("createLogsRequestManager mantiene la última selección aunque las respues
   }
 
   assert.equal(renderedSelection, "segundo.log");
+});
+
+const runWorker = (url) =>
+  new Promise((resolve, reject) => {
+    const worker = new Worker(url, { type: "module" });
+    worker.once("message", resolve);
+    worker.once("error", reject);
+    worker.once("exit", (code) => {
+      if (code !== 0) {
+        reject(new Error(`Worker exited with code ${code}`));
+      }
+    });
+  });
+
+test("la vista de logs conserva la selección tras un error de red", async () => {
+  const result = await runWorker(new URL("./logs-view.worker.js", import.meta.url));
+
+  assert.deepEqual(result.optionsAfter, result.optionsBefore);
+  assert.equal(result.selectionAfter, result.selectionBefore);
+  assert.equal(result.contentAfter, result.contentBefore);
+  assert.equal(result.metaAfter, result.metaBefore);
+  assert.equal(result.logsStatusText, "No se pudieron cargar los logs.");
+  assert.equal(result.refreshDisabled, false);
+  assert.equal(result.remainingFetchHandlers, 0);
 });
