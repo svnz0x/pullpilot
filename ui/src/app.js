@@ -62,6 +62,49 @@ export const createLogsRequestManager = () => {
   return { start, isLatest, getSignal };
 };
 
+export const createStatusTimeoutManager = () => {
+  const timers = new Map();
+
+  const schedule = (element, callback, delay) => {
+    if (!element || typeof callback !== "function" || typeof delay !== "number") {
+      return null;
+    }
+
+    const existing = timers.get(element);
+    if (existing != null) {
+      clearTimeout(existing);
+    }
+
+    const timeoutId = setTimeout(() => {
+      timers.delete(element);
+      callback();
+    }, delay);
+
+    timers.set(element, timeoutId);
+    return timeoutId;
+  };
+
+  const clear = (element) => {
+    if (!element) {
+      return;
+    }
+    const existing = timers.get(element);
+    if (existing != null) {
+      clearTimeout(existing);
+      timers.delete(element);
+    }
+  };
+
+  const clearAll = () => {
+    timers.forEach((timeoutId) => {
+      clearTimeout(timeoutId);
+    });
+    timers.clear();
+  };
+
+  return { schedule, clear, clearAll };
+};
+
 export const toggleInitialLoadOnControl = (control, isLoading) => {
   if (!control) return;
   const dataset = control.dataset;
@@ -211,6 +254,7 @@ const initializeApp = () => {
   const tokenStorage = createTokenStorage(window);
 
   const buildApiUrl = createApiUrlBuilder(window);
+  const statusTimeoutManager = createStatusTimeoutManager();
 
   const setResetConfigButtonState = (hasSnapshot) => {
     if (!resetButton) return;
@@ -769,6 +813,7 @@ const initializeApp = () => {
 
   const hideStatus = (element) => {
     if (!element) return;
+    statusTimeoutManager.clear(element);
     element.hidden = true;
     element.classList.remove("success", "error");
     element.textContent = "";
@@ -1227,7 +1272,11 @@ const initializeApp = () => {
         populateSchedule({ mode: "cron", expression: "", datetime: "" });
       }
       showStatus(scheduleStatus, "Programación cargada correctamente.", "success");
-      setTimeout(() => hideStatus(scheduleStatus), 2500);
+      statusTimeoutManager.schedule(
+        scheduleStatus,
+        () => hideStatus(scheduleStatus),
+        2500,
+      );
       return true;
     } catch (error) {
       console.error(error);
@@ -1276,7 +1325,11 @@ const initializeApp = () => {
         populateSchedule(payload);
       }
       showStatus(scheduleStatus, "Programación guardada.", "success");
-      setTimeout(() => hideStatus(scheduleStatus), 2500);
+      statusTimeoutManager.schedule(
+        scheduleStatus,
+        () => hideStatus(scheduleStatus),
+        2500,
+      );
     } catch (error) {
       console.error(error);
       if (error?.message === "UNAUTHORIZED") {
@@ -1313,7 +1366,11 @@ const initializeApp = () => {
     }
     populateSchedule(lastScheduleSnapshot);
     showStatus(scheduleStatus, "Se restauró la programación cargada.");
-    setTimeout(() => hideStatus(scheduleStatus), 2500);
+    statusTimeoutManager.schedule(
+      scheduleStatus,
+      () => hideStatus(scheduleStatus),
+      2500,
+    );
   };
 
   const booleanValue = (value) => {
@@ -1732,7 +1789,11 @@ const initializeApp = () => {
         );
       } else {
         showStatus(configStatus, "Configuración cargada correctamente.", "success");
-        setTimeout(() => hideStatus(configStatus), 2500);
+        statusTimeoutManager.schedule(
+          configStatus,
+          () => hideStatus(configStatus),
+          2500,
+        );
       }
       return true;
     } catch (error) {
@@ -1861,7 +1922,11 @@ const initializeApp = () => {
       );
     } else {
       showStatus(configStatus, "Se restauraron los valores cargados.");
-      setTimeout(() => hideStatus(configStatus), 2500);
+      statusTimeoutManager.schedule(
+        configStatus,
+        () => hideStatus(configStatus),
+        2500,
+      );
     }
   };
 
