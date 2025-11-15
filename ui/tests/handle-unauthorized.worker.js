@@ -4,6 +4,7 @@ import { createAppTestHarness } from "./helpers/app-harness.js";
 const {
   loginForm,
   tokenInput,
+  loginStatus,
   rememberCheckbox,
   enqueueResponses,
   okResponse,
@@ -41,6 +42,10 @@ await flush();
 const checkboxAfterUnauthorized = rememberCheckbox.checked;
 const tokenInputAfterUnauthorized = tokenInput.value;
 const storedAfterUnauthorized = windowStub.localStorage.getItem("pullpilot.bearerToken");
+const loginStatusAfterUnauthorized = loginStatus.textContent;
+
+rememberCheckbox.checked = true;
+tokenInput.value = tokenValue;
 
 enqueueResponses([
   () => okResponse({}),
@@ -67,5 +72,6 @@ parentPort.postMessage({
   tokenInputAfterUnauthorized,
   storedAfterUnauthorized,
   storedAfterRelogin,
+  loginStatusAfterUnauthorized,
   tokenValue,
 });

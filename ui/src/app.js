@@ -679,22 +679,11 @@ const initializeApp = () => {
     }
 
     const hadMemoryToken = memoryToken != null;
-    const storedTokenStatus = tokenStorage.readToken();
-    storedToken = storedTokenStatus?.token ?? null;
-    const reusableToken = Boolean(storedTokenStatus?.token);
-    const clearStatus = auth.clearToken({ forgetPersisted: !reusableToken });
+    const clearStatus = auth.clearToken();
+    storedToken = null;
     const storageOutcome = processStorageStatus(clearStatus, { silent: true });
     loginForm?.reset();
-    if (reusableToken) {
-      if (tokenInput) {
-        tokenInput.value = storedTokenStatus.token;
-      }
-      if (rememberCheckbox) {
-        rememberCheckbox.checked = true;
-      }
-    }
     const finalMessage = buildUnauthorizedTokenMessage(message, {
-      reusableToken,
       hadMemoryToken,
       storageOutcome,
     });
@@ -2114,6 +2103,10 @@ const initializeApp = () => {
     } finally {
       setInitialDataLoading(false);
     }
+    if (!auth.getToken()) {
+      return;
+    }
+
     const storageOutcome = processStorageStatus(storageStatus, { silent: true });
     const storageMessage = storageOutcome.handled
       ? (storageOutcome.message || "").trim()
