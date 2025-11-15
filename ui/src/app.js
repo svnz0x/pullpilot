@@ -180,6 +180,7 @@ const initializeApp = () => {
   const form = document.getElementById("config-form");
   const fieldsContainer = document.getElementById("config-fields");
   const resetButton = document.getElementById("reset-config");
+  const retryConfigButton = document.getElementById("retry-config");
   const testConfigButton = document.getElementById("test-config");
   const configStatus = document.getElementById("config-status");
   const scheduleForm = document.getElementById("schedule-form");
@@ -210,6 +211,49 @@ const initializeApp = () => {
   const tokenStorage = createTokenStorage(window);
 
   const buildApiUrl = createApiUrlBuilder(window);
+
+  const setResetConfigButtonState = (hasSnapshot) => {
+    if (!resetButton) return;
+    if (hasSnapshot) {
+      resetButton.disabled = false;
+      resetButton.removeAttribute?.("aria-disabled");
+    } else {
+      resetButton.disabled = true;
+      resetButton.setAttribute?.("aria-disabled", "true");
+    }
+  };
+
+  const toggleRetryConfigButton = (hasSnapshot) => {
+    if (!retryConfigButton) return;
+    if (hasSnapshot) {
+      retryConfigButton.hidden = true;
+      retryConfigButton.disabled = false;
+      retryConfigButton.removeAttribute?.("aria-disabled");
+      return;
+    }
+    retryConfigButton.hidden = false;
+    retryConfigButton.disabled = false;
+    retryConfigButton.removeAttribute?.("aria-disabled");
+  };
+
+  const updateConfigRecoveryControls = () => {
+    const hasSnapshot = Boolean(lastConfigSnapshot);
+    setResetConfigButtonState(hasSnapshot);
+    toggleRetryConfigButton(hasSnapshot);
+  };
+
+  const setRetryConfigButtonLoading = (isLoading) => {
+    if (!retryConfigButton) return;
+    if (isLoading) {
+      retryConfigButton.disabled = true;
+      retryConfigButton.setAttribute?.("aria-disabled", "true");
+      return;
+    }
+    retryConfigButton.disabled = false;
+    retryConfigButton.removeAttribute?.("aria-disabled");
+  };
+
+  updateConfigRecoveryControls();
 
   const showLoginMessage = (message, tone = "info") => {
     if (!loginStatus) return;
@@ -400,6 +444,7 @@ const initializeApp = () => {
       fieldsContainer.innerHTML = "";
     }
     lastConfigSnapshot = null;
+    updateConfigRecoveryControls();
     if (scheduleForm) {
       scheduleForm.reset();
     }
@@ -1637,6 +1682,7 @@ const initializeApp = () => {
       fieldsContainer.appendChild(field);
     });
     lastConfigSnapshot = data;
+    updateConfigRecoveryControls();
   };
 
   const readFormValues = () => {
@@ -1704,6 +1750,7 @@ const initializeApp = () => {
           "error",
         );
       }
+      updateConfigRecoveryControls();
       return false;
     }
   };
@@ -1791,7 +1838,15 @@ const initializeApp = () => {
   });
 
   const resetConfig = () => {
-    if (!lastConfigSnapshot) return;
+    if (!lastConfigSnapshot) {
+      updateConfigRecoveryControls();
+      showStatus(
+        configStatus,
+        "No hay una configuración cargada para descartar. Usa «Reintentar carga» para intentarlo de nuevo.",
+        "error",
+      );
+      return;
+    }
     populateConfig(lastConfigSnapshot);
     const missingPathErrors = collectMissingPathErrors(lastConfigSnapshot.values);
     if (missingPathErrors.length) {
@@ -1807,6 +1862,25 @@ const initializeApp = () => {
     } else {
       showStatus(configStatus, "Se restauraron los valores cargados.");
       setTimeout(() => hideStatus(configStatus), 2500);
+    }
+  };
+
+  const retryConfigLoad = async () => {
+    if (!retryConfigButton) {
+      return;
+    }
+    if (retryConfigButton.disabled) {
+      return;
+    }
+    setRetryConfigButtonLoading(true);
+    try {
+      const loaded = await fetchConfig({ showLoadingStatus: true });
+      if (!loaded) {
+        updateConfigRecoveryControls();
+      }
+    } finally {
+      setRetryConfigButtonLoading(false);
+      updateConfigRecoveryControls();
     }
   };
 
@@ -2104,6 +2178,9 @@ const initializeApp = () => {
 
   form.addEventListener("submit", submitConfig);
   resetButton.addEventListener("click", resetConfig);
+  retryConfigButton?.addEventListener("click", () => {
+    retryConfigLoad();
+  });
   testConfigButton?.addEventListener("click", runConfigTest);
   logSelect.addEventListener("change", (event) => {
     const { value } = event.target;
