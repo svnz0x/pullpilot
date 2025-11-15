@@ -5,6 +5,8 @@ import { createAppTestHarness } from "./helpers/app-harness.js";
 const {
   loginForm,
   tokenInput,
+  configForm,
+  saveConfigButton,
   resetConfigButton,
   retryConfigButton,
   configStatus,
@@ -58,7 +60,14 @@ const manualNotice = configStatus.querySelector("span")?.textContent ?? "";
 
 enqueueResponses([() => okResponse(configPayload)]);
 
+const saveDisabledBeforeRetry = saveConfigButton.disabled;
+const formBusyBeforeRetry = configForm.getAttribute("aria-busy");
+
 retryConfigButton.dispatchEvent(new FakeEvent("click", { bubbles: true, cancelable: true }));
+
+const saveDisabledDuringRetry = saveConfigButton.disabled;
+const resetDisabledDuringRetry = resetConfigButton.disabled;
+const formBusyDuringRetry = configForm.getAttribute("aria-busy");
 
 await flush();
 await flush();
@@ -66,6 +75,8 @@ await flush();
 const resetEnabledAfterRetry = !resetConfigButton.disabled;
 const retryHiddenAfterRetry = retryConfigButton.hidden;
 const successSummary = configStatus.querySelector("span")?.textContent ?? "";
+const saveDisabledAfterRetry = saveConfigButton.disabled;
+const formBusyAfterRetry = configForm.getAttribute("aria-busy");
 
 parentPort.postMessage({
   failure: {
@@ -78,6 +89,17 @@ parentPort.postMessage({
     resetEnabled: resetEnabledAfterRetry,
     retryHidden: retryHiddenAfterRetry,
     successSummary,
+    buttons: {
+      saveBefore: saveDisabledBeforeRetry,
+      saveDuring: saveDisabledDuringRetry,
+      saveAfter: saveDisabledAfterRetry,
+      resetDuring: resetDisabledDuringRetry,
+    },
+    formBusy: {
+      before: formBusyBeforeRetry,
+      during: formBusyDuringRetry,
+      after: formBusyAfterRetry,
+    },
     remainingFetchHandlers: fetchQueue.length,
   },
 });

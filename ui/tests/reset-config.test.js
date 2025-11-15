@@ -33,4 +33,11 @@ test("reset config stays disabled without snapshot and retry flow reloads data",
   assert.equal(result.retry.retryHidden, true);
   assert.equal(result.retry.remainingFetchHandlers, 0);
   assert.equal(result.retry.successSummary, "Configuración cargada correctamente.");
+  assert.equal(result.retry.buttons.saveBefore, false);
+  assert.equal(result.retry.buttons.saveDuring, true);
+  assert.equal(result.retry.buttons.saveAfter, false);
+  assert.equal(result.retry.buttons.resetDuring, true);
+  assert.equal(result.retry.formBusy.before, null);
+  assert.equal(result.retry.formBusy.during, "true");
+  assert.equal(result.retry.formBusy.after, null);
 });

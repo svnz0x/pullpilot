@@ -392,6 +392,7 @@ const initializeApp = () => {
   const logoutButton = document.getElementById("logout-button");
   const form = document.getElementById("config-form");
   const fieldsContainer = document.getElementById("config-fields");
+  const saveConfigButton = document.getElementById("save-config");
   const resetButton = document.getElementById("reset-config");
   const retryConfigButton = document.getElementById("retry-config");
   const testConfigButton = document.getElementById("test-config");
@@ -406,6 +407,7 @@ const initializeApp = () => {
     scheduleFieldsContainer?.querySelector('[data-name="datetime"]') ?? null;
   const scheduleDatetimeInput = document.getElementById("schedule-datetime");
   const scheduleStatus = document.getElementById("schedule-status");
+  const saveScheduleButton = document.getElementById("save-schedule");
   const scheduleResetButton = document.getElementById("reset-schedule");
   const logSelect = document.getElementById("log-select");
   const logContent = document.getElementById("log-content");
@@ -1177,6 +1179,67 @@ const initializeApp = () => {
     }
   };
 
+  const setFormBusyState = (formElement, key, isBusy) => {
+    if (!formElement) return;
+    const dataset = formElement.dataset ?? {};
+    const busyKey = `${key}Busy`;
+    if (isBusy) {
+      dataset[busyKey] = "true";
+      formElement.setAttribute("aria-busy", "true");
+      return;
+    }
+    delete dataset[busyKey];
+    if (dataset.initialLoading === "true") {
+      formElement.setAttribute("aria-busy", "true");
+      return;
+    }
+    const hasOtherBusyStates = Object.entries(dataset).some(
+      ([entryKey, value]) => entryKey !== "initialLoading" && entryKey.endsWith("Busy") && value === "true",
+    );
+    if (!hasOtherBusyStates) {
+      formElement.removeAttribute("aria-busy");
+    }
+  };
+
+  const setButtonPendingState = (button, key, isPending) => {
+    if (!button) return;
+    const dataset = button.dataset ?? {};
+    const stateKey = `${key}Pending`;
+    const wasDisabledKey = `${key}WasDisabled`;
+    if (isPending) {
+      dataset[stateKey] = "true";
+      dataset[wasDisabledKey] = button.disabled ? "true" : "false";
+      button.disabled = true;
+      button.setAttribute?.("aria-disabled", "true");
+      return;
+    }
+    if (dataset[stateKey] !== "true") {
+      return;
+    }
+    const wasDisabled = dataset[wasDisabledKey] === "true";
+    delete dataset[stateKey];
+    delete dataset[wasDisabledKey];
+    if (wasDisabled) {
+      button.disabled = true;
+      button.setAttribute?.("aria-disabled", "true");
+    } else {
+      button.disabled = false;
+      button.removeAttribute?.("aria-disabled");
+    }
+  };
+
+  const setConfigFormSubmitting = (isSubmitting) => {
+    setFormBusyState(form, "configSubmitting", isSubmitting);
+    setButtonPendingState(saveConfigButton, "configSubmitting", isSubmitting);
+    setButtonPendingState(resetButton, "configSubmitting", isSubmitting);
+  };
+
+  const setScheduleFormSubmitting = (isSubmitting) => {
+    setFormBusyState(scheduleForm, "scheduleSubmitting", isSubmitting);
+    setButtonPendingState(saveScheduleButton, "scheduleSubmitting", isSubmitting);
+    setButtonPendingState(scheduleResetButton, "scheduleSubmitting", isSubmitting);
+  };
+
   const clearFieldErrors = (container = fieldsContainer) => {
     if (!container) return;
     container.querySelectorAll(".config-field.is-error").forEach((field) => {
@@ -1655,6 +1718,7 @@ const initializeApp = () => {
       );
       return;
     }
+    setScheduleFormSubmitting(true);
     try {
       const response = await scheduleApi.save(payload);
       const data = await response.json().catch(() => null);
@@ -1698,6 +1762,8 @@ const initializeApp = () => {
         "No se pudo guardar la programación. Revisa los datos e inténtalo de nuevo.",
         "error",
       );
+    } finally {
+      setScheduleFormSubmitting(false);
     }
   };
 
@@ -2238,11 +2304,13 @@ const initializeApp = () => {
   };
 
   const fetchConfig = async ({ showLoadingStatus = false } = {}) => {
+    clearFieldErrors();
     if (showLoadingStatus) {
       showStatus(configStatus, "Cargando configuración inicial…");
     } else {
       hideStatus(configStatus);
     }
+    setConfigFormSubmitting(true);
     try {
       const response = await authorizedFetch(buildApiUrl("config"));
       if (!response.ok) {
@@ -2287,6 +2355,8 @@ const initializeApp = () => {
       }
       updateConfigRecoveryControls();
       return false;
+    } finally {
+      setConfigFormSubmitting(false);
     }
   };
 
@@ -2321,6 +2391,7 @@ const initializeApp = () => {
       );
       return;
     }
+    setConfigFormSubmitting(true);
     try {
       const response = await authorizedFetch(buildApiUrl("config"), {
         method: "POST",
@@ -2358,6 +2429,8 @@ const initializeApp = () => {
         "No se pudo guardar la configuración. Revisa los datos e inténtalo de nuevo.",
         "error",
       );
+    } finally {
+      setConfigFormSubmitting(false);
     }
   };
 

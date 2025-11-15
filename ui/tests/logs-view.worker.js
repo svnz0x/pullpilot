@@ -10,6 +10,9 @@ const {
   logMeta,
   logsStatus,
   refreshLogs,
+  scheduleForm,
+  saveScheduleButton,
+  scheduleReset: scheduleResetButton,
   enqueueResponses,
   okResponse,
   fetchQueue,
@@ -81,6 +84,45 @@ const selectionBefore = logSelect.value;
 const contentBefore = logContent.textContent;
 const metaBefore = logMeta.textContent;
 
+let resolveScheduleSave;
+enqueueResponses([
+  () =>
+    new Promise((resolve) => {
+      resolveScheduleSave = () =>
+        resolve(
+          new Response(
+            JSON.stringify({ mode: "cron", expression: "0 * * * *", datetime: "" }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+    }),
+]);
+
+const scheduleButtonsBefore = {
+  saveDisabled: saveScheduleButton.disabled,
+  resetDisabled: scheduleResetButton.disabled,
+  formBusy: scheduleForm.getAttribute("aria-busy"),
+};
+
+scheduleForm.dispatchEvent(new FakeEvent("submit", { bubbles: true, cancelable: true }));
+
+const scheduleButtonsDuring = {
+  saveDisabled: saveScheduleButton.disabled,
+  resetDisabled: scheduleResetButton.disabled,
+  formBusy: scheduleForm.getAttribute("aria-busy"),
+};
+
+resolveScheduleSave();
+
+await flush();
+await flush();
+
+const scheduleButtonsAfter = {
+  saveDisabled: saveScheduleButton.disabled,
+  resetDisabled: scheduleResetButton.disabled,
+  formBusy: scheduleForm.getAttribute("aria-busy"),
+};
+
 enqueueResponses([
   () => Promise.reject(new Error("Network unreachable")),
 ]);
@@ -91,6 +133,7 @@ const contentDuringRefresh = logContent.textContent;
 const selectDisabledDuringRefresh = logSelect.disabled;
 const selectBusyDuringRefresh = logSelect.getAttribute("aria-busy");
 const contentBusyDuringRefresh = logContent.getAttribute("aria-busy");
+const refreshDisabledDuringRequest = refreshLogs.disabled;
 
 await flush();
 await flush();
@@ -114,11 +157,17 @@ parentPort.postMessage({
   metaAfter,
   logsStatusText,
   refreshDisabled: refreshLogs.disabled,
+  refreshDisabledDuringRequest,
   contentDuringRefresh,
   selectDisabledDuringRefresh,
   selectBusyDuringRefresh,
   contentBusyDuringRefresh,
   selectBusyAfter,
   contentBusyAfter,
+  scheduleButtons: {
+    before: scheduleButtonsBefore,
+    during: scheduleButtonsDuring,
+    after: scheduleButtonsAfter,
+  },
   remainingFetchHandlers: fetchQueue.length,
 });

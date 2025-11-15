@@ -338,6 +338,7 @@ export const createAppTestHarness = () => {
   const logoutButton = registerElement(new FakeElement("logout-button", "button"));
   const configForm = registerElement(new FakeFormElement("config-form"));
   const configFields = registerElement(new FakeElement("config-fields", "div"));
+  const saveConfigButton = registerElement(new FakeElement("save-config", "button"));
   const resetConfigButton = registerElement(new FakeElement("reset-config", "button"));
   const retryConfigButton = registerElement(new FakeElement("retry-config", "button"));
   retryConfigButton.hidden = true;
@@ -350,6 +351,7 @@ export const createAppTestHarness = () => {
   const scheduleExpression = registerElement(new FakeElement("schedule-expression", "input"));
   const scheduleDatetime = registerElement(new FakeElement("schedule-datetime", "input"));
   const scheduleStatus = registerElement(new FakeElement("schedule-status", "div"));
+  const saveScheduleButton = registerElement(new FakeElement("save-schedule", "button"));
   const scheduleReset = registerElement(new FakeElement("reset-schedule", "button"));
   const logSelect = registerElement(new FakeSelectElement("log-select"));
   const logContent = registerElement(new FakeElement("log-content", "pre"));
@@ -465,6 +467,7 @@ export const createAppTestHarness = () => {
     logoutButton,
     configForm,
     configFields,
+    saveConfigButton,
     resetConfigButton,
     retryConfigButton,
     testConfigButton,
@@ -475,6 +478,7 @@ export const createAppTestHarness = () => {
     scheduleExpression,
     scheduleDatetime,
     scheduleStatus,
+    saveScheduleButton,
     scheduleReset,
     logSelect,
     logContent,

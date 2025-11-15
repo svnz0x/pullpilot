@@ -64,20 +64,33 @@ const runWorker = (url) =>
     });
   });
 
-test("la vista de logs conserva la selección tras un error de red", async () => {
-  const result = await runWorker(new URL("./logs-view.worker.js", import.meta.url));
+test(
+  "la vista de logs conserva la selección tras un error de red y bloquea las acciones en curso",
+  async () => {
+    const result = await runWorker(new URL("./logs-view.worker.js", import.meta.url));
 
-  assert.deepEqual(result.optionsAfter, result.optionsBefore);
-  assert.equal(result.selectionAfter, result.selectionBefore);
-  assert.equal(result.contentAfter, result.contentBefore);
-  assert.equal(result.metaAfter, result.metaBefore);
-  assert.equal(result.logsStatusText, "No se pudieron cargar los logs.");
-  assert.equal(result.refreshDisabled, false);
-  assert.equal(result.contentDuringRefresh, "Cargando logs…");
-  assert.equal(result.selectDisabledDuringRefresh, true);
-  assert.equal(result.selectBusyDuringRefresh, "true");
-  assert.equal(result.contentBusyDuringRefresh, "true");
-  assert.equal(result.selectBusyAfter, null);
-  assert.equal(result.contentBusyAfter, null);
-  assert.equal(result.remainingFetchHandlers, 0);
-});
+    assert.deepEqual(result.optionsAfter, result.optionsBefore);
+    assert.equal(result.selectionAfter, result.selectionBefore);
+    assert.equal(result.contentAfter, result.contentBefore);
+    assert.equal(result.metaAfter, result.metaBefore);
+    assert.equal(result.logsStatusText, "No se pudieron cargar los logs.");
+    assert.equal(result.refreshDisabledDuringRequest, true);
+    assert.equal(result.refreshDisabled, false);
+    assert.equal(result.contentDuringRefresh, "Cargando logs…");
+    assert.equal(result.selectDisabledDuringRefresh, true);
+    assert.equal(result.selectBusyDuringRefresh, "true");
+    assert.equal(result.contentBusyDuringRefresh, "true");
+    assert.equal(result.selectBusyAfter, null);
+    assert.equal(result.contentBusyAfter, null);
+    assert.equal(result.scheduleButtons.before.saveDisabled, false);
+    assert.equal(result.scheduleButtons.during.saveDisabled, true);
+    assert.equal(result.scheduleButtons.after.saveDisabled, false);
+    assert.equal(result.scheduleButtons.before.resetDisabled, false);
+    assert.equal(result.scheduleButtons.during.resetDisabled, true);
+    assert.equal(result.scheduleButtons.after.resetDisabled, false);
+    assert.equal(result.scheduleButtons.before.formBusy, null);
+    assert.equal(result.scheduleButtons.during.formBusy, "true");
+    assert.equal(result.scheduleButtons.after.formBusy, null);
+    assert.equal(result.remainingFetchHandlers, 0);
+  },
+);
