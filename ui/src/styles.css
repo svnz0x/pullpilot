@@ -334,8 +334,26 @@ main > section h2 {
 .config-field label {
   font-weight: 600;
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.config-field .field-label-text {
+  font-size: clamp(0.95rem, 1.8vw, 1.1rem);
+  color: var(--text);
+}
+
+.config-field .field-variable {
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(25, 32, 45, 0.8);
+  background: rgba(124, 140, 255, 0.18);
+  border: 1px solid rgba(124, 140, 255, 0.35);
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+  line-height: 1.4;
 }
 
 .config-field .field-input {

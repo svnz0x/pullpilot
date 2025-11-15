@@ -33,6 +33,11 @@ const SECTION_MAP = Object.freeze({
   COMPOSE_BIN: { section: "Compatibilidad", subsection: "Docker Compose" },
 });
 
+const LABEL_MAP = Object.freeze({
+  BASE_DIR: "Carpeta de proyectos docker-compose",
+  LOG_DIR: "Carpeta de logs del updater",
+});
+
 const pickFirstString = (...candidates) => {
   for (const candidate of candidates) {
     if (typeof candidate === "string") {
@@ -1868,16 +1873,24 @@ const initializeApp = () => {
 
     const label = document.createElement("label");
     label.htmlFor = `field-${variable.name}`;
+    label.dataset.variable = variable.name;
 
     const isBaseDirField = variable.name === "BASE_DIR";
     const isLogDirField = variable.name === "LOG_DIR";
-    if (isBaseDirField) {
-      label.textContent = "Carpeta de proyectos docker-compose";
-    } else if (isLogDirField) {
-      label.textContent = "Carpeta de logs del updater";
-    } else {
-      label.textContent = variable.name;
-    }
+    const friendlyLabelText =
+      pickFirstString(LABEL_MAP[variable.name], variable.label, variable.metadata?.label) ||
+      variable.name;
+
+    const labelText = document.createElement("span");
+    labelText.className = "field-label-text";
+    labelText.textContent = friendlyLabelText;
+    label.appendChild(labelText);
+
+    const variableLabel = document.createElement("span");
+    variableLabel.className = "field-variable";
+    variableLabel.textContent = variable.name;
+    label.appendChild(variableLabel);
+
     wrapper.appendChild(label);
 
     const inputContainer = document.createElement("div");
@@ -1969,7 +1982,7 @@ const initializeApp = () => {
     wrapper.appendChild(inputContainer);
 
     const { container: descriptionContainer, panel: descriptionPanel } =
-      createInfoDisclosureElements(descriptionId, label.textContent || variable.name);
+      createInfoDisclosureElements(descriptionId, friendlyLabelText || variable.name);
     if (isBaseDirField || isLogDirField) {
       const helpLines = [];
       if (variable.description) {
