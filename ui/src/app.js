@@ -100,6 +100,75 @@ export const toggleInitialLoadOnControl = (control, isLoading) => {
   }
 };
 
+export const createConfigTestRunner = ({
+  authorizedFetch,
+  buildApiUrl,
+  buildProcessStatusMessage,
+  buildErrorStatusPayload,
+  showStatus,
+  hideStatus,
+  setTestConfigButtonLoading,
+  configStatus,
+}) => {
+  if (typeof authorizedFetch !== "function") {
+    throw new Error("createConfigTestRunner requires an authorizedFetch function");
+  }
+  if (typeof buildApiUrl !== "function") {
+    throw new Error("createConfigTestRunner requires a buildApiUrl function");
+  }
+
+  return async () => {
+    hideStatus(configStatus);
+    setTestConfigButtonLoading(true);
+    showStatus(configStatus, "Ejecutando prueba del updater…");
+    try {
+      const response = await authorizedFetch(buildApiUrl("run-test"), {
+        method: "POST",
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        const requestError = new Error("REQUEST_FAILED");
+        requestError.status = response.status;
+        requestError.data = data;
+        throw requestError;
+      }
+      const { summary, details, tone } = buildProcessStatusMessage(data);
+      showStatus(configStatus, { summary, details }, tone);
+    } catch (error) {
+      console.error(error);
+      if (error?.message === "UNAUTHORIZED") {
+        showStatus(
+          configStatus,
+          "No se pudo ejecutar la prueba porque falta un token válido.",
+          "error",
+        );
+        return;
+      }
+      if (error?.data) {
+        const statusPayload = buildErrorStatusPayload(error.data, {
+          defaultSummary: "No se pudo ejecutar la prueba del updater.",
+          container: null,
+        });
+        showStatus(configStatus, statusPayload, "error");
+        return;
+      }
+      if (typeof error?.status === "number") {
+        const summary =
+          "El backend devolvió un error (código " + error.status + ") al ejecutar la prueba.";
+        showStatus(configStatus, summary, "error");
+        return;
+      }
+      showStatus(
+        configStatus,
+        "No se pudo ejecutar la prueba del updater. Revisa los logs e inténtalo de nuevo.",
+        "error",
+      );
+    } finally {
+      setTestConfigButtonLoading(false);
+    }
+  };
+};
+
 const initializeApp = () => {
   const body = document.body;
   const loginForm = document.getElementById("token-form");
@@ -1479,56 +1548,16 @@ const initializeApp = () => {
     }
   };
 
-  const runConfigTest = async () => {
-    hideStatus(configStatus);
-    setTestConfigButtonLoading(true);
-    showStatus(configStatus, "Ejecutando prueba del updater…");
-    try {
-      const response = await authorizedFetch(buildApiUrl("ui/run-test"), {
-        method: "POST",
-      });
-      const data = await response.json().catch(() => null);
-      if (!response.ok) {
-        const requestError = new Error("REQUEST_FAILED");
-        requestError.status = response.status;
-        requestError.data = data;
-        throw requestError;
-      }
-      const { summary, details, tone } = buildProcessStatusMessage(data);
-      showStatus(configStatus, { summary, details }, tone);
-    } catch (error) {
-      console.error(error);
-      if (error?.message === "UNAUTHORIZED") {
-        showStatus(
-          configStatus,
-          "No se pudo ejecutar la prueba porque falta un token válido.",
-          "error",
-        );
-        return;
-      }
-      if (error?.data) {
-        const statusPayload = buildErrorStatusPayload(error.data, {
-          defaultSummary: "No se pudo ejecutar la prueba del updater.",
-          container: null,
-        });
-        showStatus(configStatus, statusPayload, "error");
-        return;
-      }
-      if (typeof error?.status === "number") {
-        const summary =
-          "El backend devolvió un error (código " + error.status + ") al ejecutar la prueba.";
-        showStatus(configStatus, summary, "error");
-        return;
-      }
-      showStatus(
-        configStatus,
-        "No se pudo ejecutar la prueba del updater. Revisa los logs e inténtalo de nuevo.",
-        "error",
-      );
-    } finally {
-      setTestConfigButtonLoading(false);
-    }
-  };
+  const runConfigTest = createConfigTestRunner({
+    authorizedFetch,
+    buildApiUrl,
+    buildProcessStatusMessage,
+    buildErrorStatusPayload,
+    showStatus,
+    hideStatus,
+    setTestConfigButtonLoading,
+    configStatus,
+  });
 
   const resetConfig = () => {
     if (!lastConfigSnapshot) return;
