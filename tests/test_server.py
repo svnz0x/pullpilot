@@ -2,11 +2,12 @@ import errno
 import gzip
 import os
 import stat
+import subprocess
 import sys
 import uuid
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Optional
 
 
 import pytest
@@ -222,6 +223,32 @@ def test_run_test_endpoint_reports_success(
     assert body["exit_code"] == 0
     assert "listo" in body["stdout"]
     assert body["command"] == command
+
+
+def test_run_test_endpoint_injects_config_path_into_env(
+    auth_headers: Mapping[str, str], store: ConfigStore, schedule_store: ScheduleStore
+) -> None:
+    captured_env: Optional[Mapping[str, str]] = None
+
+    def fake_runner(command, **kwargs):
+        nonlocal captured_env
+        captured_env = kwargs.get("env")
+        return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
+
+    command = ["/bin/echo", "hola"]
+    api = ConfigAPI(
+        store=store,
+        schedule_store=schedule_store,
+        updater_command=command,
+        process_runner=fake_runner,
+    )
+
+    status, body = api.handle_request("POST", "/ui/run-test", headers=auth_headers)
+
+    assert status == HTTPStatus.OK
+    assert body["status"] == "success"
+    assert captured_env is not None
+    assert captured_env.get("CONF_FILE") == str(store.config_path)
 
 
 def test_run_test_endpoint_reports_non_zero_exit(
