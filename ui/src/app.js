@@ -312,6 +312,210 @@ const initializeApp = () => {
   const main = document.querySelector("main");
   const initialLoadingBanner = document.getElementById("initial-loading-banner");
 
+  const getDocument = () => (typeof document === "undefined" ? null : document);
+
+  const disclosurePanelState = new WeakMap();
+  const infoDisclosureRegistry = new Set();
+  let hasGlobalDisclosureListener = false;
+
+  const getDisclosureState = (panel) => {
+    if (!panel) {
+      return null;
+    }
+    let state = disclosurePanelState.get(panel);
+    if (!state) {
+      state = { closeTimeoutId: null, transitionEndHandler: null };
+      disclosurePanelState.set(panel, state);
+    }
+    return state;
+  };
+
+  const closeInfoDisclosure = (toggle, panel) => {
+    if (!panel) {
+      toggle?.setAttribute?.("aria-expanded", "false");
+      return;
+    }
+    const state = getDisclosureState(panel);
+    if (!state) {
+      toggle?.setAttribute?.("aria-expanded", "false");
+      return;
+    }
+    if (panel.hidden) {
+      toggle?.setAttribute?.("aria-expanded", "false");
+      panel.classList.remove("is-visible");
+      return;
+    }
+
+    if (state.transitionEndHandler) {
+      panel.removeEventListener("transitionend", state.transitionEndHandler);
+      state.transitionEndHandler = null;
+    }
+    if (state.closeTimeoutId) {
+      clearTimeout(state.closeTimeoutId);
+      state.closeTimeoutId = null;
+    }
+
+    const finish = () => {
+      if (!panel.hidden) {
+        panel.hidden = true;
+      }
+      panel.classList.remove("is-visible");
+      if (state.transitionEndHandler) {
+        panel.removeEventListener("transitionend", state.transitionEndHandler);
+        state.transitionEndHandler = null;
+      }
+      if (state.closeTimeoutId) {
+        clearTimeout(state.closeTimeoutId);
+        state.closeTimeoutId = null;
+      }
+    };
+
+    const handler = (event) => {
+      if (event.target !== panel) {
+        return;
+      }
+      finish();
+    };
+
+    panel.classList.remove("is-visible");
+    state.transitionEndHandler = handler;
+    panel.addEventListener("transitionend", handler);
+    state.closeTimeoutId = window.setTimeout(() => {
+      finish();
+    }, 250);
+    toggle?.setAttribute?.("aria-expanded", "false");
+  };
+
+  const openInfoDisclosure = (toggle, panel) => {
+    if (!panel) {
+      toggle?.setAttribute?.("aria-expanded", "true");
+      return;
+    }
+    const state = getDisclosureState(panel);
+    if (!state) {
+      toggle?.setAttribute?.("aria-expanded", "true");
+      return;
+    }
+    if (state.transitionEndHandler) {
+      panel.removeEventListener("transitionend", state.transitionEndHandler);
+      state.transitionEndHandler = null;
+    }
+    if (state.closeTimeoutId) {
+      clearTimeout(state.closeTimeoutId);
+      state.closeTimeoutId = null;
+    }
+
+    if (panel.hidden) {
+      panel.hidden = false;
+      panel.classList.remove("is-visible");
+      requestAnimationFrame(() => {
+        panel.classList.add("is-visible");
+      });
+    } else {
+      panel.classList.add("is-visible");
+    }
+    toggle?.setAttribute?.("aria-expanded", "true");
+  };
+
+  const ensureGlobalInfoDisclosureListener = () => {
+    if (hasGlobalDisclosureListener) {
+      return;
+    }
+    const doc = getDocument();
+    if (!doc?.addEventListener) {
+      return;
+    }
+    doc.addEventListener("pointerdown", (event) => {
+      infoDisclosureRegistry.forEach((entry) => {
+        const { toggle, panel } = entry;
+        if (!toggle || !panel || !doc.contains(toggle)) {
+          infoDisclosureRegistry.delete(entry);
+          return;
+        }
+        if (toggle.getAttribute("aria-expanded") !== "true") {
+          return;
+        }
+        if (toggle.contains(event.target) || panel.contains(event.target)) {
+          return;
+        }
+        closeInfoDisclosure(toggle, panel);
+      });
+    });
+    hasGlobalDisclosureListener = true;
+  };
+
+  const toggleInfoDisclosure = (toggle, panel) => {
+    if (!toggle || !panel) {
+      return;
+    }
+    const expanded = toggle.getAttribute("aria-expanded") === "true";
+    if (expanded) {
+      closeInfoDisclosure(toggle, panel);
+    } else {
+      openInfoDisclosure(toggle, panel);
+    }
+  };
+
+  const wireInfoDisclosure = (toggle, panel) => {
+    if (!toggle || !panel || toggle.dataset.infoToggleBound === "true") {
+      return;
+    }
+    ensureGlobalInfoDisclosureListener();
+    infoDisclosureRegistry.add({ toggle, panel });
+
+    const handleKeydown = (event) => {
+      if (event.key === "Escape") {
+        closeInfoDisclosure(toggle, panel);
+        toggle.blur();
+      }
+    };
+
+    toggle.addEventListener("click", (event) => {
+      event.preventDefault();
+      toggleInfoDisclosure(toggle, panel);
+    });
+    toggle.addEventListener("keydown", handleKeydown);
+    panel.addEventListener("keydown", handleKeydown);
+
+    toggle.dataset.infoToggleBound = "true";
+  };
+
+  const initializeStaticInfoDisclosures = () => {
+    const doc = getDocument();
+    if (!doc?.querySelectorAll) {
+      return;
+    }
+    doc.querySelectorAll(".info-toggle").forEach((toggle) => {
+      if (toggle.dataset.infoToggleBound === "true") {
+        return;
+      }
+      const panelId = toggle.getAttribute("aria-controls");
+      if (!panelId) {
+        return;
+      }
+      const panel = doc.getElementById(panelId);
+      if (!panel) {
+        return;
+      }
+      wireInfoDisclosure(toggle, panel);
+    });
+  };
+
+  const unregisterInfoDisclosures = (root) => {
+    if (!root) {
+      return;
+    }
+    const doc = getDocument();
+    infoDisclosureRegistry.forEach((entry) => {
+      const { toggle } = entry;
+      if (!toggle || !doc?.contains || !doc.contains(toggle) || root.contains(toggle)) {
+        infoDisclosureRegistry.delete(entry);
+      }
+    });
+  };
+
+  initializeStaticInfoDisclosures();
+
   let lastConfigSnapshot = null;
   let lastScheduleSnapshot = null;
   let memoryToken = null;
@@ -1623,6 +1827,40 @@ const initializeApp = () => {
     return violations;
   };
 
+  const createInfoDisclosureElements = (descriptionId, labelText) => {
+    const container = document.createElement("div");
+    container.className = "field-description info-disclosure";
+
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "info-toggle";
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.setAttribute("aria-controls", descriptionId);
+
+    const icon = document.createElement("span");
+    icon.className = "info-toggle-icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = "i";
+    toggle.appendChild(icon);
+
+    const srText = document.createElement("span");
+    srText.className = "sr-only";
+    srText.textContent = `Mostrar ayuda para ${labelText}`;
+    toggle.appendChild(srText);
+
+    const panel = document.createElement("div");
+    panel.className = "info-panel";
+    panel.id = descriptionId;
+    panel.setAttribute("role", "tooltip");
+    panel.hidden = true;
+
+    container.appendChild(toggle);
+    container.appendChild(panel);
+    wireInfoDisclosure(toggle, panel);
+
+    return { container, panel };
+  };
+
   const createField = (variable, values) => {
     const wrapper = document.createElement("div");
     wrapper.className = "config-field";
@@ -1730,9 +1968,8 @@ const initializeApp = () => {
 
     wrapper.appendChild(inputContainer);
 
-    const description = document.createElement("p");
-    description.className = "field-description";
-    description.id = descriptionId;
+    const { container: descriptionContainer, panel: descriptionPanel } =
+      createInfoDisclosureElements(descriptionId, label.textContent || variable.name);
     if (isBaseDirField || isLogDirField) {
       const helpLines = [];
       if (variable.description) {
@@ -1754,36 +1991,36 @@ const initializeApp = () => {
         );
       }
       if (helpLines.length) {
-        description.textContent = helpLines[0];
-        helpLines.slice(1).forEach((line) => {
-          description.appendChild(document.createElement("br"));
-          const span = document.createElement("span");
-          span.textContent = line;
-          description.appendChild(span);
+        helpLines.forEach((line) => {
+          const paragraph = document.createElement("p");
+          paragraph.textContent = line;
+          descriptionPanel.appendChild(paragraph);
         });
       }
     } else {
-      description.textContent = variable.description || "Sin descripción";
+      const paragraph = document.createElement("p");
+      paragraph.textContent = variable.description || "Sin descripción";
+      descriptionPanel.appendChild(paragraph);
       if (variable.name === "EXCLUDE_PROJECTS") {
-        description.textContent =
+        const guidance = document.createElement("p");
+        guidance.textContent =
           "Introduce rutas absolutas que no deban procesarse (se ignorarán subdirectorios).";
-        description.appendChild(document.createElement("br"));
-        const hint = document.createElement("span");
+        descriptionPanel.appendChild(guidance);
+        const hint = document.createElement("p");
         hint.textContent =
           "Ejemplo: /srv/app para omitir tanto /srv/app como cualquier carpeta dentro.";
-        description.appendChild(hint);
+        descriptionPanel.appendChild(hint);
       }
     }
 
     if (variable.default !== undefined && variable.default !== null && String(variable.default).length) {
-      const defaultTag = document.createElement("span");
+      const defaultTag = document.createElement("p");
       defaultTag.className = "field-default";
       defaultTag.textContent = `Valor por defecto: ${variable.default}`;
-      description.appendChild(document.createElement("br"));
-      description.appendChild(defaultTag);
+      descriptionPanel.appendChild(defaultTag);
     }
 
-    wrapper.appendChild(description);
+    wrapper.appendChild(descriptionContainer);
     return wrapper;
   };
 
@@ -1791,6 +2028,7 @@ const initializeApp = () => {
     const schema = data?.schema;
     const values = data?.values;
 
+    unregisterInfoDisclosures(fieldsContainer);
     fieldsContainer.innerHTML = "";
 
     const sectionOrder = [];
