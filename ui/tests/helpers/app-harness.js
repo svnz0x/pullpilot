@@ -4,33 +4,52 @@ export const createAppTestHarness = () => {
   const elementsById = new Map();
 
   class FakeClassList {
-    constructor() {
+    constructor(owner) {
+      this.owner = owner;
       this.classes = new Set();
     }
+    _updateOwner() {
+      if (this.owner) {
+        this.owner._className = Array.from(this.classes).join(" ");
+      }
+    }
     add(...names) {
-      names.forEach((name) => this.classes.add(name));
+      names.filter(Boolean).forEach((name) => this.classes.add(name));
+      this._updateOwner();
     }
     remove(...names) {
-      names.forEach((name) => this.classes.delete(name));
+      names.filter(Boolean).forEach((name) => this.classes.delete(name));
+      this._updateOwner();
     }
     toggle(name, force) {
+      if (!name) {
+        return this.classes.size > 0;
+      }
       if (force === true) {
         this.classes.add(name);
+        this._updateOwner();
         return true;
       }
       if (force === false) {
         this.classes.delete(name);
+        this._updateOwner();
         return false;
       }
       if (this.classes.has(name)) {
         this.classes.delete(name);
+        this._updateOwner();
         return false;
       }
       this.classes.add(name);
+      this._updateOwner();
       return true;
     }
     contains(name) {
       return this.classes.has(name);
+    }
+    setFrom(names) {
+      this.classes = new Set(names.filter(Boolean));
+      this._updateOwner();
     }
   }
 
@@ -55,16 +74,30 @@ export const createAppTestHarness = () => {
       this.tagName = tagName.toUpperCase();
       this.dataset = {};
       this.children = [];
-      this.classList = new FakeClassList();
+      this.classList = new FakeClassList(this);
+      this._className = "";
       this.attributes = new Map();
       this.listeners = new Map();
       this.disabled = false;
       this.hidden = false;
-      this.textContent = "";
+      this._textContent = "";
       this.value = "";
       this.checked = false;
       this.innerHTML = "";
       this.parentElement = null;
+    }
+    get className() {
+      return this._className;
+    }
+    set className(value) {
+      const names =
+        typeof value === "string"
+          ? value
+              .split(/\s+/)
+              .map((name) => name.trim())
+              .filter(Boolean)
+          : [];
+      this.classList.setFrom(names);
     }
     appendChild(child) {
       child.parentElement = this;
@@ -78,6 +111,24 @@ export const createAppTestHarness = () => {
         child.parentElement = null;
       }
       return child;
+    }
+    get textContent() {
+      if (!this.children.length) {
+        return this._textContent ?? "";
+      }
+      const childText = this.children
+        .map((child) => child.textContent ?? "")
+        .join("");
+      return `${this._textContent ?? ""}${childText}`;
+    }
+    set textContent(value) {
+      this._textContent = value == null ? "" : String(value);
+      if (this.children.length) {
+        this.children.forEach((child) => {
+          child.parentElement = null;
+        });
+        this.children = [];
+      }
     }
     addEventListener(type, handler) {
       if (!this.listeners.has(type)) {
@@ -93,11 +144,83 @@ export const createAppTestHarness = () => {
       }
       return !event.defaultPrevented;
     }
-    querySelector() {
-      return null;
+    matchesSelector(selector) {
+      if (!selector) {
+        return false;
+      }
+      const tagMatch = selector.match(/^[a-zA-Z][a-zA-Z0-9-]*/);
+      if (tagMatch && this.tagName !== tagMatch[0].toUpperCase()) {
+        return false;
+      }
+      const idMatch = selector.match(/#([a-zA-Z0-9_-]+)/);
+      if (idMatch && this.id !== idMatch[1]) {
+        return false;
+      }
+      const classMatches = selector.match(/\.([a-zA-Z0-9_-]+)/g) || [];
+      const hasClass = (name) => {
+        if (!name) return false;
+        if (this.classList.contains(name)) return true;
+        if (typeof this._className === "string" && this._className.length) {
+          return this._className.split(/\s+/).includes(name);
+        }
+        return false;
+      };
+      for (const classToken of classMatches) {
+        const className = classToken.slice(1);
+        if (!hasClass(className)) {
+          return false;
+        }
+      }
+      const attributeRegex = /\[data-([a-zA-Z0-9_-]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\]]+)))?\]/g;
+      let attributeMatch;
+      while ((attributeMatch = attributeRegex.exec(selector))) {
+        const rawName = attributeMatch[1];
+        const camelName = rawName.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+        const expected = attributeMatch[2] ?? attributeMatch[3] ?? attributeMatch[4] ?? null;
+        const actual = this.dataset?.[camelName] ?? null;
+        if (expected === null) {
+          if (actual == null) {
+            return false;
+          }
+        } else if (actual !== expected) {
+          return false;
+        }
+      }
+      return true;
     }
-    querySelectorAll() {
-      return [];
+    querySelector(selector) {
+      const all = this.querySelectorAll(selector);
+      return all.length ? all[0] : null;
+    }
+    querySelectorAll(selector) {
+      if (!selector) {
+        return [];
+      }
+      const selectors = selector
+        .split(",")
+        .map((segment) => segment.trim())
+        .filter(Boolean);
+      if (!selectors.length) {
+        return [];
+      }
+      const results = [];
+      const seen = new Set();
+      const visit = (element) => {
+        element.children.forEach((child) => {
+          for (const simpleSelector of selectors) {
+            if (child.matchesSelector(simpleSelector)) {
+              if (!seen.has(child)) {
+                seen.add(child);
+                results.push(child);
+              }
+              break;
+            }
+          }
+          visit(child);
+        });
+      };
+      visit(this);
+      return results;
     }
     focus() {}
     setAttribute(name, value) {
@@ -105,6 +228,12 @@ export const createAppTestHarness = () => {
     }
     removeAttribute(name) {
       this.attributes.delete(name);
+    }
+    getAttribute(name) {
+      return this.attributes.has(name) ? this.attributes.get(name) : null;
+    }
+    hasAttribute(name) {
+      return this.attributes.has(name);
     }
     reset() {}
   }

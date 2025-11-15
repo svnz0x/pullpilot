@@ -1246,6 +1246,194 @@ const initializeApp = () => {
     return Boolean(value);
   };
 
+  const applyRequiredAttributes = (control, isRequired) => {
+    if (!control) return;
+    if ("required" in control) {
+      control.required = Boolean(isRequired);
+    }
+    if (isRequired) {
+      control.setAttribute?.("required", "");
+      control.setAttribute?.("aria-required", "true");
+    } else {
+      control.removeAttribute?.("required");
+      control.removeAttribute?.("aria-required");
+    }
+  };
+
+  const applyConstraintAttributes = (control, variable) => {
+    if (!control || !variable) return;
+
+    const constraints =
+      variable.constraints && typeof variable.constraints === "object"
+        ? variable.constraints
+        : {};
+
+    const allowEmpty = constraints.allow_empty === true;
+    const tagName = String(control.tagName || "").toUpperCase();
+    const isSelect = tagName === "SELECT";
+    const isBooleanField = variable.type === "boolean";
+
+    if (!isBooleanField) {
+      applyRequiredAttributes(control, !allowEmpty);
+    }
+
+    if (!isSelect) {
+      if (typeof constraints.pattern === "string" && constraints.pattern) {
+        control.pattern = constraints.pattern;
+        control.setAttribute?.("pattern", constraints.pattern);
+      }
+      if (typeof constraints.min_length === "number") {
+        control.minLength = constraints.min_length;
+        control.setAttribute?.("minlength", String(constraints.min_length));
+      }
+      if (typeof constraints.max_length === "number") {
+        control.maxLength = constraints.max_length;
+        control.setAttribute?.("maxlength", String(constraints.max_length));
+      }
+    }
+
+    if (variable.type === "integer" || control.type === "number") {
+      if (typeof constraints.min === "number") {
+        control.min = String(constraints.min);
+        control.setAttribute?.("min", String(constraints.min));
+      }
+      if (typeof constraints.max === "number") {
+        control.max = String(constraints.max);
+        control.setAttribute?.("max", String(constraints.max));
+      }
+    }
+  };
+
+  const appendEmptyOptionIfNeeded = (select, variable, defaultValue) => {
+    if (!select || !variable) return;
+    const constraints =
+      variable.constraints && typeof variable.constraints === "object"
+        ? variable.constraints
+        : {};
+    if (constraints.allow_empty !== true) {
+      return;
+    }
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "— Selecciona una opción —";
+    option.dataset.placeholder = "true";
+    if (defaultValue == null || defaultValue === "") {
+      option.selected = true;
+    }
+    select.appendChild(option);
+  };
+
+  const collectConstraintViolations = () => {
+    if (!fieldsContainer) return [];
+    const schemaVariables = lastConfigSnapshot?.schema?.variables;
+    if (!Array.isArray(schemaVariables)) {
+      return [];
+    }
+    const violations = [];
+    schemaVariables.forEach((variable) => {
+      if (!variable?.name) {
+        return;
+      }
+      const fieldSelector = `.config-field[data-name="${escapeSelector(variable.name)}"]`;
+      const field = fieldsContainer.querySelector(fieldSelector);
+      if (!field) {
+        return;
+      }
+      const control = field.querySelector?.(".value-input") ?? null;
+      if (!control || variable.type === "boolean") {
+        return;
+      }
+      const constraints =
+        variable.constraints && typeof variable.constraints === "object"
+          ? variable.constraints
+          : {};
+      const allowEmpty = constraints.allow_empty === true;
+      const rawValue = control.value ?? "";
+      const stringValue =
+        typeof rawValue === "string"
+          ? rawValue
+          : rawValue == null
+          ? ""
+          : String(rawValue);
+      const trimmedValue = stringValue.trim();
+      const valueForChecks =
+        variable.name === "BASE_DIR" || variable.name === "LOG_DIR"
+          ? trimmedValue
+          : stringValue;
+
+      if (variable.type === "integer") {
+        if (!trimmedValue) {
+          if (!allowEmpty) {
+            violations.push({ field: variable.name, message: "Indica un valor." });
+          }
+          return;
+        }
+        if (!/^[-+]?\d+$/.test(trimmedValue)) {
+          violations.push({ field: variable.name, message: "Debe ser un número entero." });
+          return;
+        }
+        const numericValue = Number(trimmedValue);
+        if (Number.isNaN(numericValue)) {
+          violations.push({ field: variable.name, message: "Debe ser un número entero." });
+          return;
+        }
+        if (typeof constraints.min === "number" && numericValue < constraints.min) {
+          violations.push({
+            field: variable.name,
+            message: `Debe ser como mínimo ${constraints.min}.`,
+          });
+          return;
+        }
+        if (typeof constraints.max === "number" && numericValue > constraints.max) {
+          violations.push({
+            field: variable.name,
+            message: `No puede ser mayor que ${constraints.max}.`,
+          });
+          return;
+        }
+        return;
+      }
+
+      if (!trimmedValue) {
+        if (!allowEmpty) {
+          violations.push({ field: variable.name, message: "Indica un valor." });
+        }
+        return;
+      }
+
+      if (typeof constraints.min_length === "number" && valueForChecks.length < constraints.min_length) {
+        violations.push({
+          field: variable.name,
+          message: `Debe tener al menos ${constraints.min_length} caracteres.`,
+        });
+        return;
+      }
+
+      if (typeof constraints.max_length === "number" && valueForChecks.length > constraints.max_length) {
+        violations.push({
+          field: variable.name,
+          message: `No puede superar ${constraints.max_length} caracteres.`,
+        });
+        return;
+      }
+
+      if (typeof constraints.pattern === "string" && constraints.pattern && valueForChecks) {
+        try {
+          const regex = new RegExp(constraints.pattern);
+          if (!regex.test(valueForChecks)) {
+            violations.push({
+              field: variable.name,
+              message: "El valor no cumple el formato esperado.",
+            });
+          }
+        } catch (error) {
+          // Ignorar patrones inválidos en el cliente.
+        }
+      }
+    });
+    return violations;
+  };
+
   const createField = (variable, values) => {
     const wrapper = document.createElement("div");
     wrapper.className = "config-field";
@@ -1289,9 +1477,6 @@ const initializeApp = () => {
         : "Introduce una ruta absoluta existente";
       control.placeholder = placeholder;
       control.spellcheck = false;
-      if (variable.constraints?.pattern) {
-        control.pattern = variable.constraints.pattern;
-      }
       control.value = defaultValue ?? "";
     } else if (variable.type === "boolean") {
       control = document.createElement("input");
@@ -1309,6 +1494,7 @@ const initializeApp = () => {
       control.className = "value-input";
       control.dataset.type = variable.type;
       const allowed = variable.constraints.allowed_values;
+      appendEmptyOptionIfNeeded(control, variable, defaultValue);
       allowed.forEach((option) => {
         const opt = document.createElement("option");
         opt.value = option;
@@ -1346,6 +1532,7 @@ const initializeApp = () => {
     }
 
     if (control) {
+      applyConstraintAttributes(control, variable);
       control.setAttribute("aria-describedby", `field-${variable.name}-description`);
     }
     inputContainer.appendChild(control);
@@ -1494,6 +1681,19 @@ const initializeApp = () => {
     event.preventDefault();
     hideStatus(configStatus);
     clearFieldErrors();
+    const constraintViolations = collectConstraintViolations();
+    if (constraintViolations.length) {
+      const detailMessages = applyFieldErrorHighlights(constraintViolations);
+      showStatus(
+        configStatus,
+        {
+          summary: "Revisa los campos marcados antes de guardar.",
+          details: detailMessages,
+        },
+        "error",
+      );
+      return;
+    }
     const payload = readFormValues();
     const missingPathErrors = collectMissingPathErrors(payload.values);
     if (missingPathErrors.length) {
