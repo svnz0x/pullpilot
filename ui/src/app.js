@@ -7,6 +7,73 @@ import {
 } from "./auth-errors.js";
 import { buildUnauthorizedTokenMessage } from "./unauthorized-message.js";
 
+const SECTION_MAP = Object.freeze({
+  BASE_DIR: { section: "Rutas y registros", subsection: "Directorios requeridos" },
+  LOG_DIR: { section: "Rutas y registros", subsection: "Directorios requeridos" },
+  LOCK_FILE: { section: "Rutas y registros", subsection: "Directorios requeridos" },
+  LOG_RETENTION_DAYS: { section: "Rutas y registros", subsection: "Retención de logs" },
+  EMAIL_TO: { section: "Notificaciones", subsection: "Correo electrónico" },
+  EMAIL_FROM: { section: "Notificaciones", subsection: "Correo electrónico" },
+  SUBJECT_PREFIX: { section: "Notificaciones", subsection: "Correo electrónico" },
+  ATTACH_LOGS_ON: { section: "Notificaciones", subsection: "Correo electrónico" },
+  SMTP_CMD: { section: "Notificaciones", subsection: "Cliente SMTP" },
+  SMTP_ACCOUNT: { section: "Notificaciones", subsection: "Cliente SMTP" },
+  SMTP_READ_ENVELOPE: { section: "Notificaciones", subsection: "Cliente SMTP" },
+  DOCKER_TIMEOUT: { section: "Ejecución de Docker", subsection: "Tiempo de espera y concurrencia" },
+  PARALLEL_PULL: { section: "Ejecución de Docker", subsection: "Tiempo de espera y concurrencia" },
+  QUIET_PULL: { section: "Ejecución de Docker", subsection: "Comportamiento de pulls" },
+  PULL_POLICY: { section: "Ejecución de Docker", subsection: "Comportamiento de pulls" },
+  DRY_RUN: { section: "Ejecución de Docker", subsection: "Depuración" },
+  EXCLUDE_PATTERNS: { section: "Filtrado de proyectos", subsection: "Patrones y exclusiones" },
+  EXCLUDE_PROJECTS: { section: "Filtrado de proyectos", subsection: "Patrones y exclusiones" },
+  PRUNE_ENABLED: { section: "Limpieza", subsection: "Prune de Docker" },
+  PRUNE_VOLUMES: { section: "Limpieza", subsection: "Prune de Docker" },
+  PRUNE_FILTER_UNTIL: { section: "Limpieza", subsection: "Prune de Docker" },
+  MIN_COMPOSE_WAIT_VERSION: { section: "Compatibilidad", subsection: "Docker Compose" },
+  COMPOSE_BIN: { section: "Compatibilidad", subsection: "Docker Compose" },
+});
+
+const pickFirstString = (...candidates) => {
+  for (const candidate of candidates) {
+    if (typeof candidate === "string") {
+      const trimmed = candidate.trim();
+      if (trimmed.length > 0) {
+        return trimmed;
+      }
+    }
+  }
+  return null;
+};
+
+const resolveVariableGrouping = (variable) => {
+  if (!variable || typeof variable !== "object") {
+    return { section: "General", subsection: null };
+  }
+
+  const metadata =
+    variable.metadata && typeof variable.metadata === "object" ? variable.metadata : {};
+  const overrides = SECTION_MAP[variable.name] ?? null;
+
+  const section =
+    pickFirstString(
+      overrides?.section,
+      variable.section,
+      metadata.section,
+      metadata.group,
+      metadata.category,
+    ) ?? "General";
+
+  const subsection = pickFirstString(
+    overrides?.subsection,
+    variable.subsection,
+    metadata.subsection,
+    metadata.groupLabel,
+    metadata.subcategory,
+  );
+
+  return { section, subsection };
+};
+
 export const formatLogMetadata = ({ logDir, modified, size }) => {
   const segments = [];
   if (logDir) {
@@ -1721,12 +1788,99 @@ const initializeApp = () => {
   };
 
   const populateConfig = (data) => {
-    const { schema, values } = data;
+    const schema = data?.schema;
+    const values = data?.values;
+
     fieldsContainer.innerHTML = "";
+
+    const sectionOrder = [];
+    const sectionDescriptors = new Map();
+
+    const ensureSectionDescriptor = (sectionName) => {
+      const key = sectionName && sectionName.trim().length ? sectionName : "General";
+      let descriptor = sectionDescriptors.get(key);
+      if (!descriptor) {
+        const sectionElement = document.createElement("section");
+        sectionElement.className = "config-section";
+        sectionElement.dataset.section = key;
+
+        const heading = document.createElement("h3");
+        heading.className = "config-section-title";
+        heading.textContent = key;
+
+        const body = document.createElement("div");
+        body.className = "config-section-body";
+
+        sectionElement.appendChild(heading);
+        sectionElement.appendChild(body);
+
+        descriptor = {
+          element: sectionElement,
+          body,
+          defaultGrid: null,
+          subsections: new Map(),
+        };
+        sectionDescriptors.set(key, descriptor);
+        sectionOrder.push(key);
+      }
+      return descriptor;
+    };
+
+    const ensureDefaultGrid = (descriptor) => {
+      if (!descriptor.defaultGrid) {
+        const grid = document.createElement("div");
+        grid.className = "config-section-grid";
+        descriptor.body.appendChild(grid);
+        descriptor.defaultGrid = grid;
+      }
+      return descriptor.defaultGrid;
+    };
+
+    const ensureSubsectionDescriptor = (descriptor, subsectionName) => {
+      const key = subsectionName && subsectionName.trim().length ? subsectionName : null;
+      if (!key) {
+        return ensureDefaultGrid(descriptor);
+      }
+
+      let subsection = descriptor.subsections.get(key);
+      if (!subsection) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "config-subsection";
+        wrapper.dataset.subsection = key;
+
+        const heading = document.createElement("h4");
+        heading.className = "config-subsection-title";
+        heading.textContent = key;
+
+        const grid = document.createElement("div");
+        grid.className = "config-subsection-grid";
+
+        wrapper.appendChild(heading);
+        wrapper.appendChild(grid);
+        descriptor.body.appendChild(wrapper);
+
+        subsection = { wrapper, grid };
+        descriptor.subsections.set(key, subsection);
+      }
+      return subsection.grid;
+    };
+
     schema?.variables?.forEach((variable) => {
       const field = createField(variable, values);
-      fieldsContainer.appendChild(field);
+      const { section, subsection } = resolveVariableGrouping(variable);
+      const descriptor = ensureSectionDescriptor(section);
+      const targetContainer = ensureSubsectionDescriptor(descriptor, subsection);
+      targetContainer.appendChild(field);
     });
+
+    sectionOrder.forEach((sectionName) => {
+      const descriptor = sectionDescriptors.get(sectionName);
+      if (!descriptor) {
+        return;
+      }
+      fieldsContainer.appendChild(descriptor.element);
+    });
+
     lastConfigSnapshot = data;
     updateConfigRecoveryControls();
   };

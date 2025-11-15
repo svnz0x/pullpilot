@@ -245,7 +245,8 @@ form[data-initial-loading="true"] .form-actions button:hover {
   cursor: not-allowed;
 }
 
-section {
+body > section,
+main > section {
   background: var(--surface-strong);
   border-radius: 1.25rem;
   border: 1px solid var(--surface-border);
@@ -254,7 +255,8 @@ section {
   backdrop-filter: blur(16px);
 }
 
-section h2 {
+body > section h2,
+main > section h2 {
   margin: 0 0 0.75rem;
   font-size: clamp(1.4rem, 2.4vw, 1.65rem);
   letter-spacing: -0.015em;
@@ -262,7 +264,49 @@ section h2 {
 
 .config-grid {
   display: grid;
-  gap: 1rem;
+  gap: clamp(1.25rem, 2.4vw, 1.65rem);
+}
+
+.config-section {
+  background: rgba(255, 255, 255, 0.28);
+  border-radius: 1.15rem;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  padding: clamp(1.25rem, 2.6vw, 1.85rem);
+  box-shadow: 0 6px 22px var(--surface-shadow);
+  backdrop-filter: blur(14px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1rem, 2.2vw, 1.35rem);
+}
+
+.config-section-title {
+  margin: 0;
+  font-size: clamp(1.1rem, 2vw, 1.3rem);
+  letter-spacing: -0.01em;
+}
+
+.config-section-body {
+  display: grid;
+  gap: clamp(0.85rem, 1.8vw, 1.2rem);
+}
+
+.config-section-grid,
+.config-subsection-grid {
+  display: grid;
+  gap: clamp(0.85rem, 1.65vw, 1.1rem);
+}
+
+.config-subsection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.config-subsection-title {
+  margin: 0;
+  font-size: clamp(1rem, 1.8vw, 1.15rem);
+  color: var(--text-secondary);
+  font-weight: 600;
 }
 
 .config-field {
@@ -517,8 +561,18 @@ button:focus-visible {
     gap: 1.25rem;
   }
 
-  section {
+  body > section,
+  main > section {
     padding: 1.25rem;
+  }
+
+  .config-section {
+    padding: 1rem 1.1rem;
+    gap: 1rem;
+  }
+
+  .config-section-body {
+    gap: 1rem;
   }
 
   .config-field input[type="text"],
