@@ -103,6 +103,104 @@ export const resolveLogContentText = (selected) => {
   return "Archivo sin contenido o no legible.";
 };
 
+export const createAuthorizedFetch = ({
+  auth,
+  buildApiUrl,
+  handleUnauthorized,
+  createUnauthorizedError,
+}) => {
+  if (!auth || typeof auth.getToken !== "function") {
+    throw new TypeError("createAuthorizedFetch requires an auth object with getToken");
+  }
+  if (typeof buildApiUrl !== "function") {
+    throw new TypeError("createAuthorizedFetch requires a buildApiUrl function");
+  }
+  if (typeof handleUnauthorized !== "function") {
+    throw new TypeError("createAuthorizedFetch requires a handleUnauthorized function");
+  }
+  if (typeof createUnauthorizedError !== "function") {
+    throw new TypeError("createAuthorizedFetch requires a createUnauthorizedError function");
+  }
+
+  const resolveUrlString = (value) => (value instanceof URL ? value.toString() : value);
+
+  return async (input, options = {}) => {
+    const token = auth.getToken();
+    if (!token) {
+      throw createUnauthorizedError();
+    }
+
+    const baseHeaders = new Headers(options.headers || {});
+    if (!baseHeaders.has("Authorization")) {
+      baseHeaders.set("Authorization", `Bearer ${token}`);
+    }
+
+    let requestInput = input;
+    let requestInit = { ...options, headers: baseHeaders };
+
+    if (requestInput instanceof Request) {
+      const originalRequest = requestInput;
+      const mergedHeaders = new Headers(originalRequest.headers);
+      baseHeaders.forEach((value, key) => mergedHeaders.set(key, value));
+
+      const clonedRequest = new Request(originalRequest, {
+        method: originalRequest.method,
+        headers: mergedHeaders,
+        mode: originalRequest.mode,
+        credentials: originalRequest.credentials,
+        signal: options.signal ?? originalRequest.signal ?? null,
+      });
+
+      const apiUrl = resolveUrlString(buildApiUrl(originalRequest.url));
+      const method = clonedRequest.method || originalRequest.method || "GET";
+      const shouldIncludeBody = !/^(GET|HEAD)$/i.test(method);
+
+      const nextRequestInit = {
+        method,
+        headers: mergedHeaders,
+        mode: clonedRequest.mode,
+        credentials: clonedRequest.credentials,
+        signal: clonedRequest.signal,
+      };
+
+      if (shouldIncludeBody) {
+        nextRequestInit.body = clonedRequest.body;
+        if (typeof window === "undefined") {
+          nextRequestInit.duplex = "half";
+        }
+      }
+
+      requestInput = new Request(apiUrl, nextRequestInit);
+      requestInit = undefined;
+    } else if (requestInput instanceof URL || typeof requestInput === "string") {
+      requestInput = resolveUrlString(buildApiUrl(requestInput));
+    }
+
+    let response;
+    try {
+      response = await fetch(requestInput, requestInit);
+    } catch (error) {
+      throw error;
+    }
+
+    if (response.status === 401) {
+      const unauthorizedError = createUnauthorizedError();
+      try {
+        unauthorizedError.payload = await response.clone().json();
+      } catch (error) {
+        // Ignorar si la respuesta no contiene JSON.
+      }
+      handleUnauthorized(
+        unauthorizedError,
+        "El token ha caducado o es incorrecto. Introduce uno nuevo.",
+      );
+      throw unauthorizedError;
+    }
+
+    return response;
+  };
+};
+
 export const createLogsRequestManager = () => {
   let currentId = 0;
   let activeController = null;
@@ -966,47 +1064,12 @@ const initializeApp = () => {
     showLoginPrompt("error", finalMessage);
   };
 
-  const authorizedFetch = async (input, options = {}) => {
-    const token = auth.getToken();
-    if (!token) {
-      throw createUnauthorizedError();
-    }
-
-    const headers = new Headers(options.headers || {});
-    if (!headers.has("Authorization")) {
-      headers.set("Authorization", `Bearer ${token}`);
-    }
-
-    let requestInput = input;
-    if (requestInput instanceof Request) {
-      requestInput = new Request(buildApiUrl(requestInput.url), requestInput);
-    } else if (requestInput instanceof URL || typeof requestInput === "string") {
-      requestInput = buildApiUrl(requestInput);
-    }
-
-    let response;
-    try {
-      response = await fetch(requestInput, { ...options, headers });
-    } catch (error) {
-      throw error;
-    }
-
-    if (response.status === 401) {
-      const unauthorizedError = createUnauthorizedError();
-      try {
-        unauthorizedError.payload = await response.clone().json();
-      } catch (error) {
-        // Ignorar si la respuesta no contiene JSON.
-      }
-      handleUnauthorized(
-        unauthorizedError,
-        "El token ha caducado o es incorrecto. Introduce uno nuevo.",
-      );
-      throw unauthorizedError;
-    }
-
-    return response;
-  };
+  const authorizedFetch = createAuthorizedFetch({
+    auth,
+    buildApiUrl,
+    handleUnauthorized,
+    createUnauthorizedError,
+  });
 
   const scheduleApi = createScheduleApi({ authorizedFetch, buildApiUrl });
 
