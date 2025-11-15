@@ -621,6 +621,9 @@ class ConfigAPI:
                 },
             )
 
+        env = dict(os.environ)
+        env.setdefault("CONF_FILE", str(self.store.config_path))
+
         runner = self._process_runner
         try:
             completed = runner(  # type: ignore[call-arg]
@@ -628,6 +631,7 @@ class ConfigAPI:
                 check=False,
                 capture_output=True,
                 text=True,
+                env=env,
             )
         except FileNotFoundError as exc:
             detail: Dict[str, Any] = {
