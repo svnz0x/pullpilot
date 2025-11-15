@@ -1781,8 +1781,8 @@ const initializeApp = () => {
       return;
     }
     showLoginMessage("Verificando token…", "info");
+    const shouldPersist = rememberCheckbox?.checked ?? false;
     try {
-      const shouldPersist = rememberCheckbox?.checked ?? false;
       const verification = await verifyToken(value, { persist: shouldPersist });
       await handleSuccessfulLogin({ storageStatus: verification?.storageStatus });
     } catch (error) {
@@ -1792,11 +1792,22 @@ const initializeApp = () => {
           error,
           "El token proporcionado no está autorizado. Vuelve a intentarlo.",
         );
-        const finalMessage =
-          reason === "missing-credentials"
-            ? buildMissingCredentialsMessage(message)
-            : message;
-        showLoginMessage(finalMessage, "error");
+        if (reason === "missing-credentials") {
+          const storageStatus = auth.setToken(value, { persist: shouldPersist });
+          const storageOutcome = processStorageStatus(storageStatus, { silent: true });
+          const baseMessage = buildMissingCredentialsMessage(message);
+          const storageMessage = storageOutcome.handled
+            ? (storageOutcome.message || "").trim()
+            : "";
+          const combinedMessage = [baseMessage, storageMessage]
+            .filter(Boolean)
+            .join(" ")
+            .trim();
+          const tone = storageOutcome.handled ? storageOutcome.tone ?? "error" : "error";
+          showLoginMessage(combinedMessage, tone);
+          return;
+        }
+        showLoginMessage(message, "error");
       } else if (error?.message === "NETWORK_ERROR") {
         showLoginMessage(
           "No se pudo verificar el token. Revisa la conexión e inténtalo de nuevo.",
