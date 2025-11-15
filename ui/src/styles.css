@@ -38,6 +38,18 @@ body::before {
   z-index: 0;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 header {
   padding: clamp(2.5rem, 6vw, 3.5rem) 1.5rem clamp(2rem, 4vw, 2.5rem);
   text-align: center;
@@ -373,13 +385,109 @@ main > section h2 {
   color: var(--text-secondary);
   line-height: 1.45;
   font-size: 0.95rem;
+  display: inline-flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.config-field .info-toggle {
+  appearance: none;
+  border: none;
+  background: rgba(124, 140, 255, 0.2);
+  color: var(--accent-strong);
+  border-radius: 999px;
+  width: 2.35rem;
+  height: 2.35rem;
+  min-width: 2.35rem;
+  min-height: 2.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 0.35rem 1.25rem rgba(21, 32, 52, 0.18);
+  transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease,
+    box-shadow 0.25s ease;
+  touch-action: manipulation;
+}
+
+.config-field .info-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-ring), 0 0.35rem 1.25rem rgba(21, 32, 52, 0.18);
+  background: rgba(124, 140, 255, 0.35);
+}
+
+.config-field .info-toggle[aria-expanded="true"] {
+  background: var(--accent-strong);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.config-field .info-toggle-icon {
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.config-field .info-panel {
+  flex: 1 1 auto;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 0.9rem;
+  border: 1px solid rgba(124, 132, 150, 0.35);
+  padding: 0.85rem 1rem;
+  box-shadow: 0 1.25rem 2.5rem rgba(15, 18, 24, 0.16);
+  max-width: 42rem;
+  color: var(--text-secondary);
+  opacity: 0;
+  transform: translateY(-0.3rem);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: none;
+}
+
+.config-field .info-panel.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.config-field .info-panel[hidden] {
+  display: none;
+}
+
+.config-field .info-panel p {
+  margin: 0 0 0.5rem;
+}
+
+.config-field .info-panel p:last-child {
+  margin-bottom: 0;
 }
 
 .config-field .field-default {
-  display: inline-block;
-  margin-top: 0.35rem;
+  margin: 0;
   font-size: 0.85rem;
-  color: rgba(95, 100, 115, 0.75);
+  color: rgba(95, 100, 115, 0.85);
+}
+
+.config-field .info-panel code {
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.9em;
+  background: rgba(124, 140, 255, 0.12);
+  padding: 0.05rem 0.35rem;
+  border-radius: 0.35rem;
+}
+
+@media (hover: hover) {
+  .config-field .info-toggle:hover {
+    background: rgba(124, 140, 255, 0.3);
+    transform: translateY(-1px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .config-field .info-toggle,
+  .config-field .info-panel {
+    transition: none;
+  }
 }
 
 .form-actions {
