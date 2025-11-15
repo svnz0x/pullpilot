@@ -851,6 +851,23 @@ const initializeApp = () => {
     refreshLogs.removeAttribute?.("aria-disabled");
   };
 
+  const setLogDisplayBusyState = (isBusy) => {
+    if (logSelect) {
+      if (isBusy) {
+        logSelect.setAttribute("aria-busy", "true");
+      } else {
+        logSelect.removeAttribute("aria-busy");
+      }
+    }
+    if (logContent) {
+      if (isBusy) {
+        logContent.setAttribute("aria-busy", "true");
+      } else {
+        logContent.removeAttribute("aria-busy");
+      }
+    }
+  };
+
   const storedTokenStatus = tokenStorage.readToken();
   storedToken = storedTokenStatus?.token ?? null;
   const initialStorageOutcome = processStorageStatus(storedTokenStatus, {
@@ -2420,6 +2437,7 @@ const initializeApp = () => {
 
     if (showLoadingStatus) {
       showStatus(logsStatus, "Cargando lista de logs…");
+      setLogDisplayBusyState(true);
       if (logSelect) {
         logSelect.disabled = true;
       }
@@ -2486,6 +2504,7 @@ const initializeApp = () => {
     } finally {
       if (logsRequestManager.isLatest(id)) {
         setLogsLoadingState(false);
+        setLogDisplayBusyState(false);
       }
       release?.();
     }
@@ -2718,7 +2737,7 @@ const initializeApp = () => {
       return;
     }
     const selected = logSelect.disabled ? null : logSelect.value;
-    fetchLogs(selected || null);
+    fetchLogs(selected || null, { showLoadingStatus: true });
   });
 
   if (storedToken) {

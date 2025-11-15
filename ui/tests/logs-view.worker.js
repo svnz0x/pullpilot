@@ -87,6 +87,11 @@ enqueueResponses([
 
 refreshLogs.dispatchEvent(new FakeEvent("click", { bubbles: true }));
 
+const contentDuringRefresh = logContent.textContent;
+const selectDisabledDuringRefresh = logSelect.disabled;
+const selectBusyDuringRefresh = logSelect.getAttribute("aria-busy");
+const contentBusyDuringRefresh = logContent.getAttribute("aria-busy");
+
 await flush();
 await flush();
 
@@ -95,6 +100,8 @@ const selectionAfter = logSelect.value;
 const contentAfter = logContent.textContent;
 const metaAfter = logMeta.textContent;
 const logsStatusText = logsStatus.textContent;
+const selectBusyAfter = logSelect.getAttribute("aria-busy");
+const contentBusyAfter = logContent.getAttribute("aria-busy");
 
 parentPort.postMessage({
   optionsBefore,
@@ -107,5 +114,11 @@ parentPort.postMessage({
   metaAfter,
   logsStatusText,
   refreshDisabled: refreshLogs.disabled,
+  contentDuringRefresh,
+  selectDisabledDuringRefresh,
+  selectBusyDuringRefresh,
+  contentBusyDuringRefresh,
+  selectBusyAfter,
+  contentBusyAfter,
   remainingFetchHandlers: fetchQueue.length,
 });
