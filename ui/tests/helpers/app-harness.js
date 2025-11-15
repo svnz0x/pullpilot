@@ -339,6 +339,8 @@ export const createAppTestHarness = () => {
   const configForm = registerElement(new FakeFormElement("config-form"));
   const configFields = registerElement(new FakeElement("config-fields", "div"));
   const resetConfigButton = registerElement(new FakeElement("reset-config", "button"));
+  const retryConfigButton = registerElement(new FakeElement("retry-config", "button"));
+  retryConfigButton.hidden = true;
   const testConfigButton = registerElement(new FakeElement("test-config", "button"));
   const configStatus = registerElement(new FakeElement("config-status", "div"));
   const scheduleForm = registerElement(new FakeFormElement("schedule-form"));
@@ -464,6 +466,7 @@ export const createAppTestHarness = () => {
     configForm,
     configFields,
     resetConfigButton,
+    retryConfigButton,
     testConfigButton,
     configStatus,
     scheduleForm,
