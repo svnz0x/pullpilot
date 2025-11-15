@@ -73,5 +73,11 @@ test("la vista de logs conserva la selección tras un error de red", async () =>
   assert.equal(result.metaAfter, result.metaBefore);
   assert.equal(result.logsStatusText, "No se pudieron cargar los logs.");
   assert.equal(result.refreshDisabled, false);
+  assert.equal(result.contentDuringRefresh, "Cargando logs…");
+  assert.equal(result.selectDisabledDuringRefresh, true);
+  assert.equal(result.selectBusyDuringRefresh, "true");
+  assert.equal(result.contentBusyDuringRefresh, "true");
+  assert.equal(result.selectBusyAfter, null);
+  assert.equal(result.contentBusyAfter, null);
   assert.equal(result.remainingFetchHandlers, 0);
 });
