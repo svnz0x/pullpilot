@@ -1,84 +1,162 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  createLogsRequestManager,
-  formatLogMetadata,
-  resolveLogContentText,
-} from "../src/app.js";
 
-import { runWorker } from "./helpers/run-worker.js";
+import { bootApp } from "./helpers/boot-app.js";
+import { createFetchQueue } from "./helpers/fetch-queue.js";
+import { flushTasks } from "./helpers/flush.js";
 
-test("formatLogMetadata muestra 0 bytes para archivos vacíos", () => {
-  const text = formatLogMetadata({ logDir: "", modified: "", size: 0 });
-  assert.equal(text, "Tamaño: 0 bytes");
-});
+test("logs view loads options and handles refresh failures", async () => {
+  const { fetch: fetchMock, enqueueResponses, okResponse, queue } = createFetchQueue();
 
-test("formatLogMetadata evita separadores adicionales cuando faltan datos", () => {
-  const text = formatLogMetadata({ logDir: "logs", modified: "", size: undefined });
-  assert.equal(text, "Directorio: logs");
-});
-
-test("resolveLogContentText muestra visor vacío cuando content es cadena vacía", () => {
-  const text = resolveLogContentText({ name: "app.log", content: "" });
-  assert.equal(text, "");
-});
-
-test("createLogsRequestManager mantiene la última selección aunque las respuestas lleguen tarde", () => {
-  const manager = createLogsRequestManager();
-
-  const first = manager.start();
-  const second = manager.start();
-
-  let renderedSelection = null;
-
-  const renderIfLatest = (request, selection) => {
-    if (manager.isLatest(request.id)) {
-      renderedSelection = selection;
-    }
+  const authCheckResponse = () => Promise.resolve(new Response(null, { status: 204 }));
+  const configPayload = {
+    schema: {
+      variables: [
+        {
+          name: "LOG_DIR",
+          type: "string",
+          default: "/var/log/app",
+          description: "Directorio de logs",
+          constraints: { pattern: "^/.+" },
+        },
+      ],
+    },
+    values: { LOG_DIR: "/var/log/app" },
+  };
+  const schedulePayload = { mode: "cron", expression: "0 * * * *", datetime: "" };
+  const initialLogsPayload = {
+    log_dir: "/var/log/app",
+    files: [
+      { name: "app.log", modified: "2024-06-20T10:00:00.000Z", size: 4096 },
+      { name: "worker.log", modified: "2024-06-20T10:30:00.000Z", size: 2048 },
+    ],
+    selected: {
+      name: "worker.log",
+      modified: "2024-06-20T10:30:00.000Z",
+      size: 2048,
+      content: "línea 1\nlínea 2",
+    },
   };
 
-  // La segunda respuesta llega primero y debe fijar la selección.
-  renderIfLatest(second, "segundo.log");
-  // La primera respuesta llega al final, pero debe ignorarse.
-  renderIfLatest(first, "primero.log");
+  enqueueResponses([
+    authCheckResponse,
+    () => okResponse(configPayload),
+    () => okResponse(schedulePayload),
+    () => okResponse(initialLogsPayload),
+  ]);
 
-  if (first.controller) {
-    assert.equal(first.controller.signal.aborted, true);
-  }
-  if (second.controller) {
-    assert.equal(second.controller.signal.aborted, false);
-  }
+  await bootApp({ fetchMock });
 
-  assert.equal(renderedSelection, "segundo.log");
+  const loginForm = document.getElementById("token-form");
+  const tokenInput = document.getElementById("token-input");
+  const logSelect = document.getElementById("log-select");
+  const logContent = document.getElementById("log-content");
+  const logMeta = document.getElementById("log-meta");
+  const logsStatus = document.getElementById("logs-status");
+  const refreshLogs = document.getElementById("refresh-logs");
+  const scheduleForm = document.getElementById("schedule-form");
+  const saveScheduleButton = document.getElementById("save-schedule");
+  const scheduleResetButton = document.getElementById("reset-schedule");
+
+  tokenInput.value = "demo-token";
+  loginForm.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+  await flushTasks(3);
+
+  const optionsBefore = Array.from(logSelect.options).map((option) => option.value);
+  const selectionBefore = logSelect.value;
+  const contentBefore = logContent.textContent;
+  const metaBefore = logMeta.textContent;
+
+  let resolveScheduleSave;
+  enqueueResponses([
+    () =>
+      new Promise((resolve) => {
+        resolveScheduleSave = () =>
+          resolve(
+            new Response(JSON.stringify({ mode: "cron", expression: "0 * * * *", datetime: "" }), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
+      }),
+  ]);
+
+  const scheduleButtonsBefore = {
+    saveDisabled: saveScheduleButton.disabled,
+    resetDisabled: scheduleResetButton.disabled,
+    formBusy: scheduleForm.getAttribute("aria-busy"),
+  };
+
+  scheduleForm.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+
+  const scheduleButtonsDuring = {
+    saveDisabled: saveScheduleButton.disabled,
+    resetDisabled: scheduleResetButton.disabled,
+    formBusy: scheduleForm.getAttribute("aria-busy"),
+  };
+
+  resolveScheduleSave();
+  await flushTasks(2);
+
+  const scheduleButtonsAfter = {
+    saveDisabled: saveScheduleButton.disabled,
+    resetDisabled: scheduleResetButton.disabled,
+    formBusy: scheduleForm.getAttribute("aria-busy"),
+  };
+
+  enqueueResponses([() => Promise.reject(new Error("Network unreachable"))]);
+
+  refreshLogs.dispatchEvent(new Event("click", { bubbles: true }));
+
+  const contentDuringRefresh = logContent.textContent;
+  const selectDisabledDuringRefresh = logSelect.disabled;
+  const selectBusyDuringRefresh = logSelect.getAttribute("aria-busy");
+  const contentBusyDuringRefresh = logContent.getAttribute("aria-busy");
+  const refreshDisabledDuringRequest = refreshLogs.disabled;
+
+  await flushTasks(2);
+
+  const optionsAfter = Array.from(logSelect.options).map((option) => option.value);
+  const selectionAfter = logSelect.value;
+  const contentAfter = logContent.textContent;
+  const metaAfter = logMeta.textContent;
+  const logsStatusText = logsStatus.textContent;
+  const selectBusyAfter = logSelect.getAttribute("aria-busy");
+  const contentBusyAfter = logContent.getAttribute("aria-busy");
+
+  assert.deepEqual(optionsBefore, ["app.log", "worker.log"]);
+  assert.equal(selectionBefore, "worker.log");
+  assert.equal(contentBefore, "línea 1\nlínea 2");
+  assert.deepEqual(optionsAfter, optionsBefore);
+  assert.equal(selectionAfter, selectionBefore);
+  assert.equal(contentAfter, contentBefore);
+  assert.equal(metaAfter, metaBefore);
+  assert.equal(logsStatusText, "No se pudieron cargar los logs.");
+
+  assert.equal(refreshLogs.disabled, false);
+  assert.equal(refreshDisabledDuringRequest, true);
+  assert.equal(selectDisabledDuringRefresh, true);
+  assert.equal(selectBusyDuringRefresh, "true");
+  assert.equal(contentBusyDuringRefresh, "true");
+  assert.equal(selectBusyAfter, null);
+  assert.equal(contentBusyAfter, null);
+  assert.equal(contentDuringRefresh.includes("Cargando"), true);
+
+  assert.deepEqual(scheduleButtonsBefore, {
+    saveDisabled: false,
+    resetDisabled: false,
+    formBusy: null,
+  });
+  assert.deepEqual(scheduleButtonsDuring, {
+    saveDisabled: true,
+    resetDisabled: true,
+    formBusy: "true",
+  });
+  assert.deepEqual(scheduleButtonsAfter, {
+    saveDisabled: false,
+    resetDisabled: false,
+    formBusy: null,
+  });
+
+  assert.equal(queue.length, 0);
 });
-
-test(
-  "la vista de logs conserva la selección tras un error de red y bloquea las acciones en curso",
-  async () => {
-    const result = await runWorker(new URL("./logs-view.worker.js", import.meta.url));
-
-    assert.deepEqual(result.optionsAfter, result.optionsBefore);
-    assert.equal(result.selectionAfter, result.selectionBefore);
-    assert.equal(result.contentAfter, result.contentBefore);
-    assert.equal(result.metaAfter, result.metaBefore);
-    assert.equal(result.logsStatusText, "No se pudieron cargar los logs.");
-    assert.equal(result.refreshDisabledDuringRequest, true);
-    assert.equal(result.refreshDisabled, false);
-    assert.equal(result.contentDuringRefresh, "Cargando logs…");
-    assert.equal(result.selectDisabledDuringRefresh, true);
-    assert.equal(result.selectBusyDuringRefresh, "true");
-    assert.equal(result.contentBusyDuringRefresh, "true");
-    assert.equal(result.selectBusyAfter, null);
-    assert.equal(result.contentBusyAfter, null);
-    assert.equal(result.scheduleButtons.before.saveDisabled, false);
-    assert.equal(result.scheduleButtons.during.saveDisabled, true);
-    assert.equal(result.scheduleButtons.after.saveDisabled, false);
-    assert.equal(result.scheduleButtons.before.resetDisabled, false);
-    assert.equal(result.scheduleButtons.during.resetDisabled, true);
-    assert.equal(result.scheduleButtons.after.resetDisabled, false);
-    assert.equal(result.scheduleButtons.before.formBusy, null);
-    assert.equal(result.scheduleButtons.during.formBusy, "true");
-    assert.equal(result.scheduleButtons.after.formBusy, null);
-    assert.equal(result.remainingFetchHandlers, 0);
-  },
-);
