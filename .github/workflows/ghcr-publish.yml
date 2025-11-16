@@ -19,6 +19,16 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name }}
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build frontend bundle for release
+        run: |
+          npm --prefix apps/frontend install
+          make build-ui
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 

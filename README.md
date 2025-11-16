@@ -84,7 +84,13 @@ npm install
 npm run dev       # entorno de desarrollo
 npm run build     # genera artefactos locales en apps/frontend/dist/
 make build-ui     # compila y copia esos artefactos al backend
+make build-backend-package  # (opcional) encadena el build de la UI + python -m build apps/backend
 ```
+
+> ℹ️ El bundle generado en `apps/backend/src/pullpilot/resources/ui/dist/` **no se versiona**. Se regenera automáticamente
+> durante los builds oficiales (Docker multi-stage o publicación del paquete Python) ejecutando `npm --prefix apps/frontend run build`
+> y copiando el resultado mediante `make build-ui`. Ejecuta manualmente `make build-ui` (o `make build-backend-package`) solo
+> cuando necesites preparar un paquete local (`python -m build apps/backend`) o quieras validar cambios en la UI integrada.
 
 ### Flujo de build frontend → backend
 
@@ -92,9 +98,10 @@ make build-ui     # compila y copia esos artefactos al backend
 2. El build de Vite deja los archivos temporales en `apps/frontend/dist/`.
 3. El propio objetivo `build-ui` limpia `apps/backend/src/pullpilot/resources/ui/dist/` y copia ahí el contenido de `dist`.
 
-Este paso forma parte del pipeline de release y debe ejecutarse siempre antes de empaquetar o publicar el backend para asegurarse
-de que la interfaz queda sincronizada con el código fuente. El directorio `apps/frontend/dist/` está ignorado en Git a propósito;
-no subas binarios generados manualmente. Cualquier cambio en la UI debe pasar por el flujo anterior tanto en local como en CI.
+Este flujo forma parte del pipeline de release (GitHub Actions ejecuta `make build-ui` antes de empaquetar Docker/Python), por lo
+que los artefactos llegan sincronizados sin necesidad de versionarlos. Tanto `apps/frontend/dist/` como
+`apps/backend/src/pullpilot/resources/ui/dist/` permanecen en `.gitignore`; no subas binarios generados manualmente. Cuando
+construyas localmente una rueda o imagen asegúrate de lanzar `make build-ui` (o la diana `build-backend-package`) previamente.
 
 ### `updater.sh` como script canonical
 

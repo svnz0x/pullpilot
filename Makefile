@@ -1,19 +1,22 @@
-.PHONY: validate-config sync-defaults build-ui sync-updater
+.PHONY: validate-config sync-defaults build-ui sync-updater build-backend-package
 
 FRONTEND_DIR := apps/frontend
 BACKEND_UI_DIST := apps/backend/src/pullpilot/resources/ui/dist
 
 validate-config:
-python3 -m pullpilot.cli.validate_config
+	python3 -m pullpilot.cli.validate_config
 
 sync-defaults:
-python3 -m pullpilot.cli.sync_defaults
+	python3 -m pullpilot.cli.sync_defaults
 
 build-ui:
 	npm --prefix $(FRONTEND_DIR) run build
 	rm -rf $(BACKEND_UI_DIST)
 	mkdir -p $(BACKEND_UI_DIST)
 	cp -R $(FRONTEND_DIR)/dist/. $(BACKEND_UI_DIST)
+
+build-backend-package: build-ui
+	cd apps/backend && python -m build
 
 sync-updater:
 	python3 apps/backend/tools/sync_updater.py
