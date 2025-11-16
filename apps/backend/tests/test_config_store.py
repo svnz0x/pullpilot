@@ -301,15 +301,11 @@ def test_validate_config_cli_reports_errors(
     config_path = tmp_path / "updater.conf"
     config_path.write_text("UNKNOWN=value\n", encoding="utf-8")
 
-    import importlib.util
+    from pullpilot.cli import validate_config as validate_config_cli
 
-    module_path = Path(__file__).resolve().parents[1] / "scripts" / "validate_config.py"
-    spec = importlib.util.spec_from_file_location("validate_config_cli", module_path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    exit_code = module.main(["--config", str(config_path), "--schema", str(schema_path)])
+    exit_code = validate_config_cli.main(
+        ["--config", str(config_path), "--schema", str(schema_path)]
+    )
 
     captured = capsys.readouterr()
     assert exit_code == 1
