@@ -1,12 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Worker } from "node:worker_threads";
-
 import {
   createLogsRequestManager,
   formatLogMetadata,
   resolveLogContentText,
 } from "../src/app.js";
+
+import { runWorker } from "./helpers/run-worker.js";
 
 test("formatLogMetadata muestra 0 bytes para archivos vacíos", () => {
   const text = formatLogMetadata({ logDir: "", modified: "", size: 0 });
@@ -51,18 +51,6 @@ test("createLogsRequestManager mantiene la última selección aunque las respues
 
   assert.equal(renderedSelection, "segundo.log");
 });
-
-const runWorker = (url) =>
-  new Promise((resolve, reject) => {
-    const worker = new Worker(url, { type: "module" });
-    worker.once("message", resolve);
-    worker.once("error", reject);
-    worker.once("exit", (code) => {
-      if (code !== 0) {
-        reject(new Error(`Worker exited with code ${code}`));
-      }
-    });
-  });
 
 test(
   "la vista de logs conserva la selección tras un error de red y bloquea las acciones en curso",
