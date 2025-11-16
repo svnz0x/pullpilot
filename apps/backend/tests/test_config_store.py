@@ -313,4 +313,4 @@ def test_validate_config_cli_reports_errors(
 
     captured = capsys.readouterr()
     assert exit_code == 1
-    assert "UNKNOWN" in captured.out
+    assert "UNKNOWN" in captured.err

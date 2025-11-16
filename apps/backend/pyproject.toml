@@ -23,6 +23,10 @@ dependencies = [
   "uvicorn[standard]==0.30.*",
 ]
 
+[project.scripts]
+pullpilot-sync-defaults = "pullpilot.cli.sync_defaults:main"
+pullpilot-validate-config = "pullpilot.cli.validate_config:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
