@@ -1,6 +1,10 @@
 services:
   pullpilot:
     image: ghcr.io/svnz0x/pullpilot:latest
+    # Para builds locales, descomenta las siguientes líneas
+    # build:
+    #   context: .
+    #   dockerfile: apps/backend/Dockerfile
     env_file: .env
     environment:
       PULLPILOT_TOKEN: ${PULLPILOT_TOKEN}

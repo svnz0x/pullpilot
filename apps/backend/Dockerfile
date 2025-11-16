@@ -2,13 +2,13 @@
 
 FROM node:20-slim AS ui-builder
 
-WORKDIR /build
+WORKDIR /build/apps/frontend
 
-COPY package.json vite.config.js ./
+COPY apps/frontend/package.json apps/frontend/vite.config.js ./
 
 RUN npm install
 
-COPY ui ./ui
+COPY apps/frontend/ui ./ui
 
 RUN npm run build \
     && rm -rf node_modules
@@ -58,12 +58,12 @@ RUN set -eux; \
 RUN pip install --no-cache-dir "fastapi==0.115.*" "uvicorn[standard]==0.30.*"
 
 # ---- Archivos de la app (igual que tu Dockerfile original) ----
-COPY src/pullpilot/resources/config ./config.defaults
+COPY apps/backend/src/pullpilot/resources/config ./config.defaults
 RUN cp -r ./config.defaults ./config
-COPY scripts/updater.sh ./updater.sh
-COPY src/pullpilot/resources/config/updater.conf ./updater.conf
-COPY src ./src
-COPY --from=ui-builder /build/src/pullpilot/resources/ui/dist ./src/pullpilot/resources/ui/dist
+COPY apps/backend/scripts/updater.sh ./updater.sh
+COPY apps/backend/src/pullpilot/resources/config/updater.conf ./updater.conf
+COPY apps/backend/src ./src
+COPY --from=ui-builder /build/apps/backend/src/pullpilot/resources/ui/dist ./src/pullpilot/resources/ui/dist
 
 RUN chmod +x /app/updater.sh
 

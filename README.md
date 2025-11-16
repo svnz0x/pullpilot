@@ -16,12 +16,19 @@ vive dentro del contenedor (mediante volúmenes persistentes), por lo que tras u
 ```text
 .
 ├─ .github/workflows/ghcr-publish.yml   # CI para construir y publicar a GHCR
-├─ scripts/                             # Wrappers y utilidades (p. ej. updater.sh → canonical empaquetado)
-├─ src/pullpilot/                       # Código de la API y utilidades
-├─ tests/                               # Pruebas
-├─ Dockerfile                           # Imagen de la app
+├─ apps/
+│  ├─ backend/
+│  │  ├─ Dockerfile                     # Imagen de la app
+│  │  ├─ pyproject.toml                 # Metadatos del paquete y deps
+│  │  ├─ scripts/                       # Wrappers y utilidades (p. ej. updater.sh)
+│  │  ├─ src/pullpilot/                 # Código de la API y utilidades
+│  │  └─ tests/                         # Pruebas Python
+│  └─ frontend/
+│     ├─ package.json                   # Scripts y dependencias de la UI
+│     ├─ ui/                            # Código del frontend
+│     └─ vite.config.js                 # Configuración de build
 ├─ docker-compose.yml                   # Ejemplo de despliegue
-├─ pyproject.toml                       # Metadatos del paquete y deps
+├─ Makefile                             # Atajos para validar config o construir la UI
 └─ logo/logo.png                        # Logo del proyecto
 ```
 
@@ -36,7 +43,7 @@ docker run --rm -p 8000:8000 ghcr.io/svnz0x/pullpilot:latest
 - La imagen monta por defecto un volumen nombrado `pullpilot_config` en `/app/config`. En el primer arranque se copian automáticamente los archivos por defecto y, a partir de ahí, se preservan los cambios que hagas desde la API o editando el volumen. Los nuevos archivos añadidos a `config.defaults` (incluidos los subdirectorios) se sincronizan en arranques posteriores sin sobrescribir tus personalizaciones existentes.
 - Los ajustes relacionados con credenciales se definen mediante `PULLPILOT_TOKEN` (ver detalles más adelante). El resto de opciones se controlan desde la interfaz de usuario o modificando directamente los archivos persistidos en el volumen.
 - El esquema JSON empaquetado (`pullpilot.resources.get_resource_path("config/schema.json")`) documenta cada opción.
-- Para validación rápida: `python scripts/validate_config.py`
+- Para validación rápida: `python apps/backend/scripts/validate_config.py`
 - Puedes excluir proyectos concretos usando `EXCLUDE_PROJECTS`, introduciendo rutas absolutas (una por línea). Cualquier subdirectorio bajo esas rutas también se omitirá durante los escaneos.
 - Los campos `BASE_DIR` y `LOG_DIR` se definen desde la interfaz de usuario. Al guardar la configuración, el backend garantiza que los directorios existan (creándolos automáticamente si faltan) y conserva las rutas establecidas para reinicios futuros. La operación solo se rechazará cuando la ruta no pueda resolverse o prepararse (por ejemplo, por permisos insuficientes o porque ya exista un fichero con ese nombre).
 - Siempre que el contenedor tenga acceso de lectura y escritura, puedes apuntar `BASE_DIR` y `LOG_DIR` a cualquier ruta del filesystem. Ajusta los montajes de volumen de tu `docker-compose.yml` en caso de necesitar directorios ubicados fuera del volumen por defecto en `/app/config`.
@@ -61,9 +68,19 @@ docker run --rm -p 8000:8000 ghcr.io/svnz0x/pullpilot:latest
 ## Desarrollo local
 
 ```bash
+cd apps/backend
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
 uvicorn pullpilot.app:create_app --host 0.0.0.0 --port 8000 --reload
+```
+
+Para trabajar en la interfaz basta con situarse en `apps/frontend`, instalar dependencias y usar los scripts de `npm` habituales:
+
+```bash
+cd apps/frontend
+npm install
+npm run dev       # entorno de desarrollo
+npm run build     # deja los artefactos en apps/backend/src/pullpilot/resources/ui/dist
 ```
 
 ## Extra: docker‑compose (ejemplo)

@@ -7,7 +7,7 @@ name = "pullpilot"
 version = "0.1.0"
 description = "Servicio ligero para actualizar imágenes Docker de un homelab y exponer configuración por API."
 authors = [{ name = "PullPilot Maintainers" }]
-readme = "README.md"
+readme = "../../README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 keywords = ["docker", "homelab", "automation", "fastapi"]

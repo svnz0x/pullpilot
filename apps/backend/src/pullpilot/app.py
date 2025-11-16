@@ -98,7 +98,8 @@ def _iter_candidate_env_paths() -> Iterable[Path]:
     package_root = Path(__file__).resolve().parent
     project_root = package_root.parent
     repo_root = project_root.parent
-    for root in (Path.cwd(), package_root, project_root, repo_root):
+    workspace_root = repo_root.parent
+    for root in (Path.cwd(), package_root, project_root, repo_root, workspace_root):
         try:
             resolved = root.resolve()
         except OSError:
@@ -865,8 +866,13 @@ def create_app(
     dist_index_path = ui_dist_dir / "index.html"
     has_built_assets = dist_index_path.exists()
 
-    project_root = Path(__file__).resolve().parent.parent.parent
-    ui_source_root = project_root / "ui"
+    backend_root = Path(__file__).resolve().parent.parent.parent
+    apps_root = backend_root.parent
+    ui_source_candidates = (
+        apps_root / "frontend" / "ui",
+        backend_root / "ui",
+    )
+    ui_source_root = next((path for path in ui_source_candidates if path.exists()), ui_source_candidates[0])
     ui_source_index_path = ui_source_root / "index.html"
     ui_source_src_dir = ui_source_root / "src"
     ui_source_styles_path = ui_source_src_dir / "styles.css"
