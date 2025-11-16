@@ -124,6 +124,8 @@ export const createAuthorizedFetch = ({
 
   const resolveUrlString = (value) => (value instanceof URL ? value.toString() : value);
 
+  const isNodeRuntime = typeof process !== "undefined" && Boolean(process.versions?.node);
+
   return async (input, options = {}) => {
     const token = auth.getToken();
     if (!token) {
@@ -165,7 +167,7 @@ export const createAuthorizedFetch = ({
 
       if (shouldIncludeBody) {
         nextRequestInit.body = clonedRequest.body;
-        if (typeof window === "undefined") {
+        if (isNodeRuntime) {
           nextRequestInit.duplex = "half";
         }
       }
