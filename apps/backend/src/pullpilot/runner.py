@@ -21,8 +21,8 @@ from .scheduler.watch import build_watcher
 LOGGER = logging.getLogger("pullpilot.runner")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-LEGACY_CONFIG_DIRNAME = "Legacy - config"
 DEFAULT_CONFIG_TARGET = Path("/app/config")
+DEFAULT_CONFIG_DIR = PROJECT_ROOT / "config"
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 8000
 DEFAULT_LOG_LEVEL = "info"
@@ -51,14 +51,30 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
         action="store_true",
         help="Inicia solo la API, deshabilitando el scheduler interno",
     )
+    parser.add_argument(
+        "--config-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Directorio donde se almacenan updater.conf y pullpilot.schedule. "
+            "Por defecto se usa ./config si existe o /app/config."
+        ),
+    )
     return parser.parse_args(argv)
 
 
-def _resolve_config_dir() -> Path:
-    for candidate_name in (LEGACY_CONFIG_DIRNAME, "config"):
-        candidate = PROJECT_ROOT / candidate_name
-        if candidate.exists():
-            return candidate
+def _resolve_config_dir(requested: Optional[Path]) -> Path:
+    if requested:
+        candidate = requested.expanduser()
+        return candidate.resolve()
+
+    candidate = (Path.cwd() / "config").expanduser()
+    if candidate.exists():
+        return candidate
+
+    if DEFAULT_CONFIG_DIR.exists():
+        return DEFAULT_CONFIG_DIR
+
     return DEFAULT_CONFIG_TARGET
 
 
@@ -114,7 +130,7 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
     args = parse_args(argv)
     _configure_logging(args.log_level)
 
-    config_dir = _resolve_config_dir()
+    config_dir = _resolve_config_dir(args.config_dir)
     default_dir = _discover_default_config_dir()
     _copy_missing_config(config_dir, default_dir)
 

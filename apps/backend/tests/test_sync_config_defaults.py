@@ -1,11 +1,6 @@
 from pathlib import Path
-import sys
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
-from scripts.sync_config_defaults import sync_defaults
+from pullpilot.cli.sync_defaults import sync_defaults
 
 
 def test_sync_defaults_uses_overwrite_flag(tmp_path, monkeypatch):
@@ -19,7 +14,7 @@ def test_sync_defaults_uses_overwrite_flag(tmp_path, monkeypatch):
     target_dir = tmp_path / "target"
 
     monkeypatch.setattr(
-        "scripts.sync_config_defaults.get_resource_path",
+        "pullpilot.cli.sync_defaults.get_resource_path",
         lambda _: Path(defaults_dir),
     )
 
