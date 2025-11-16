@@ -61,11 +61,12 @@ RUN pip install --no-cache-dir "fastapi==0.115.*" "uvicorn[standard]==0.30.*"
 COPY apps/backend/src/pullpilot/resources/config ./config.defaults
 RUN cp -r ./config.defaults ./config
 COPY apps/backend/scripts/updater.sh ./updater.sh
+COPY apps/backend/tools/updater.sh ./tools/updater.sh
 COPY apps/backend/src/pullpilot/resources/config/updater.conf ./updater.conf
 COPY apps/backend/src ./src
 COPY --from=ui-builder /build/apps/backend/src/pullpilot/resources/ui/dist ./src/pullpilot/resources/ui/dist
 
-RUN chmod +x /app/updater.sh
+RUN chmod +x /app/updater.sh /app/tools/updater.sh
 
 EXPOSE 8000
 
