@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PullPilot · Panel local</title>
-    <script type="module" crossorigin src="/ui/assets/index-CSFkb0Dz.js"></script>
-    <link rel="stylesheet" crossorigin href="/ui/assets/index-Uc5ojoM9.css">
+    <script type="module" crossorigin src="/ui/assets/index-IvQAS1TG.js"></script>
+    <link rel="stylesheet" crossorigin href="/ui/assets/index-D8-Eid1H.css">
   </head>
   <body class="requires-auth">
     <header>
@@ -48,16 +48,132 @@
       </form>
     </section>
     <main>
+      <div
+        class="initial-loading-banner"
+        id="initial-loading-banner"
+        role="status"
+        aria-live="polite"
+        hidden
+      >
+        Preparando la interfaz…
+      </div>
       <section id="config-section">
         <h2>Configuración del updater</h2>
         <form id="config-form">
           <div class="config-grid" id="config-fields"></div>
           <div class="form-actions">
-            <button type="submit" class="primary">Guardar cambios</button>
+            <button type="submit" class="primary" id="save-config">Guardar cambios</button>
             <button type="button" class="secondary" id="reset-config">Descartar cambios</button>
+            <button type="button" class="secondary" id="retry-config" hidden>
+              Reintentar carga
+            </button>
+            <button type="button" class="secondary" id="test-config">Probar ejecución</button>
           </div>
         </form>
         <div class="status" id="config-status" role="status" aria-live="polite" hidden></div>
+      </section>
+
+      <section id="schedule-section">
+        <h2>Programación</h2>
+        <form id="schedule-form">
+          <div class="config-grid" id="schedule-fields">
+            <div class="config-field" data-name="mode">
+              <label for="schedule-mode">Modo de ejecución</label>
+              <div class="field-input">
+                <select id="schedule-mode" class="value-input" aria-describedby="schedule-mode-description">
+                  <option value="cron">Repetir según cron</option>
+                  <option value="once">Ejecutar una sola vez</option>
+                </select>
+              </div>
+              <div class="field-description info-disclosure">
+                <button
+                  type="button"
+                  class="info-toggle"
+                  aria-controls="schedule-mode-description"
+                  aria-expanded="false"
+                >
+                  <span class="info-toggle-icon" aria-hidden="true">i</span>
+                  <span class="sr-only">Mostrar ayuda para Modo de ejecución</span>
+                </button>
+                <div class="info-panel" id="schedule-mode-description" role="tooltip" hidden>
+                  <p>
+                    Selecciona si el updater debe repetirse de forma recurrente mediante cron o ejecutarse una sola
+                    vez en una fecha concreta.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="config-field" data-name="expression">
+              <label for="schedule-expression">Expresión cron</label>
+              <div class="field-input">
+                <input
+                  id="schedule-expression"
+                  class="value-input"
+                  type="text"
+                  placeholder="Ej.: 0 4 * * * o @daily"
+                  aria-describedby="schedule-expression-description"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
+              <div class="field-description info-disclosure">
+                <button
+                  type="button"
+                  class="info-toggle"
+                  aria-controls="schedule-expression-description"
+                  aria-expanded="false"
+                >
+                  <span class="info-toggle-icon" aria-hidden="true">i</span>
+                  <span class="sr-only">Mostrar ayuda para Expresión cron</span>
+                </button>
+                <div class="info-panel" id="schedule-expression-description" role="tooltip" hidden>
+                  <p>
+                    Define la planificación usando una expresión cron de cinco campos o macros como
+                    <code>@daily</code>.
+                  </p>
+                  <p>
+                    También puedes emplear <code>@every</code> con duraciones válidas.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="config-field" data-name="datetime" hidden>
+              <label for="schedule-datetime">Fecha y hora exactas</label>
+              <div class="field-input">
+                <input
+                  id="schedule-datetime"
+                  class="value-input"
+                  type="text"
+                  placeholder="Ej.: 2030-05-10T12:30:00+02:00"
+                  aria-describedby="schedule-datetime-description"
+                  autocomplete="off"
+                />
+              </div>
+              <div class="field-description info-disclosure">
+                <button
+                  type="button"
+                  class="info-toggle"
+                  aria-controls="schedule-datetime-description"
+                  aria-expanded="false"
+                >
+                  <span class="info-toggle-icon" aria-hidden="true">i</span>
+                  <span class="sr-only">Mostrar ayuda para Fecha y hora exactas</span>
+                </button>
+                <div class="info-panel" id="schedule-datetime-description" role="tooltip" hidden>
+                  <p>
+                    Introduce una fecha y hora con zona horaria en formato ISO 8601. El updater se ejecutará una
+                    única vez en el instante indicado.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="primary" id="save-schedule">Guardar programación</button>
+            <button type="button" class="secondary" id="reset-schedule">Descartar cambios</button>
+          </div>
+        </form>
+        <div class="status" id="schedule-status" role="status" aria-live="polite" hidden></div>
       </section>
 
       <section id="logs-section">

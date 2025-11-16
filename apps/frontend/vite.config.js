@@ -8,7 +8,7 @@ export default defineConfig({
   publicDir: false,
   base: "/ui/",
   build: {
-    outDir: "../../backend/src/pullpilot/resources/ui/dist",
+    outDir: "../dist",
     emptyOutDir: true,
     assetsDir: "assets",
     manifest: true,
