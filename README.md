@@ -20,7 +20,8 @@ vive dentro del contenedor (mediante volúmenes persistentes), por lo que tras u
 │  ├─ backend/
 │  │  ├─ Dockerfile                     # Imagen de la app
 │  │  ├─ pyproject.toml                 # Metadatos del paquete y deps
-│  │  ├─ scripts/                       # Wrappers y utilidades (p. ej. updater.sh)
+│  │  ├─ scripts/                       # Wrappers generados automáticamente
+│  │  ├─ tools/                         # utilidades de build (p. ej. updater.sh canonical)
 │  │  ├─ src/pullpilot/                 # Código de la API y utilidades
 │  │  └─ tests/                         # Pruebas Python
 │  └─ frontend/
@@ -82,6 +83,15 @@ npm install
 npm run dev       # entorno de desarrollo
 npm run build     # deja los artefactos en apps/backend/src/pullpilot/resources/ui/dist
 ```
+
+### `updater.sh` como script canonical
+
+- La implementación viva en `apps/backend/tools/updater.sh` es la **única fuente de verdad**.
+- Tras modificar el script ejecuta `make sync-updater` (o `python apps/backend/tools/sync_updater.py`) para copiarlo a
+  `pullpilot/resources/scripts/updater.sh` y regenerar el wrapper `apps/backend/scripts/updater.sh` que se empaqueta dentro
+  de la imagen Docker (`/app/updater.sh`).
+- El wrapper generado solo localiza automáticamente `tools/updater.sh` y lo ejecuta, así que no es necesario editarlo ni
+  comitearlo manualmente.
 
 ## Extra: docker‑compose (ejemplo)
 
