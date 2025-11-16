@@ -33,8 +33,7 @@ include-package-data = true
 pullpilot = [
   "resources/config/*",
   "resources/scripts/*",
-  "resources/ui/*",
-  "resources/ui/manifest.json",
+  # Artefactos de la UI generados mediante `make build-ui`.
   "resources/ui/dist/**/*",
 ]
 
