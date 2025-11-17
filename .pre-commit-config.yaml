@@ -14,6 +14,6 @@ repos:
     hooks:
       - id: shellcheck
         name: shellcheck
-        entry: bash -lc 'command -v shellcheck >/dev/null 2>&1 && shellcheck -S warning apps/backend/scripts/*.sh || echo "shellcheck not installed, skipping"'
+        entry: bash -lc 'command -v shellcheck >/dev/null 2>&1 && shellcheck -S warning apps/backend/scripts/*.sh apps/backend/pullpilot/resources/scripts/updater.sh apps/backend/tools/*.sh || echo "shellcheck not installed, skipping"'
         language: system
-        files: ^apps/backend/scripts/.*\.sh$
+        files: ^apps/backend/(scripts/.*\.sh|pullpilot/resources/scripts/updater\.sh|tools/.*\.sh)$
