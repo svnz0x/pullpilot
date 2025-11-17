@@ -184,21 +184,27 @@ def test_default_updater_command_prefers_canonical_script(
     assert resolve_default_updater_command() == str(canonical)
 
 
-def test_default_updater_command_falls_back_to_wrapper(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+@pytest.mark.parametrize(
+    "wrapper_subpath",
+    [
+        Path("apps/backend/scripts/updater.sh"),
+        Path("apps/backend/tools/updater.sh"),
+    ],
+)
+def test_default_updater_command_falls_back_to_wrappers(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, wrapper_subpath: Path
 ) -> None:
     monkeypatch.setattr(
         watch_module, "CANONICAL_UPDATER", tmp_path / "does-not-exist.sh"
     )
 
-    local_scripts = tmp_path / "scripts"
-    local_scripts.mkdir()
-    local_script = local_scripts / "updater.sh"
-    local_script.write_text("#!/bin/sh\n", encoding="utf-8")
+    wrapper = tmp_path / wrapper_subpath
+    wrapper.parent.mkdir(parents=True)
+    wrapper.write_text("#!/bin/sh\n", encoding="utf-8")
 
     monkeypatch.setattr("pullpilot.scheduler.watch._project_root", lambda: tmp_path)
 
-    assert resolve_default_updater_command() == str(local_script)
+    assert resolve_default_updater_command() == str(wrapper)
 
 
 def test_default_updater_command_falls_back_to_default_string(
