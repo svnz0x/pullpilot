@@ -1,6 +1,7 @@
 from importlib import resources
 from pathlib import Path
 
+import pullpilot.scheduler.watch as watch_module
 from pullpilot.api import ConfigAPI
 from pullpilot.resources import get_resource_path
 from pullpilot.schedule import ScheduleStore
@@ -30,7 +31,7 @@ def test_bundled_files_accessible(monkeypatch):
     monkeypatch.setattr(
         "pullpilot.scheduler.watch._project_root", lambda: Path("/__does_not_exist__"),
     )
-    assert resolve_default_updater_command() == DEFAULT_COMMAND
+    assert resolve_default_updater_command() == str(watch_module.CANONICAL_UPDATER)
 
 
 def test_ui_bundle_included():

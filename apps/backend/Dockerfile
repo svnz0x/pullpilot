@@ -60,8 +60,8 @@ RUN pip install --no-cache-dir "fastapi==0.115.*" "uvicorn[standard]==0.30.*"
 # ---- Archivos de la app (igual que tu Dockerfile original) ----
 COPY apps/backend/pullpilot/resources/config ./config.defaults
 RUN cp -r ./config.defaults ./config
-COPY apps/backend/scripts/updater.sh ./updater.sh
-COPY apps/backend/tools/updater.sh ./tools/updater.sh
+COPY apps/backend/pullpilot/resources/scripts/updater.sh ./updater.sh
+COPY apps/backend/pullpilot/resources/scripts/updater.sh ./tools/updater.sh
 COPY apps/backend/pullpilot/resources/config/updater.conf ./updater.conf
 COPY apps/backend/pullpilot ./pullpilot
 COPY --from=ui-builder /build/apps/backend/pullpilot/resources/ui/dist ./pullpilot/resources/ui/dist

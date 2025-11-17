@@ -105,12 +105,12 @@ construyas localmente una rueda o imagen asegúrate de lanzar `make build-ui` (o
 
 ### `updater.sh` como script canonical
 
-- La implementación viva en `apps/backend/tools/updater.sh` es la **única fuente de verdad**.
-- Tras modificar el script ejecuta `make sync-updater` (o `python apps/backend/tools/sync_updater.py`) para copiarlo a
-  `pullpilot/resources/scripts/updater.sh` y regenerar el wrapper `apps/backend/scripts/updater.sh` que se empaqueta dentro
-  de la imagen Docker (`/app/updater.sh`).
-- El wrapper generado solo localiza automáticamente `tools/updater.sh` y lo ejecuta, así que no es necesario editarlo ni
-  comitearlo manualmente.
+- Edita exclusivamente `apps/backend/pullpilot/resources/scripts/updater.sh`. Ese archivo es la **única fuente de verdad**
+  y se incluye en el paquete Python.
+- Los wrappers de conveniencia `apps/backend/tools/updater.sh` y `apps/backend/scripts/updater.sh` únicamente resuelven el
+  path del script canonical y lo ejecutan. No hay procesos de sincronización ni archivos generados.
+- Durante el build de Docker el script canonical se copia tal cual a `/app/updater.sh` y `/app/tools/updater.sh`, por lo
+  que cualquier cambio queda disponible sin pasos adicionales.
 
 ## Extra: docker‑compose (ejemplo)
 

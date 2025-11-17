@@ -1,4 +1,4 @@
-.PHONY: validate-config sync-defaults build-ui sync-updater build-backend-package
+.PHONY: validate-config sync-defaults build-ui build-backend-package
 
 FRONTEND_DIR := apps/frontend
 BACKEND_UI_DIST := apps/backend/pullpilot/resources/ui/dist
@@ -18,5 +18,3 @@ build-ui:
 build-backend-package: build-ui
 	cd apps/backend && python -m build
 
-sync-updater:
-	python3 apps/backend/tools/sync_updater.py

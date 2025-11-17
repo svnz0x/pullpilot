@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Docker script updater for homelabs
 # Licencia: MIT
-# Fuente canonical (ver tools/sync_updater.py para empaquetarlo)
+# Este archivo es la fuente canonical. Los wrappers en `tools/` y `scripts/`
+# simplemente lo invocan.
 
 # ————————————————
 # Modo estricto + helpers

@@ -10,6 +10,7 @@ from typing import Any, Dict, List
 
 import pytest
 
+import pullpilot.scheduler.watch as watch_module
 from pullpilot.resources import get_resource_path
 from pullpilot.scheduler.watch import (
     DEFAULT_COMMAND,
@@ -171,9 +172,25 @@ def test_watcher_default_schedule_path_matches_store_default() -> None:
     assert DEFAULT_SCHEDULE_FILE == DEFAULT_SCHEDULE_PATH
 
 
-def test_default_updater_command_prefers_local_script(
+def test_default_updater_command_prefers_canonical_script(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    canonical = tmp_path / "resources" / "scripts" / "updater.sh"
+    canonical.parent.mkdir(parents=True)
+    canonical.write_text("#!/bin/sh\n", encoding="utf-8")
+
+    monkeypatch.setattr(watch_module, "CANONICAL_UPDATER", canonical)
+
+    assert resolve_default_updater_command() == str(canonical)
+
+
+def test_default_updater_command_falls_back_to_wrapper(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(
+        watch_module, "CANONICAL_UPDATER", tmp_path / "does-not-exist.sh"
+    )
+
     local_scripts = tmp_path / "scripts"
     local_scripts.mkdir()
     local_script = local_scripts / "updater.sh"
@@ -187,6 +204,9 @@ def test_default_updater_command_prefers_local_script(
 def test_default_updater_command_falls_back_to_default_string(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    monkeypatch.setattr(
+        watch_module, "CANONICAL_UPDATER", tmp_path / "missing.sh"
+    )
     monkeypatch.setattr("pullpilot.scheduler.watch._project_root", lambda: tmp_path)
     def missing_resource(_: str) -> Path:
         raise FileNotFoundError
@@ -199,6 +219,9 @@ def test_default_updater_command_falls_back_to_default_string(
 def test_default_updater_command_uses_packaged_resource(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    monkeypatch.setattr(
+        watch_module, "CANONICAL_UPDATER", tmp_path / "missing.sh"
+    )
     monkeypatch.setattr("pullpilot.scheduler.watch._project_root", lambda: tmp_path)
 
     original_exists = Path.exists
