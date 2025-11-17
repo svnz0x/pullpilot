@@ -51,7 +51,7 @@ def _strip_inline_comments(value: str) -> str:
             quote_char = char
             result.append(char)
             continue
-        if char == "#":
+        if char == "#" and (not result or result[-1].isspace()):
             break
         result.append(char)
     return "".join(result)

@@ -160,6 +160,36 @@ def test_load_token_from_env_files_includes_repo_root(
             os.environ["PULLPILOT_TOKEN"] = original_token
 
 
+def test_load_token_from_env_files_allows_hash_characters(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    env_path = tmp_path / ".env"
+    env_path.write_text("PULLPILOT_TOKEN=abc#123\n", encoding="utf-8")
+
+    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
+    monkeypatch.setattr("pullpilot.auth._iter_candidate_env_paths", lambda: [env_path])
+
+    token = _load_token_from_env_files()
+
+    assert token == "abc#123"
+    assert os.environ.get("PULLPILOT_TOKEN") == "abc#123"
+
+
+def test_load_token_from_env_files_supports_inline_comments(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    env_path = tmp_path / ".env"
+    env_path.write_text("PULLPILOT_TOKEN=value # trailing comment\n", encoding="utf-8")
+
+    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
+    monkeypatch.setattr("pullpilot.auth._iter_candidate_env_paths", lambda: [env_path])
+
+    token = _load_token_from_env_files()
+
+    assert token == "value"
+    assert os.environ.get("PULLPILOT_TOKEN") == "value"
+
+
 def test_get_returns_defaults(
     auth_headers: Mapping[str, str], store: ConfigStore, schedule_store: ScheduleStore
 ) -> None:
