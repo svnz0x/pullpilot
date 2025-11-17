@@ -1,24 +1,157 @@
 :root {
-  color-scheme: light;
-  --bg-canvas: #e8eaee;
-  --surface: rgba(255, 255, 255, 0.55);
-  --surface-strong: rgba(255, 255, 255, 0.75);
-  --surface-border: rgba(255, 255, 255, 0.35);
-  --surface-shadow: rgba(15, 18, 24, 0.07);
-  --accent: #7c8cff;
-  --accent-strong: #5f6dd4;
-  --text: rgba(25, 32, 45, 0.92);
-  --text-secondary: rgba(25, 32, 45, 0.6);
-  --danger: #d27171;
-  --success: #6ba984;
-  --focus-ring: rgba(124, 140, 255, 0.26);
+  color-scheme: light dark;
   font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  /* Neutral tokens */
+  --color-bg-canvas: #e8eaee;
+  --color-surface-base: rgba(255, 255, 255, 0.55);
+  --color-surface-strong: rgba(255, 255, 255, 0.75);
+  --color-glass-muted: rgba(255, 255, 255, 0.28);
+  --color-glass-border: rgba(255, 255, 255, 0.24);
+  --color-panel-strong: rgba(255, 255, 255, 0.92);
+  --color-panel-border: rgba(124, 132, 150, 0.35);
+  --color-border-subtle: rgba(255, 255, 255, 0.35);
+  --color-border-strong: rgba(124, 132, 150, 0.28);
+  --color-border-heavy: rgba(124, 132, 150, 0.4);
+  --color-muted-border: rgba(124, 132, 150, 0.22);
+  --color-shadow-soft: rgba(15, 18, 24, 0.07);
+  --color-shadow-strong: rgba(15, 18, 24, 0.16);
+  --color-shadow-accent: rgba(21, 32, 52, 0.18);
+  --color-text-primary: rgba(25, 32, 45, 0.92);
+  --color-text-secondary: rgba(25, 32, 45, 0.6);
+  --color-text-muted: rgba(95, 100, 115, 0.85);
+  --color-chip-text: rgba(25, 32, 45, 0.8);
+  --color-text-emphasis: rgba(25, 32, 45, 0.82);
+  --color-glow-1: rgba(255, 255, 255, 0.55);
+  --color-glow-2: rgba(255, 255, 255, 0.35);
+  --color-glow-3: rgba(220, 224, 232, 0.45);
+  --color-muted-bg: rgba(124, 132, 150, 0.12);
+  --color-muted-bg-strong: rgba(124, 132, 150, 0.18);
+  --color-log-bg: rgba(16, 21, 32, 0.12);
+  --color-log-border: rgba(255, 255, 255, 0.18);
+  --color-log-text: rgba(20, 27, 40, 0.92);
+  --color-input-bg: #ffffff;
+  --color-input-surface: rgba(255, 255, 255, 0.55);
+  --color-input-border: rgba(120, 124, 131, 0.4);
+  --color-input-border-strong: rgba(120, 124, 131, 0.75);
+  --color-input-outline: rgba(120, 124, 131, 0.35);
+
+  /* Accent tokens */
+  --color-accent: #7c8cff;
+  --color-accent-strong: #5f6dd4;
+  --color-accent-soft: rgba(124, 140, 255, 0.2);
+  --color-accent-softer: rgba(124, 140, 255, 0.18);
+  --color-accent-soft-strong: rgba(124, 140, 255, 0.3);
+  --color-accent-ghost: rgba(124, 140, 255, 0.12);
+  --color-accent-border: rgba(124, 140, 255, 0.35);
+  --color-accent-border-strong: rgba(124, 140, 255, 0.4);
+  --color-accent-border-bolder: rgba(124, 140, 255, 0.55);
+  --color-accent-focus-border: rgba(124, 140, 255, 0.45);
+  --color-accent-outline: rgba(124, 140, 255, 0.26);
+  --color-accent-intense: rgba(124, 140, 255, 0.8);
+  --color-text-on-accent: #ffffff;
+
+  --color-focus-ring: var(--color-accent-outline);
+
+  /* Buttons */
+  --color-button-bg: rgba(255, 255, 255, 0.45);
+  --color-button-border: rgba(124, 132, 150, 0.28);
+  --color-button-text: var(--color-text-primary);
+  --color-button-primary-bg: rgba(124, 140, 255, 0.32);
+  --color-button-primary-border: rgba(124, 140, 255, 0.5);
+  --color-button-primary-hover-bg: rgba(124, 140, 255, 0.42);
+  --color-button-primary-hover-border: rgba(124, 140, 255, 0.6);
+  --color-button-secondary-bg: rgba(124, 132, 150, 0.12);
+  --color-button-secondary-hover-bg: rgba(124, 132, 150, 0.18);
+  --color-button-secondary-text: rgba(25, 32, 45, 0.85);
+
+  /* State tokens */
+  --color-success-bg: rgba(107, 169, 132, 0.2);
+  --color-success-border: rgba(107, 169, 132, 0.35);
+  --color-success-text: rgba(48, 112, 76, 0.9);
+  --color-danger-bg: rgba(210, 113, 113, 0.2);
+  --color-danger-border: rgba(210, 113, 113, 0.35);
+  --color-danger-border-strong: rgba(210, 113, 113, 0.6);
+  --color-danger-outline: rgba(210, 113, 113, 0.25);
+  --color-danger-text: rgba(143, 54, 54, 0.9);
+}
+
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg-canvas: #050c19;
+    --color-surface-base: rgba(11, 20, 36, 0.75);
+    --color-surface-strong: rgba(11, 20, 36, 0.85);
+    --color-glass-muted: rgba(9, 17, 31, 0.7);
+    --color-glass-border: rgba(76, 107, 152, 0.45);
+    --color-panel-strong: rgba(5, 11, 22, 0.95);
+    --color-panel-border: rgba(100, 136, 176, 0.45);
+    --color-border-subtle: rgba(84, 123, 171, 0.4);
+    --color-border-strong: rgba(95, 134, 180, 0.45);
+    --color-border-heavy: rgba(95, 134, 180, 0.55);
+    --color-muted-border: rgba(86, 122, 168, 0.45);
+    --color-shadow-soft: rgba(0, 0, 0, 0.4);
+    --color-shadow-strong: rgba(0, 0, 0, 0.55);
+    --color-shadow-accent: rgba(0, 0, 0, 0.45);
+    --color-text-primary: rgba(242, 247, 255, 0.95);
+    --color-text-secondary: rgba(206, 222, 245, 0.75);
+    --color-text-muted: rgba(166, 190, 218, 0.85);
+    --color-chip-text: rgba(207, 226, 247, 0.85);
+    --color-text-emphasis: rgba(222, 238, 255, 0.9);
+    --color-glow-1: rgba(69, 130, 185, 0.35);
+    --color-glow-2: rgba(40, 76, 115, 0.4);
+    --color-glow-3: rgba(17, 33, 58, 0.55);
+    --color-muted-bg: rgba(53, 74, 106, 0.4);
+    --color-muted-bg-strong: rgba(53, 74, 106, 0.55);
+    --color-log-bg: rgba(5, 12, 27, 0.78);
+    --color-log-border: rgba(71, 109, 158, 0.45);
+    --color-log-text: rgba(214, 234, 255, 0.92);
+    --color-input-bg: rgba(6, 12, 24, 0.85);
+    --color-input-surface: rgba(11, 20, 36, 0.85);
+    --color-input-border: rgba(80, 117, 163, 0.5);
+    --color-input-border-strong: rgba(108, 151, 201, 0.8);
+    --color-input-outline: rgba(80, 117, 163, 0.5);
+
+    --color-accent: #75c8ff;
+    --color-accent-strong: #58aefc;
+    --color-accent-soft: rgba(88, 174, 252, 0.35);
+    --color-accent-softer: rgba(88, 174, 252, 0.3);
+    --color-accent-soft-strong: rgba(88, 174, 252, 0.42);
+    --color-accent-ghost: rgba(88, 174, 252, 0.22);
+    --color-accent-border: rgba(88, 174, 252, 0.5);
+    --color-accent-border-strong: rgba(88, 174, 252, 0.6);
+    --color-accent-border-bolder: rgba(117, 200, 255, 0.75);
+    --color-accent-focus-border: rgba(117, 200, 255, 0.7);
+    --color-accent-outline: rgba(117, 200, 255, 0.5);
+    --color-accent-intense: rgba(117, 200, 255, 0.85);
+    --color-text-on-accent: rgba(1, 8, 18, 0.95);
+
+    --color-button-bg: rgba(8, 16, 30, 0.85);
+    --color-button-border: rgba(80, 117, 163, 0.5);
+    --color-button-text: var(--color-text-primary);
+    --color-button-primary-bg: rgba(88, 174, 252, 0.4);
+    --color-button-primary-border: rgba(117, 200, 255, 0.6);
+    --color-button-primary-hover-bg: rgba(117, 200, 255, 0.5);
+    --color-button-primary-hover-border: rgba(117, 200, 255, 0.7);
+    --color-button-secondary-bg: rgba(41, 65, 95, 0.6);
+    --color-button-secondary-hover-bg: rgba(53, 84, 121, 0.7);
+    --color-button-secondary-text: var(--color-text-primary);
+
+    --color-success-bg: rgba(52, 140, 155, 0.35);
+    --color-success-border: rgba(90, 204, 194, 0.55);
+    --color-success-text: rgba(195, 247, 240, 0.95);
+    --color-danger-bg: rgba(169, 77, 98, 0.35);
+    --color-danger-border: rgba(235, 133, 161, 0.55);
+    --color-danger-border-strong: rgba(235, 133, 161, 0.75);
+    --color-danger-outline: rgba(235, 133, 161, 0.5);
+    --color-danger-text: rgba(255, 210, 218, 0.95);
+  }
 }
 
 body {
   margin: 0;
-  background-color: var(--bg-canvas);
-  color: var(--text);
+  background-color: var(--color-bg-canvas);
+  color: var(--color-text-primary);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -31,9 +164,9 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.55), transparent 55%),
-    radial-gradient(circle at 80% 10%, rgba(255, 255, 255, 0.35), transparent 50%),
-    radial-gradient(circle at 50% 80%, rgba(220, 224, 232, 0.45), transparent 60%);
+  background: radial-gradient(circle at 20% 20%, var(--color-glow-1), transparent 55%),
+    radial-gradient(circle at 80% 10%, var(--color-glow-2), transparent 50%),
+    radial-gradient(circle at 50% 80%, var(--color-glow-3), transparent 60%);
   filter: blur(80px);
   z-index: 0;
 }
@@ -54,10 +187,10 @@ header {
   padding: clamp(2.5rem, 6vw, 3.5rem) 1.5rem clamp(2rem, 4vw, 2.5rem);
   text-align: center;
   backdrop-filter: blur(18px);
-  background: var(--surface);
-  border: 1px solid var(--surface-border);
+  background: var(--color-surface-base);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 1.5rem;
-  box-shadow: 0 12px 35px var(--surface-shadow);
+  box-shadow: 0 12px 35px var(--color-shadow-soft);
   width: min(960px, 92vw);
   margin: clamp(1.5rem, 4vw, 2.5rem) auto 2rem;
   position: relative;
@@ -68,13 +201,13 @@ header h1 {
   margin: 0;
   font-size: clamp(2.25rem, 6vw, 3.25rem);
   letter-spacing: -0.03em;
-  color: var(--text);
+  color: var(--color-text-primary);
 }
 
 header p {
   margin: 1rem auto 0;
   max-width: 36rem;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   line-height: 1.6;
   font-size: clamp(1rem, 2.5vw, 1.1rem);
 }
@@ -98,11 +231,11 @@ body.authenticated #login-screen {
 #login-screen {
   margin: clamp(2rem, 5vw, 3rem) auto 0;
   width: min(32rem, 92vw);
-  background: var(--surface-strong);
+  background: var(--color-surface-strong);
   border-radius: 1.25rem;
-  border: 1px solid var(--surface-border);
+  border: 1px solid var(--color-border-subtle);
   padding: clamp(1.5rem, 5vw, 2.25rem);
-  box-shadow: 0 10px 30px var(--surface-shadow);
+  box-shadow: 0 10px 30px var(--color-shadow-soft);
   display: none;
   backdrop-filter: blur(18px);
   position: relative;
@@ -133,7 +266,7 @@ body.authenticated #login-screen {
   width: 1.15rem;
   height: 1.15rem;
   margin: 0;
-  accent-color: var(--accent);
+  accent-color: var(--color-accent);
 }
 
 #login-screen label.remember-token .remember-token-text {
@@ -148,7 +281,7 @@ body.authenticated #login-screen {
 
 #login-screen label.remember-token .remember-token-text span {
   font-size: 0.85rem;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font-weight: 400;
 }
 
@@ -156,16 +289,16 @@ body.authenticated #login-screen {
   width: 100%;
   padding: 0.65rem 0.85rem;
   border-radius: 0.5rem;
-  border: 1px solid rgba(120, 124, 131, 0.4);
-  background: #ffffff;
+  border: 1px solid var(--color-input-border);
+  background: var(--color-input-bg);
   color: inherit;
   font: inherit;
 }
 
 #login-screen input[type="password"]:focus {
-  outline: 2px solid rgba(120, 124, 131, 0.35);
+  outline: 2px solid var(--color-input-outline);
   outline-offset: 0;
-  border-color: rgba(120, 124, 131, 0.75);
+  border-color: var(--color-input-border-strong);
   box-shadow: none;
 }
 
@@ -182,16 +315,16 @@ body.authenticated #login-screen {
 
 .login-status {
   font-size: 0.95rem;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   min-height: 1.35em;
 }
 
 .login-status.is-success {
-  color: var(--success);
+  color: var(--color-success-text);
 }
 
 .login-status.is-error {
-  color: var(--danger);
+  color: var(--color-danger-text);
 }
 
 .logout-button {
@@ -211,12 +344,12 @@ main {
   gap: clamp(1.5rem, 4vw, 2.5rem);
   position: relative;
   z-index: 1;
-  background: var(--surface);
-  border: 1px solid var(--surface-border);
+  background: var(--color-surface-base);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 1.5rem;
   padding: clamp(1.75rem, 4vw, 2.5rem);
   backdrop-filter: blur(16px);
-  box-shadow: 0 10px 28px var(--surface-shadow);
+  box-shadow: 0 10px 28px var(--color-shadow-soft);
   box-sizing: border-box;
 }
 
@@ -229,12 +362,12 @@ body.initial-loading {
   align-items: center;
   gap: 0.65rem;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid var(--surface-border);
+  background: var(--color-surface-strong);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 1rem;
   padding: 0.85rem 1.25rem;
-  color: var(--text-secondary);
-  box-shadow: 0 12px 28px var(--surface-shadow);
+  color: var(--color-text-secondary);
+  box-shadow: 0 12px 28px var(--color-shadow-soft);
   line-height: 1.4;
 }
 
@@ -259,11 +392,11 @@ form[data-initial-loading="true"] .form-actions button:hover {
 
 body > section,
 main > section {
-  background: var(--surface-strong);
+  background: var(--color-surface-strong);
   border-radius: 1.25rem;
-  border: 1px solid var(--surface-border);
+  border: 1px solid var(--color-border-subtle);
   padding: clamp(1.5rem, 3vw, 2.25rem);
-  box-shadow: 0 8px 26px var(--surface-shadow);
+  box-shadow: 0 8px 26px var(--color-shadow-soft);
   backdrop-filter: blur(16px);
 }
 
@@ -280,11 +413,11 @@ main > section h2 {
 }
 
 .config-section {
-  background: rgba(255, 255, 255, 0.28);
+  background: var(--color-glass-muted);
   border-radius: 1.15rem;
-  border: 1px solid rgba(255, 255, 255, 0.24);
+  border: 1px solid var(--color-glass-border);
   padding: clamp(1.25rem, 2.6vw, 1.85rem);
-  box-shadow: 0 6px 22px var(--surface-shadow);
+  box-shadow: 0 6px 22px var(--color-shadow-soft);
   backdrop-filter: blur(14px);
   display: flex;
   flex-direction: column;
@@ -317,7 +450,7 @@ main > section h2 {
 .config-subsection-title {
   margin: 0;
   font-size: clamp(1rem, 1.8vw, 1.15rem);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font-weight: 600;
 }
 
@@ -325,8 +458,8 @@ main > section h2 {
   display: grid;
   gap: 0.5rem;
   padding: 0.9rem 1rem;
-  background: rgba(255, 255, 255, 0.28);
-  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: var(--color-glass-muted);
+  border: 1px solid var(--color-glass-border);
   border-radius: 0.9rem;
   backdrop-filter: blur(14px);
 }
@@ -341,16 +474,16 @@ main > section h2 {
 
 .config-field .field-label-text {
   font-size: clamp(0.95rem, 1.8vw, 1.1rem);
-  color: var(--text);
+  color: var(--color-text-primary);
 }
 
 .config-field .field-variable {
   font-size: 0.75rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: rgba(25, 32, 45, 0.8);
-  background: rgba(124, 140, 255, 0.18);
-  border: 1px solid rgba(124, 140, 255, 0.35);
+  color: var(--color-chip-text);
+  background: var(--color-accent-softer);
+  border: 1px solid var(--color-accent-border);
   border-radius: 999px;
   padding: 0.1rem 0.55rem;
   line-height: 1.4;
@@ -369,8 +502,8 @@ main > section h2 {
   width: min(100%, 30rem);
   padding: 0.65rem 0.85rem;
   border-radius: 0.6rem;
-  border: 1px solid rgba(124, 132, 150, 0.28);
-  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-input-surface);
   color: inherit;
   font: inherit;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -387,20 +520,20 @@ main > section h2 {
 .config-field input[type="checkbox"] {
   width: 1.25rem;
   height: 1.25rem;
-  accent-color: var(--accent);
+  accent-color: var(--color-accent);
 }
 
 .config-field input:focus,
 .config-field select:focus,
 .config-field textarea:focus {
   outline: none;
-  border-color: rgba(124, 140, 255, 0.45);
-  box-shadow: 0 0 0 2px var(--focus-ring);
+  border-color: var(--color-accent-focus-border);
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
 }
 
 .config-field .field-description {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   line-height: 1.45;
   font-size: 0.95rem;
   display: inline-flex;
@@ -412,8 +545,8 @@ main > section h2 {
 .config-field .info-toggle {
   appearance: none;
   border: none;
-  background: rgba(124, 140, 255, 0.2);
-  color: var(--accent-strong);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
   border-radius: 999px;
   width: 2.35rem;
   height: 2.35rem;
@@ -423,7 +556,7 @@ main > section h2 {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 0.35rem 1.25rem rgba(21, 32, 52, 0.18);
+  box-shadow: 0 0.35rem 1.25rem var(--color-shadow-accent);
   transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease,
     box-shadow 0.25s ease;
   touch-action: manipulation;
@@ -431,13 +564,13 @@ main > section h2 {
 
 .config-field .info-toggle:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--focus-ring), 0 0.35rem 1.25rem rgba(21, 32, 52, 0.18);
-  background: rgba(124, 140, 255, 0.35);
+  box-shadow: 0 0 0 3px var(--color-focus-ring), 0 0.35rem 1.25rem var(--color-shadow-accent);
+  background: var(--color-accent-border);
 }
 
 .config-field .info-toggle[aria-expanded="true"] {
-  background: var(--accent-strong);
-  color: #fff;
+  background: var(--color-accent-strong);
+  color: var(--color-text-on-accent);
   transform: translateY(-1px);
 }
 
@@ -449,13 +582,13 @@ main > section h2 {
 
 .config-field .info-panel {
   flex: 1 1 auto;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--color-panel-strong);
   border-radius: 0.9rem;
-  border: 1px solid rgba(124, 132, 150, 0.35);
+  border: 1px solid var(--color-panel-border);
   padding: 0.85rem 1rem;
-  box-shadow: 0 1.25rem 2.5rem rgba(15, 18, 24, 0.16);
+  box-shadow: 0 1.25rem 2.5rem var(--color-shadow-strong);
   max-width: 42rem;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   opacity: 0;
   transform: translateY(-0.3rem);
   transition: opacity 0.25s ease, transform 0.25s ease;
@@ -483,20 +616,20 @@ main > section h2 {
 .config-field .field-default {
   margin: 0;
   font-size: 0.85rem;
-  color: rgba(95, 100, 115, 0.85);
+  color: var(--color-text-muted);
 }
 
 .config-field .info-panel code {
   font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.9em;
-  background: rgba(124, 140, 255, 0.12);
+  background: var(--color-accent-ghost);
   padding: 0.05rem 0.35rem;
   border-radius: 0.35rem;
 }
 
 @media (hover: hover) {
   .config-field .info-toggle:hover {
-    background: rgba(124, 140, 255, 0.3);
+    background: var(--color-accent-soft-strong);
     transform: translateY(-1px);
   }
 }
@@ -511,7 +644,7 @@ main > section h2 {
 .form-actions {
   margin-top: 1rem;
   padding-top: 0.75rem;
-  border-top: 1px solid var(--surface-border);
+  border-top: 1px solid var(--color-border-subtle);
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
@@ -535,8 +668,8 @@ main > section h2 {
   width: 1rem;
   height: 1rem;
   border-radius: 50%;
-  border: 2px solid rgba(124, 132, 150, 0.4);
-  border-top-color: rgba(124, 140, 255, 0.8);
+  border: 2px solid var(--color-border-heavy);
+  border-top-color: var(--color-accent-intense);
   animation: test-config-spin 0.8s linear infinite;
 }
 
@@ -548,45 +681,45 @@ main > section h2 {
 
 button {
   appearance: none;
-  border: 1px solid rgba(124, 132, 150, 0.28);
+  border: 1px solid var(--color-border-strong);
   border-radius: 0.6rem;
   padding: 0.65rem 1.4rem;
   font-weight: 600;
   cursor: pointer;
-  background: rgba(255, 255, 255, 0.45);
-  color: var(--text);
+  background: var(--color-button-bg);
+  color: var(--color-text-primary);
   transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   backdrop-filter: blur(8px);
 }
 
 button.primary {
-  background: rgba(124, 140, 255, 0.32);
-  border-color: rgba(124, 140, 255, 0.5);
-  color: #ffffff;
+  background: var(--color-button-primary-bg);
+  border-color: var(--color-button-primary-border);
+  color: var(--color-text-on-accent);
 }
 
 button.primary:hover {
-  background: rgba(124, 140, 255, 0.42);
-  border-color: rgba(124, 140, 255, 0.6);
+  background: var(--color-button-primary-hover-bg);
+  border-color: var(--color-button-primary-hover-border);
 }
 
 button.secondary {
-  background: rgba(124, 132, 150, 0.12);
-  color: rgba(25, 32, 45, 0.85);
+  background: var(--color-muted-bg);
+  color: var(--color-button-secondary-text);
 }
 
 button.secondary:hover {
-  background: rgba(124, 132, 150, 0.18);
+  background: var(--color-muted-bg-strong);
 }
 
 button:hover {
-  border-color: rgba(124, 140, 255, 0.4);
+  border-color: var(--color-accent-border-strong);
 }
 
 button:focus-visible {
   outline: none;
-  border-color: rgba(124, 140, 255, 0.55);
-  box-shadow: 0 0 0 2px var(--focus-ring);
+  border-color: var(--color-accent-border-bolder);
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
 }
 
 .status {
@@ -594,9 +727,9 @@ button:focus-visible {
   padding: 0.85rem 1rem;
   border-radius: 0.95rem;
   font-size: 0.95rem;
-  background: rgba(124, 132, 150, 0.12);
-  border: 1px solid rgba(124, 132, 150, 0.22);
-  color: rgba(25, 32, 45, 0.82);
+  background: var(--color-muted-bg);
+  border: 1px solid var(--color-muted-border);
+  color: var(--color-text-emphasis);
   font-weight: 600;
   backdrop-filter: blur(12px);
 }
@@ -615,26 +748,26 @@ button:focus-visible {
 }
 
 .status.success {
-  background: rgba(107, 169, 132, 0.2);
-  border-color: rgba(107, 169, 132, 0.35);
-  color: rgba(48, 112, 76, 0.9);
+  background: var(--color-success-bg);
+  border-color: var(--color-success-border);
+  color: var(--color-success-text);
 }
 
 .status.error {
-  background: rgba(210, 113, 113, 0.2);
-  border-color: rgba(210, 113, 113, 0.35);
-  color: rgba(143, 54, 54, 0.9);
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger-border);
+  color: var(--color-danger-text);
 }
 
 .config-field.is-error label {
-  color: var(--danger);
+  color: var(--color-danger-text);
 }
 
 .config-field.is-error .value-input,
 .config-field.is-error textarea[data-multiline] {
-  border-color: rgba(210, 113, 113, 0.6);
+  border-color: var(--color-danger-border-strong);
   box-shadow: none;
-  outline: 1px solid rgba(210, 113, 113, 0.25);
+  outline: 1px solid var(--color-danger-outline);
   outline-offset: 0;
 }
 
@@ -651,13 +784,13 @@ button:focus-visible {
 
 .log-meta {
   font-size: 0.85rem;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .log-output {
-  background: rgba(16, 21, 32, 0.12);
+  background: var(--color-log-bg);
   border-radius: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid var(--color-log-border);
   padding: 1.05rem 1.15rem;
   margin-top: 1rem;
   max-height: 24rem;
@@ -667,7 +800,7 @@ button:focus-visible {
   font-family: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 0.9rem;
   line-height: 1.5;
-  color: rgba(20, 27, 40, 0.92);
+  color: var(--color-log-text);
   backdrop-filter: blur(14px);
 }
 
