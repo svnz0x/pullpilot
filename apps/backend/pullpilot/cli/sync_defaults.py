@@ -9,7 +9,7 @@ from typing import Iterable, Optional
 from pullpilot.config_utils import copy_config_tree
 from pullpilot.resources import get_resource_path
 
-DEFAULT_CONFIG_TARGET = Path("config") / "defaults"
+DEFAULT_CONFIG_TARGET = Path("config.defaults")
 
 
 class SyncDefaultsError(Exception):
@@ -39,10 +39,10 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--target",
         type=Path,
-        default=DEFAULT_CONFIG_TARGET,
+        default=None,
         help=(
             "Directorio donde colocar los defaults. "
-            "Por defecto se usa ./config/defaults relativo al directorio actual."
+            "Por defecto se usa ./config.defaults relativo al directorio actual."
         ),
     )
     parser.add_argument(
@@ -50,12 +50,15 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
         action="store_true",
         help="Reemplaza archivos existentes en el destino",
     )
-    return parser.parse_args(list(argv) if argv is not None else None)
+    args = parser.parse_args(list(argv) if argv is not None else None)
+    if args.target is None:
+        args.target = Path.cwd() / DEFAULT_CONFIG_TARGET
+    return args
 
 
 def main(argv: Optional[Iterable[str]] = None) -> int:
     args = parse_args(argv)
-    target = args.target if args.target is not None else DEFAULT_CONFIG_TARGET
+    target = args.target
     try:
         sync_defaults(target, args.overwrite)
     except SyncDefaultsError as exc:

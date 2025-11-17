@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pullpilot.cli.sync_defaults import sync_defaults
+from pullpilot.cli.sync_defaults import parse_args, sync_defaults
 
 
 def test_sync_defaults_uses_overwrite_flag(tmp_path, monkeypatch):
@@ -33,3 +33,11 @@ def test_sync_defaults_uses_overwrite_flag(tmp_path, monkeypatch):
 
     sync_defaults(target_dir, overwrite=True)
     assert copied_file.read_text(encoding="utf-8") == "default content"
+
+
+def test_cli_default_target_points_to_config_defaults(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    args = parse_args([])
+
+    assert args.target == tmp_path / "config.defaults"
