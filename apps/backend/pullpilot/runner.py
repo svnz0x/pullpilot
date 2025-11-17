@@ -19,10 +19,6 @@ from .schedule import ScheduleStore
 from .scheduler.watch import build_watcher
 
 LOGGER = logging.getLogger("pullpilot.runner")
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CONFIG_TARGET = Path("/app/config")
-DEFAULT_CONFIG_DIR = PROJECT_ROOT / "config"
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 8000
 DEFAULT_LOG_LEVEL = "info"
@@ -57,7 +53,7 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
         default=None,
         help=(
             "Directorio donde se almacenan updater.conf y pullpilot.schedule. "
-            "Por defecto se usa ./config si existe o /app/config."
+            "Por defecto se usa ./config (se crea automáticamente si no existe)."
         ),
     )
     return parser.parse_args(argv)
@@ -69,13 +65,7 @@ def _resolve_config_dir(requested: Optional[Path]) -> Path:
         return candidate.resolve()
 
     candidate = (Path.cwd() / "config").expanduser()
-    if candidate.exists():
-        return candidate
-
-    if DEFAULT_CONFIG_DIR.exists():
-        return DEFAULT_CONFIG_DIR
-
-    return DEFAULT_CONFIG_TARGET
+    return candidate.resolve()
 
 
 def _discover_default_config_dir() -> Optional[Path]:
