@@ -7,10 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "NODE_OPTIONS=--import=./ui/tests/setup-dom.js node --test ui/tests/**/*.test.js"
+    "test": "NODE_OPTIONS=--import=./tests/setup-dom.js node --test tests/**/*.test.js"
   },
   "devDependencies": {
-    "happy-dom": "file:ui/tests/vendor/happy-dom",
+    "happy-dom": "file:tests/vendor/happy-dom",
     "vite": "^5.3.1"
   }
 }

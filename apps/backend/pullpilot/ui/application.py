@@ -30,7 +30,7 @@ def configure_application(app: Any, api: Any) -> None:
     backend_root = Path(__file__).resolve().parent.parent.parent
     apps_root = backend_root.parent
     ui_source_candidates = (
-        apps_root / "frontend" / "ui",
+        apps_root / "frontend",
         backend_root / "ui",
     )
     ui_source_root = next((path for path in ui_source_candidates if path.exists()), ui_source_candidates[0])
