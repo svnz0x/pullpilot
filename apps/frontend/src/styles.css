@@ -214,7 +214,7 @@ header {
 
 .hero-content {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 3fr) minmax(12rem, 1fr);
   gap: clamp(1.5rem, 4vw, 3rem);
   align-items: center;
 }
@@ -228,13 +228,15 @@ header {
 
 .hero-text {
   text-align: center;
+  max-width: 38rem;
+  margin-inline: auto;
 }
 
 .hero-text p {
   margin: 1.15rem 0 0;
   color: var(--color-text-secondary);
-  line-height: 1.65;
-  font-size: clamp(1rem, 2vw, 1.15rem);
+  line-height: 1.7;
+  font-size: clamp(1rem, 1.85vw, 1.2rem);
 }
 
 .hero-actions {
@@ -245,8 +247,8 @@ header {
 }
 
 .hero-logo {
-  width: clamp(9rem, 28vw, 14rem);
-  max-width: clamp(10rem, 32vw, 16rem);
+  width: clamp(8rem, 24vw, 13rem);
+  max-width: clamp(10rem, 28vw, 16rem);
   height: auto;
   object-fit: contain;
   filter: drop-shadow(0 18px 32px rgba(12, 45, 73, 0.35));
@@ -972,6 +974,21 @@ button:focus-visible {
     margin: 1rem auto 1.25rem;
   }
 
+  .hero-content {
+    grid-template-columns: minmax(0, 2.5fr) minmax(7rem, 1fr);
+    gap: 1.1rem;
+  }
+
+  .hero-actions {
+    gap: 0.85rem;
+    justify-items: stretch;
+  }
+
+  .hero-logo {
+    width: clamp(6rem, 32vw, 9rem);
+    max-width: clamp(7.5rem, 38vw, 10.5rem);
+  }
+
   #login-screen {
     margin-top: 1.5rem;
     padding: 1.25rem;
@@ -1013,6 +1030,7 @@ button:focus-visible {
 
   .hero-text {
     text-align: left;
+    margin-inline: 0;
   }
 
   .hero-actions {
