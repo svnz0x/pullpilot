@@ -6,6 +6,12 @@ import {
   resolveUnauthorizedDetails,
 } from "./auth-errors.js";
 import { buildUnauthorizedTokenMessage } from "./unauthorized-message.js";
+import heroLogoUrl from "../logo/logo.png";
+
+const heroLogoImage = document.querySelector(".hero-logo");
+if (heroLogoImage) {
+  heroLogoImage.src = heroLogoUrl;
+}
 
 const SECTION_MAP = Object.freeze({
   BASE_DIR: { section: "Rutas y registros", subsection: "Directorios requeridos" },
