@@ -837,6 +837,7 @@ const initializeApp = () => {
       if (dataset) {
         dataset.logsLoadingWasDisabled = refreshLogs.disabled ? "true" : "false";
       }
+      setElementLoadingAttribute(refreshLogs, true);
       refreshLogs.disabled = true;
       refreshLogs.setAttribute?.("aria-disabled", "true");
       return;
@@ -846,6 +847,7 @@ const initializeApp = () => {
     if (dataset) {
       delete dataset.logsLoadingWasDisabled;
     }
+    setElementLoadingAttribute(refreshLogs, false);
     if (wasDisabled) {
       refreshLogs.disabled = true;
       refreshLogs.setAttribute?.("aria-disabled", "true");
@@ -1171,11 +1173,11 @@ const initializeApp = () => {
   const setTestConfigButtonLoading = (isLoading) => {
     if (!testConfigButton) return;
     if (isLoading) {
-      testConfigButton.dataset.loading = "true";
+      setElementLoadingAttribute(testConfigButton, true);
       testConfigButton.disabled = true;
       testConfigButton.setAttribute("aria-disabled", "true");
     } else {
-      delete testConfigButton.dataset.loading;
+      setElementLoadingAttribute(testConfigButton, false);
       testConfigButton.disabled = false;
       testConfigButton.removeAttribute("aria-disabled");
     }
@@ -1203,6 +1205,24 @@ const initializeApp = () => {
     }
   };
 
+  const setElementLoadingAttribute = (element, isLoading) => {
+    if (!element) return;
+    const { dataset } = element;
+    if (isLoading) {
+      if (dataset) {
+        dataset.loading = "true";
+      } else {
+        element.setAttribute?.("data-loading", "true");
+      }
+      return;
+    }
+    if (dataset && Object.prototype.hasOwnProperty.call(dataset, "loading")) {
+      delete dataset.loading;
+    } else {
+      element.removeAttribute?.("data-loading");
+    }
+  };
+
   const setButtonPendingState = (button, key, isPending) => {
     if (!button) return;
     const dataset = button.dataset ?? {};
@@ -1211,6 +1231,7 @@ const initializeApp = () => {
     if (isPending) {
       dataset[stateKey] = "true";
       dataset[wasDisabledKey] = button.disabled ? "true" : "false";
+      setElementLoadingAttribute(button, true);
       button.disabled = true;
       button.setAttribute?.("aria-disabled", "true");
       return;
@@ -1221,6 +1242,7 @@ const initializeApp = () => {
     const wasDisabled = dataset[wasDisabledKey] === "true";
     delete dataset[stateKey];
     delete dataset[wasDisabledKey];
+    setElementLoadingAttribute(button, false);
     if (wasDisabled) {
       button.disabled = true;
       button.setAttribute?.("aria-disabled", "true");
