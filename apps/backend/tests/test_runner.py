@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from pullpilot.runner import DEFAULT_PORT, _copy_missing_config, parse_args
+from pullpilot.runner import DEFAULT_PORT, _copy_missing_config, _resolve_config_dir, parse_args
 
 
 def test_parse_args_uses_default_port():
@@ -70,3 +70,14 @@ def test_copy_missing_config_logs_warning_on_copy_failure(tmp_path, monkeypatch,
         "No se pudo copiar el recurso de configuración por defecto" in message
         for message in caplog.messages
     )
+
+
+def test_resolve_config_dir_defaults_to_cwd_config(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    default_dir = tmp_path / "config"
+    assert not default_dir.exists()
+
+    resolved = _resolve_config_dir(None)
+
+    assert resolved == default_dir.resolve()
