@@ -22,7 +22,7 @@ ARG TARGETVARIANT
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app/src
+    PYTHONPATH=/app
 
 WORKDIR /app
 
@@ -58,13 +58,13 @@ RUN set -eux; \
 RUN pip install --no-cache-dir "fastapi==0.115.*" "uvicorn[standard]==0.30.*"
 
 # ---- Archivos de la app (igual que tu Dockerfile original) ----
-COPY apps/backend/src/pullpilot/resources/config ./config.defaults
+COPY apps/backend/pullpilot/resources/config ./config.defaults
 RUN cp -r ./config.defaults ./config
 COPY apps/backend/scripts/updater.sh ./updater.sh
 COPY apps/backend/tools/updater.sh ./tools/updater.sh
-COPY apps/backend/src/pullpilot/resources/config/updater.conf ./updater.conf
-COPY apps/backend/src ./src
-COPY --from=ui-builder /build/apps/backend/src/pullpilot/resources/ui/dist ./src/pullpilot/resources/ui/dist
+COPY apps/backend/pullpilot/resources/config/updater.conf ./updater.conf
+COPY apps/backend/pullpilot ./pullpilot
+COPY --from=ui-builder /build/apps/backend/pullpilot/resources/ui/dist ./pullpilot/resources/ui/dist
 
 RUN chmod +x /app/updater.sh /app/tools/updater.sh
 

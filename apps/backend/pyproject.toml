@@ -28,7 +28,7 @@ pullpilot-sync-defaults = "pullpilot.cli.sync_defaults:main"
 pullpilot-validate-config = "pullpilot.cli.validate_config:main"
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
 
 [tool.setuptools]
 include-package-data = true

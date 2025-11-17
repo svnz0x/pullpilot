@@ -135,7 +135,7 @@ def test_load_token_from_env_files_includes_repo_root(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     repo_root = tmp_path / "repo"
-    app_path = repo_root / "src" / "pullpilot" / "auth.py"
+    app_path = repo_root / "pullpilot" / "auth.py"
     app_path.parent.mkdir(parents=True)
     app_path.write_text("# fake app\n", encoding="utf-8")
     (repo_root / ".env").write_text("PULLPILOT_TOKEN=repo-token\n", encoding="utf-8")

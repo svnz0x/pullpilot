@@ -27,7 +27,7 @@ def configure_application(app: Any, api: Any) -> None:
     dist_index_path = ui_dist_dir / "index.html"
     has_built_assets = dist_index_path.exists()
 
-    backend_root = Path(__file__).resolve().parent.parent.parent.parent
+    backend_root = Path(__file__).resolve().parent.parent.parent
     apps_root = backend_root.parent
     ui_source_candidates = (
         apps_root / "frontend" / "ui",

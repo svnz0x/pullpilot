@@ -1,4 +1,4 @@
 node_modules/
 apps/frontend/node_modules/
 apps/frontend/dist/
-apps/backend/src/pullpilot/resources/ui/dist/
+apps/backend/pullpilot/resources/ui/dist/

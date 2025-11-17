@@ -22,7 +22,7 @@ vive dentro del contenedor (mediante volúmenes persistentes), por lo que tras u
 │  │  ├─ pyproject.toml                 # Metadatos del paquete y deps
 │  │  ├─ scripts/                       # Wrappers generados automáticamente
 │  │  ├─ tools/                         # utilidades de build (p. ej. updater.sh canonical)
-│  │  ├─ src/pullpilot/                 # Código de la API y utilidades
+│  │  ├─ pullpilot/                     # Código de la API y utilidades
 │  │  └─ tests/                         # Pruebas Python
 │  └─ frontend/
 │     ├─ package.json                   # Scripts y dependencias de la UI
@@ -87,7 +87,7 @@ make build-ui     # compila y copia esos artefactos al backend
 make build-backend-package  # (opcional) encadena el build de la UI + python -m build apps/backend
 ```
 
-> ℹ️ El bundle generado en `apps/backend/src/pullpilot/resources/ui/dist/` **no se versiona**. Se regenera automáticamente
+> ℹ️ El bundle generado en `apps/backend/pullpilot/resources/ui/dist/` **no se versiona**. Se regenera automáticamente
 > durante los builds oficiales (Docker multi-stage o publicación del paquete Python) ejecutando `npm --prefix apps/frontend run build`
 > y copiando el resultado mediante `make build-ui`. Ejecuta manualmente `make build-ui` (o `make build-backend-package`) solo
 > cuando necesites preparar un paquete local (`python -m build apps/backend`) o quieras validar cambios en la UI integrada.
@@ -96,11 +96,11 @@ make build-backend-package  # (opcional) encadena el build de la UI + python -m 
 
 1. Ejecuta `make build-ui` (equivale a `npm --prefix apps/frontend run build`).
 2. El build de Vite deja los archivos temporales en `apps/frontend/dist/`.
-3. El propio objetivo `build-ui` limpia `apps/backend/src/pullpilot/resources/ui/dist/` y copia ahí el contenido de `dist`.
+3. El propio objetivo `build-ui` limpia `apps/backend/pullpilot/resources/ui/dist/` y copia ahí el contenido de `dist`.
 
 Este flujo forma parte del pipeline de release (GitHub Actions ejecuta `make build-ui` antes de empaquetar Docker/Python), por lo
 que los artefactos llegan sincronizados sin necesidad de versionarlos. Tanto `apps/frontend/dist/` como
-`apps/backend/src/pullpilot/resources/ui/dist/` permanecen en `.gitignore`; no subas binarios generados manualmente. Cuando
+`apps/backend/pullpilot/resources/ui/dist/` permanecen en `.gitignore`; no subas binarios generados manualmente. Cuando
 construyas localmente una rueda o imagen asegúrate de lanzar `make build-ui` (o la diana `build-backend-package`) previamente.
 
 ### `updater.sh` como script canonical
