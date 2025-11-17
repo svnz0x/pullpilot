@@ -10,11 +10,11 @@ Confirmar que la interfaz web muestra mensajes de error cuando la API responde c
    ```
 2. En otra terminal, sirve la UI:
    ```bash
-   cd ui
+   cd apps/frontend
    npm install
    npm run dev -- --host
    ```
-3. Abre `http://localhost:5173/ui/` en el navegador y autentícate con un token válido.
+3. Abre `http://localhost:5173/` en el navegador y autentícate con un token válido.
 
 ## Pasos
 1. Abre las herramientas de desarrollador del navegador y en la pestaña *Network* habilita "Preserve log" para revisar la petición fallida.
