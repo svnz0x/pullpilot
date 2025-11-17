@@ -13,6 +13,7 @@ COPY apps/frontend/src ./src
 COPY apps/frontend/tests ./tests
 
 RUN npm run build \
+    && mkdir -p /build/apps/frontend/dist \
     && rm -rf node_modules
 
 # Fijo a bookworm para evitar que el tag "slim" salte a trixie y rompa APT
@@ -66,7 +67,8 @@ COPY apps/backend/pullpilot/resources/scripts/updater.sh ./updater.sh
 COPY apps/backend/pullpilot/resources/scripts/updater.sh ./tools/updater.sh
 COPY apps/backend/pullpilot/resources/config/updater.conf ./updater.conf
 COPY apps/backend/pullpilot ./pullpilot
-COPY --from=ui-builder /build/apps/backend/pullpilot/resources/ui/dist ./pullpilot/resources/ui/dist
+RUN mkdir -p ./pullpilot/resources/ui/dist
+COPY --from=ui-builder /build/apps/frontend/dist ./pullpilot/resources/ui/dist
 
 RUN chmod +x /app/updater.sh /app/tools/updater.sh
 
