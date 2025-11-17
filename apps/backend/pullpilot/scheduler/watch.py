@@ -254,28 +254,33 @@ class SchedulerWatcher:
 def _project_root() -> Path:
     """Return the project root path used for resolving helper resources."""
 
-    return Path(__file__).resolve().parents[3]
+    # ``watch.py`` lives under ``apps/backend/pullpilot/scheduler`` so the
+    # repository root sits one level above ``apps``.
+    return Path(__file__).resolve().parents[4]
 
 
 def resolve_default_updater_command() -> str:
     """Determine the default updater command path.
 
-    The scheduler now favors the canonical script bundled inside
-    ``pullpilot/resources/scripts/updater.sh`` so both local development and
-    packaged builds share the exact same implementation. If that resource is not
-    available we progressively fall back to the historical wrappers (for
-    example, ``apps/backend/scripts/updater.sh``) and finally to the runtime
-    default inside the container image. Returning the bare default string keeps
-    failures explicit when none of the candidates exist.
+    The scheduler prioritises the canonical helper bundled inside
+    ``pullpilot/resources/scripts/updater.sh``. When unavailable we look for the
+    historical wrappers in ``apps/backend/scripts`` followed by
+    ``apps/backend/tools`` before falling back to the packaged default inside
+    the container image or the resource bundle exposed via
+    :func:`pullpilot.resources.get_resource_path`.
     """
 
     if CANONICAL_UPDATER.exists():
         return str(CANONICAL_UPDATER)
 
     project_root = _project_root()
-    scripts_path = project_root / "scripts" / "updater.sh"
-    if scripts_path.exists():
-        return str(scripts_path)
+    wrapper_paths = [
+        project_root / "apps" / "backend" / "scripts" / "updater.sh",
+        project_root / "apps" / "backend" / "tools" / "updater.sh",
+    ]
+    for wrapper in wrapper_paths:
+        if wrapper.exists():
+            return str(wrapper)
 
     packaged_wrapper = Path(DEFAULT_COMMAND)
     if packaged_wrapper.exists():
