@@ -13,7 +13,9 @@ venv/
 .pytest_cache
 .mypy_cache
 .ruff_cache
-tests/
+apps/backend/tests/
+apps/frontend/tests/
+apps/frontend/tests/vendor/
 .env*
 docker-compose*.yml
 *.md
