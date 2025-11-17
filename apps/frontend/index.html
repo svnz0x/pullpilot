@@ -7,17 +7,33 @@
     <link rel="stylesheet" href="./src/styles.css" />
   </head>
   <body class="requires-auth">
-    <header>
-      <h1>PullPilot</h1>
-      <p>
-        Administra los parámetros del script de actualización y revisa los últimos logs directamente desde
-        tu navegador. Introduce el token bearer que protege la API para habilitar la interfaz y recuerda el
-        token solo en dispositivos de confianza.
-      </p>
-      <button type="button" class="secondary logout-button" id="logout-button">Olvidar token actual</button>
-    </header>
-    <section id="login-screen">
-      <form id="token-form" autocomplete="off">
+    <div class="page-shell">
+      <header>
+        <div class="hero-decor hero-glow" aria-hidden="true"></div>
+        <div class="hero-decor hero-bubble hero-bubble--one" aria-hidden="true"></div>
+        <div class="hero-decor hero-bubble hero-bubble--two" aria-hidden="true"></div>
+        <div class="hero-content">
+          <div class="hero-text">
+            <h1>PullPilot</h1>
+            <p>
+              Administra los parámetros del script de actualización y revisa los últimos logs directamente desde
+              tu navegador. Introduce el token bearer que protege la API para habilitar la interfaz y recuerda el
+              token solo en dispositivos de confianza.
+            </p>
+          </div>
+          <div class="hero-actions">
+            <div class="hero-illustration" aria-hidden="true">
+              <span class="hero-illustration-ring"></span>
+              <span class="hero-illustration-node"></span>
+            </div>
+            <button type="button" class="secondary logout-button" id="logout-button">
+              Olvidar token actual
+            </button>
+          </div>
+        </div>
+      </header>
+      <section id="login-screen">
+        <form id="token-form" autocomplete="off">
         <label for="token-input">
           Token bearer
           <input
@@ -45,8 +61,8 @@
         </div>
         <span class="login-status" id="login-status" role="status" aria-live="polite"></span>
       </form>
-    </section>
-    <main>
+      </section>
+      <main>
       <div
         class="initial-loading-banner"
         id="initial-loading-banner"
@@ -187,6 +203,7 @@
         <pre class="log-output" id="log-content">Cargando logs…</pre>
       </section>
     </main>
+    </div>
     <script type="module" src="./src/app.js"></script>
   </body>
 </html>
