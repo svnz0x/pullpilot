@@ -57,7 +57,7 @@ def test_load_token_from_file_env_requires_secure_permissions(
 ) -> None:
     token_path = tmp_path / "token.txt"
     token_path.write_text("posix-token\n", encoding="utf-8")
-    os.chmod(token_path, 0o644)
+    os.chmod(token_path, 0o664)
 
     monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
     monkeypatch.setenv("PULLPILOT_TOKEN_FILE", str(token_path))
@@ -85,6 +85,24 @@ def test_load_token_from_file_env_accepts_secure_permissions(
 
     assert token == "secure-token"
     assert os.environ.get("PULLPILOT_TOKEN") == "secure-token"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX file permissions not supported on Windows")
+@pytest.mark.parametrize("mode", [0o440, 0o444])
+def test_load_token_from_file_env_accepts_readonly_shared_permissions(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, mode: int
+) -> None:
+    token_path = tmp_path / "token.txt"
+    token_path.write_text("shared-token\n", encoding="utf-8")
+    os.chmod(token_path, mode)
+
+    monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
+    monkeypatch.setenv("PULLPILOT_TOKEN_FILE", str(token_path))
+
+    token = _load_token_from_file_env()
+
+    assert token == "shared-token"
+    assert os.environ.get("PULLPILOT_TOKEN") == "shared-token"
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX file permissions not supported on Windows")

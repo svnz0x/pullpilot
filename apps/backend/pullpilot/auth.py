@@ -149,10 +149,12 @@ def _load_token_from_file_env() -> Optional[str]:
         return None
 
     mode = stat.S_IMODE(file_stat.st_mode)
-    insecure_permissions = stat.S_IRGRP | stat.S_IROTH
+    insecure_permissions = (
+        stat.S_IWGRP | stat.S_IXGRP | stat.S_IWOTH | stat.S_IXOTH
+    )
     if mode & insecure_permissions:
         LOGGER.warning(
-            "Token file '%s' has insecure permissions; it must not be readable by group or other users.",
+            "Token file '%s' has insecure permissions; it must not be writable or executable by group/other users.",
             token_path,
         )
         return None
