@@ -25,8 +25,10 @@ vive dentro del contenedor (mediante volúmenes persistentes), por lo que tras u
 │  │  ├─ pullpilot/                     # Código de la API y utilidades
 │  │  └─ tests/                         # Pruebas Python
 │  └─ frontend/
+│     ├─ index.html                     # Punto de entrada del frontend
+│     ├─ src/                           # Código de la UI
+│     ├─ tests/                         # Pruebas y utilidades de DOM
 │     ├─ package.json                   # Scripts y dependencias de la UI
-│     ├─ ui/                            # Código del frontend
 │     └─ vite.config.js                 # Configuración de build
 ├─ docker-compose.yml                   # Ejemplo de despliegue
 ├─ Makefile                             # Atajos para validar config o construir la UI

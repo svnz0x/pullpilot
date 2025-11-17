@@ -8,7 +8,9 @@ COPY apps/frontend/package.json apps/frontend/vite.config.js ./
 
 RUN npm install
 
-COPY apps/frontend/ui ./ui
+COPY apps/frontend/index.html ./
+COPY apps/frontend/src ./src
+COPY apps/frontend/tests ./tests
 
 RUN npm run build \
     && rm -rf node_modules

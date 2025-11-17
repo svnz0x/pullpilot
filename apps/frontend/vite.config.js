@@ -1,19 +1,19 @@
 import { defineConfig } from "vite";
 import { resolve } from "path";
 
-const uiRoot = resolve(__dirname, "ui");
+const projectRoot = __dirname;
 
 export default defineConfig({
-  root: uiRoot,
+  root: projectRoot,
   publicDir: false,
   base: "/ui/",
   build: {
-    outDir: "../dist",
+    outDir: "dist",
     emptyOutDir: true,
     assetsDir: "assets",
     manifest: true,
     rollupOptions: {
-      input: resolve(uiRoot, "index.html"),
+      input: resolve(projectRoot, "index.html"),
     },
   },
 });
