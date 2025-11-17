@@ -4,7 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from pullpilot.app import Authenticator, ConfigAPI
+from pullpilot.api import ConfigAPI
+from pullpilot.auth import Authenticator
 from pullpilot.config import ConfigStore, PersistenceError, ValidationError
 from pullpilot.schedule import ScheduleStore
 
