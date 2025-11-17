@@ -601,7 +601,7 @@ main > section h2 {
 .config-field select,
 .config-field textarea {
   width: 100%;
-  max-width: clamp(16rem, 70vw, 32rem);
+  min-width: min(16rem, 100%);
   padding: 0.65rem 0.85rem;
   border-radius: 0.6rem;
   border: 1px solid var(--color-input-border);
@@ -615,7 +615,7 @@ main > section h2 {
 
 .config-field textarea.multiline-input {
   width: 100%;
-  max-width: clamp(18rem, 80vw, 42rem);
+  min-width: min(18rem, 100%);
   min-height: 6rem;
   line-height: 1.4;
 }
@@ -1035,6 +1035,10 @@ button:focus-visible {
     flex: 0 1 clamp(8rem, 18vw, 12rem);
   }
 
+  .config-field .field-input {
+    grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
+  }
+
   main {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1055,7 +1059,7 @@ button:focus-visible {
   }
 
   .config-field .field-input {
-    grid-template-columns: repeat(2, minmax(12rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
   }
 
   #schedule-section,
@@ -1097,7 +1101,7 @@ button:focus-visible {
   }
 
   .config-field .field-input {
-    grid-template-columns: repeat(3, minmax(12rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
   }
 
   .form-actions {
