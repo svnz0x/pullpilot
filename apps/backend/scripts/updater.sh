@@ -1,24 +1,14 @@
 #!/usr/bin/env bash
-# Este archivo se genera automáticamente. No lo edites a mano.
+# Wrapper liviano que invoca el script canonical dentro de pullpilot/resources.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+CANONICAL_SCRIPT="$SCRIPT_DIR/../pullpilot/resources/scripts/updater.sh"
 
-find_root() {
-  local candidate="$SCRIPT_DIR"
-  while [[ "$candidate" != "/" ]]; do
-    if [[ -f "$candidate/tools/updater.sh" ]]; then
-      printf '%s' "$candidate"
-      return 0
-    fi
-    candidate="$(dirname "$candidate")"
-  done
-  return 1
-}
-
-PROJECT_ROOT="$(find_root)" || {
-  echo "[updater wrapper] No se encontró tools/updater.sh" >&2
+if [[ ! -x "$CANONICAL_SCRIPT" ]]; then
+  echo "[updater wrapper] No se encontró el script canonical en $CANONICAL_SCRIPT" >&2
+  echo "Asegúrate de ejecutar este wrapper desde el checkout del repositorio." >&2
   exit 1
-}
+fi
 
-exec "$PROJECT_ROOT/tools/updater.sh" "$@"
+exec "$CANONICAL_SCRIPT" "$@"
