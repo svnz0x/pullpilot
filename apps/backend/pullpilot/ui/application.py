@@ -1,12 +1,16 @@
 """FastAPI wiring helpers for the Pullpilot UI."""
 from __future__ import annotations
 
+import logging
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
 from ..auth import TOKEN_ENV
-from ..resources import get_resource_path
+from ..resources import get_resource_path, resource_exists
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def configure_application(app: Any, api: Any) -> None:
@@ -22,10 +26,27 @@ def configure_application(app: Any, api: Any) -> None:
     )
     from fastapi.staticfiles import StaticFiles
 
-    ui_root_dir = get_resource_path("ui")
-    ui_dist_dir = ui_root_dir / "dist"
-    dist_index_path = ui_dist_dir / "index.html"
-    has_built_assets = dist_index_path.exists()
+    ui_root_dir: Optional[Path] = None
+    ui_dist_dir: Optional[Path] = None
+    has_built_assets = False
+
+    if resource_exists("ui"):
+        try:
+            ui_root_dir = get_resource_path("ui")
+        except FileNotFoundError:
+            _LOGGER.warning(
+                "Packaged UI bundle reported present but could not be loaded; "
+                "falling back to source assets.",
+            )
+        else:
+            ui_dist_dir = ui_root_dir / "dist"
+            dist_index_path = ui_dist_dir / "index.html"
+            has_built_assets = dist_index_path.exists()
+    else:
+        _LOGGER.warning(
+            "Packaged UI bundle not found; falling back to source assets. "
+            "Run 'npm run build' to include the UI in the package.",
+        )
 
     backend_root = Path(__file__).resolve().parent.parent.parent
     apps_root = backend_root.parent
@@ -40,8 +61,9 @@ def configure_application(app: Any, api: Any) -> None:
     ui_source_script_path = ui_source_src_dir / "app.js"
 
     use_source_assets = not has_built_assets and ui_source_index_path.exists()
+    mount_source_dir = use_source_assets and ui_source_src_dir.exists()
 
-    if has_built_assets:
+    if has_built_assets and ui_dist_dir is not None:
         ui_index_path = dist_index_path
         ui_assets_dir = ui_dist_dir / "assets"
         ui_manifest_path = ui_dist_dir / "manifest.json"
@@ -61,8 +83,12 @@ def configure_application(app: Any, api: Any) -> None:
     if ui_assets_dir and ui_assets_dir.exists():
         app.mount("/ui/assets", StaticFiles(directory=ui_assets_dir), name="ui-assets")
 
-    if not has_built_assets and ui_source_src_dir.exists():
-        app.mount("/ui/src", StaticFiles(directory=ui_source_src_dir), name="ui-src")
+    if mount_source_dir:
+        already_mounted = any(
+            getattr(route, "path", None) == "/ui/src" for route in getattr(app, "routes", ())
+        )
+        if not already_mounted:
+            app.mount("/ui/src", StaticFiles(directory=ui_source_src_dir), name="ui-src")
 
     if ui_manifest_path and ui_manifest_path.exists():
         @app.get("/ui/manifest.json")

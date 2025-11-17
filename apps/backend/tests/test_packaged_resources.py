@@ -1,11 +1,32 @@
+from http import HTTPStatus
 from importlib import resources
 from pathlib import Path
 
+import pytest
+from fastapi import FastAPI
 import pullpilot.scheduler.watch as watch_module
 from pullpilot.api import ConfigAPI
-from pullpilot.resources import get_resource_path
+from pullpilot.resources import get_resource_path, resource_exists
 from pullpilot.schedule import ScheduleStore
 from pullpilot.scheduler.watch import DEFAULT_COMMAND, resolve_default_updater_command
+from pullpilot.ui.application import configure_application
+
+
+class _DummyAuthenticator:
+    configured = True
+
+    @staticmethod
+    def authorize(headers):  # pragma: no cover - trivial helper
+        return True
+
+
+class _DummyAPI:
+    def __init__(self) -> None:
+        self.authenticator = _DummyAuthenticator()
+
+    @staticmethod
+    def handle_request(method, path, payload=None, headers=None):  # pragma: no cover - helper
+        return HTTPStatus.OK, {}
 
 
 def test_bundled_files_accessible(monkeypatch):
@@ -35,6 +56,9 @@ def test_bundled_files_accessible(monkeypatch):
 
 
 def test_ui_bundle_included():
+    if not resource_exists("ui"):
+        pytest.skip("UI bundle not built; skipping packaged resource assertion")
+
     ui_root = get_resource_path("ui")
     index_path = ui_root / "dist" / "index.html"
 
@@ -43,3 +67,47 @@ def test_ui_bundle_included():
     assets_dir = ui_root / "dist" / "assets"
     assert assets_dir.is_dir(), "packaged UI bundle is missing the assets directory"
     assert any(assets_dir.iterdir()), "packaged UI bundle assets directory is empty"
+
+
+def test_configure_application_mounts_packaged_assets(monkeypatch, tmp_path):
+    dist_dir = tmp_path / "dist"
+    dist_dir.mkdir()
+    (dist_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+    assets_dir = dist_dir / "assets"
+    assets_dir.mkdir()
+    (assets_dir / "chunk.js").write_text("console.log('hi');", encoding="utf-8")
+    (dist_dir / "manifest.json").write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "pullpilot.ui.application.resource_exists", lambda relative: relative == "ui"
+    )
+    monkeypatch.setattr(
+        "pullpilot.ui.application.get_resource_path", lambda relative: tmp_path
+    )
+
+    app = FastAPI()
+    configure_application(app, _DummyAPI())
+
+    asset_mounts = [route for route in app.routes if getattr(route, "path", None) == "/ui/assets"]
+    assert asset_mounts, "packaged assets should be mounted when available"
+
+    src_mounts = [route for route in app.routes if getattr(route, "path", None) == "/ui/src"]
+    assert not src_mounts, "source assets should not be mounted when packaged assets exist"
+
+
+def test_configure_application_falls_back_when_bundle_missing(monkeypatch):
+    monkeypatch.setattr("pullpilot.ui.application.resource_exists", lambda relative: False)
+
+    def _unexpected_call(relative):  # pragma: no cover - sanity helper
+        raise AssertionError("get_resource_path should not be called when resources are missing")
+
+    monkeypatch.setattr("pullpilot.ui.application.get_resource_path", _unexpected_call)
+
+    app = FastAPI()
+    configure_application(app, _DummyAPI())
+
+    src_mounts = [route for route in app.routes if getattr(route, "path", None) == "/ui/src"]
+    assert len(src_mounts) == 1, "source assets must be mounted exactly once when bundling fails"
+
+    asset_mounts = [route for route in app.routes if getattr(route, "path", None) == "/ui/assets"]
+    assert not asset_mounts, "packaged assets should not be mounted when the bundle is missing"
