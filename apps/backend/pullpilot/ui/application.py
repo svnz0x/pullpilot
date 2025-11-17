@@ -13,6 +13,23 @@ from ..resources import get_resource_path, resource_exists
 _LOGGER = logging.getLogger(__name__)
 
 
+def _iter_ui_source_candidates() -> tuple[Path, ...]:
+    """Return possible source directories for the unbundled UI."""
+
+    backend_root = Path(__file__).resolve().parent.parent.parent
+    apps_root = backend_root.parent
+    repo_root = apps_root.parent
+
+    candidates = []
+    for path in (
+        apps_root / "frontend",
+        repo_root / "frontend",
+    ):
+        if path not in candidates:
+            candidates.append(path)
+    return tuple(candidates)
+
+
 def configure_application(app: Any, api: Any) -> None:
     """Configure FastAPI routes and assets for the UI."""
 
@@ -48,12 +65,7 @@ def configure_application(app: Any, api: Any) -> None:
             "Run 'npm run build' to include the UI in the package.",
         )
 
-    backend_root = Path(__file__).resolve().parent.parent.parent
-    apps_root = backend_root.parent
-    ui_source_candidates = (
-        apps_root / "frontend",
-        backend_root / "ui",
-    )
+    ui_source_candidates = _iter_ui_source_candidates()
     ui_source_root = next((path for path in ui_source_candidates if path.exists()), ui_source_candidates[0])
     ui_source_index_path = ui_source_root / "index.html"
     ui_source_src_dir = ui_source_root / "src"

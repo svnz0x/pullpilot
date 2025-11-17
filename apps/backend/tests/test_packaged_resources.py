@@ -95,7 +95,7 @@ def test_configure_application_mounts_packaged_assets(monkeypatch, tmp_path):
     assert not src_mounts, "source assets should not be mounted when packaged assets exist"
 
 
-def test_configure_application_falls_back_when_bundle_missing(monkeypatch):
+def test_configure_application_falls_back_when_bundle_missing(monkeypatch, tmp_path):
     monkeypatch.setattr("pullpilot.ui.application.resource_exists", lambda relative: False)
 
     def _unexpected_call(relative):  # pragma: no cover - sanity helper
@@ -103,11 +103,40 @@ def test_configure_application_falls_back_when_bundle_missing(monkeypatch):
 
     monkeypatch.setattr("pullpilot.ui.application.get_resource_path", _unexpected_call)
 
+    source_root = tmp_path / "alt-tree" / "frontend"
+    src_dir = source_root / "src"
+    src_dir.mkdir(parents=True)
+    index_html = "<html><body>fallback</body></html>"
+    styles_css = "body { color: #f0f; }"
+    script_js = "console.log('fallback');"
+    (source_root / "index.html").write_text(index_html, encoding="utf-8")
+    (src_dir / "styles.css").write_text(styles_css, encoding="utf-8")
+    (src_dir / "app.js").write_text(script_js, encoding="utf-8")
+
+    missing_candidate = tmp_path / "does-not-exist"
+    monkeypatch.setattr(
+        "pullpilot.ui.application._iter_ui_source_candidates",
+        lambda: (missing_candidate, source_root),
+    )
+
     app = FastAPI()
     configure_application(app, _DummyAPI())
 
     src_mounts = [route for route in app.routes if getattr(route, "path", None) == "/ui/src"]
     assert len(src_mounts) == 1, "source assets must be mounted exactly once when bundling fails"
+    assert Path(src_mounts[0].app.directory) == src_dir
 
     asset_mounts = [route for route in app.routes if getattr(route, "path", None) == "/ui/assets"]
     assert not asset_mounts, "packaged assets should not be mounted when the bundle is missing"
+
+    ui_page = next(route for route in app.routes if getattr(route, "path", None) == "/ui/")
+    response = ui_page.endpoint()
+    assert response.body.decode("utf-8") == index_html
+
+    styles_route = next(route for route in app.routes if getattr(route, "path", None) == "/ui/styles.css")
+    styles_response = styles_route.endpoint()
+    assert Path(styles_response.path) == src_dir / "styles.css"
+
+    script_route = next(route for route in app.routes if getattr(route, "path", None) == "/ui/app.js")
+    script_response = script_route.endpoint()
+    assert Path(script_response.path) == src_dir / "app.js"
