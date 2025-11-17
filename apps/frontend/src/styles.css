@@ -286,6 +286,9 @@ body.authenticated #login-screen {
   backdrop-filter: blur(var(--glass-panel-blur));
   display: none;
   box-sizing: border-box;
+  --color-button-secondary-bg: #1c588a;
+  --color-button-secondary-hover-bg: #18466d;
+  --color-button-secondary-text: #ffffff;
 }
 
 #login-screen form {
@@ -360,6 +363,13 @@ body.authenticated #login-screen {
   width: 100%;
 }
 
+.login-actions button,
+.logout-button {
+  font-size: 1rem;
+  padding: 0.9rem 1.85rem;
+  box-shadow: 0 16px 36px var(--color-shadow-accent);
+}
+
 .login-status {
   font-size: 0.95rem;
   color: var(--color-text-secondary);
@@ -378,6 +388,37 @@ body.authenticated #login-screen {
   display: none;
   margin: 0;
   width: min(100%, 14rem);
+}
+
+.login-actions .primary.cta-button {
+  background: var(--color-button-primary-hover-bg);
+  border-color: var(--color-button-primary-hover-border);
+  color: var(--color-text-on-accent);
+  box-shadow: 0 20px 40px var(--color-shadow-accent);
+}
+
+.login-actions .primary.cta-button:hover,
+.login-actions .primary.cta-button:focus-visible {
+  filter: brightness(1.05);
+}
+
+.login-actions .secondary.cta-button,
+.logout-button.cta-button {
+  background: var(--color-button-secondary-bg);
+  border-color: var(--color-accent-border-bolder);
+  color: var(--color-button-secondary-text);
+  box-shadow: 0 18px 36px rgba(12, 45, 73, 0.28);
+}
+
+.login-actions .secondary.cta-button:hover,
+.logout-button.cta-button:hover {
+  background: var(--color-button-secondary-hover-bg);
+}
+
+.login-actions .cta-button[data-loading="true"],
+.logout-button.cta-button[data-loading="true"] {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15), 0 0 0 1px var(--color-accent-border);
+  filter: saturate(0.85);
 }
 
 body.authenticated .logout-button {
