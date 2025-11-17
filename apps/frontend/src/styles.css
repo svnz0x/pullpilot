@@ -167,14 +167,16 @@ body {
 }
 
 header {
-  padding: clamp(2.5rem, 6vw, 3.5rem) 1.5rem clamp(2rem, 4vw, 2.5rem);
+  padding: clamp(2.25rem, 6vw, 3.5rem) clamp(1rem, 5vw, 2rem)
+    clamp(2rem, 4vw, 2.5rem);
   text-align: center;
   background: var(--color-panel-strong);
   border: 1px solid var(--color-panel-border);
   border-radius: 1.5rem;
   box-shadow: 0 8px 20px var(--color-shadow-soft);
-  width: min(960px, 92vw);
+  width: min(100%, clamp(32rem, 80vw, 60rem));
   margin: clamp(1.5rem, 4vw, 2.5rem) auto 2rem;
+  box-sizing: border-box;
 }
 
 header h1 {
@@ -210,13 +212,14 @@ body.authenticated #login-screen {
 
 #login-screen {
   margin: clamp(2rem, 5vw, 3rem) auto 0;
-  width: min(32rem, 92vw);
+  width: min(100%, clamp(20rem, 88vw, 32rem));
   background: var(--color-panel-strong);
   border-radius: 1.25rem;
   border: 1px solid var(--color-panel-border);
   padding: clamp(1.5rem, 5vw, 2.25rem);
   box-shadow: 0 6px 18px var(--color-shadow-soft);
   display: none;
+  box-sizing: border-box;
 }
 
 #login-screen form {
@@ -282,12 +285,13 @@ body.authenticated #login-screen {
 .login-actions {
   display: flex;
   gap: 0.5rem;
-  flex-wrap: wrap;
+  flex-direction: column;
 }
 
 .login-actions button {
   flex: 1 1 auto;
   min-width: 8rem;
+  width: 100%;
 }
 
 .login-status {
@@ -315,14 +319,14 @@ body.authenticated .logout-button {
 
 main {
   flex: 1 0 auto;
-  width: min(1100px, 92vw);
+  width: min(100%, clamp(38rem, 92vw, 70rem));
   margin: 0 auto clamp(3rem, 6vw, 4rem);
   display: grid;
   gap: clamp(1.5rem, 4vw, 2.5rem);
   background: var(--color-panel-muted);
   border: 1px solid var(--color-panel-border);
   border-radius: 1.5rem;
-  padding: clamp(1.75rem, 4vw, 2.5rem);
+  padding: clamp(1.5rem, 4vw, 2.75rem);
   box-shadow: 0 8px 24px var(--color-shadow-soft);
   box-sizing: border-box;
 }
@@ -383,6 +387,7 @@ main > section h2 {
 .config-grid {
   display: grid;
   gap: clamp(1.25rem, 2.4vw, 1.65rem);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .config-section {
@@ -411,6 +416,7 @@ main > section h2 {
 .config-subsection-grid {
   display: grid;
   gap: clamp(0.85rem, 1.65vw, 1.1rem);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .config-subsection {
@@ -461,16 +467,17 @@ main > section h2 {
 }
 
 .config-field .field-input {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .config-field input[type="text"],
 .config-field input[type="number"],
 .config-field select,
 .config-field textarea {
-  width: min(100%, 30rem);
+  width: 100%;
+  max-width: clamp(16rem, 70vw, 32rem);
   padding: 0.65rem 0.85rem;
   border-radius: 0.6rem;
   border: 1px solid var(--color-input-border);
@@ -479,10 +486,12 @@ main > section h2 {
   font: inherit;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
   resize: vertical;
+  box-sizing: border-box;
 }
 
 .config-field textarea.multiline-input {
-  width: min(100%, 42rem);
+  width: 100%;
+  max-width: clamp(18rem, 80vw, 42rem);
   min-height: 6rem;
   line-height: 1.4;
 }
@@ -617,15 +626,21 @@ main > section h2 {
   border-top: 1px solid var(--color-border-subtle);
   display: flex;
   gap: 0.5rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+}
+
+.form-actions button {
+  width: 100%;
 }
 
 #test-config {
-  margin-left: auto;
+  margin-left: 0;
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
   white-space: nowrap;
+  width: 100%;
+  justify-content: center;
 }
 
 #test-config[data-loading="true"] {
@@ -742,13 +757,14 @@ button:focus-visible {
 
 .logs-header {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 0.75rem;
-  align-items: center;
+  align-items: stretch;
 }
 
 .logs-header select {
-  min-width: 14rem;
+  width: 100%;
+  min-width: 0;
 }
 
 .log-meta {
@@ -772,44 +788,164 @@ button:focus-visible {
   color: var(--color-log-text);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 480px) {
   header {
-    padding: 2.25rem 1.25rem 1.75rem;
-    margin: 1.25rem auto 1.5rem;
+    padding: 2rem 1rem 1.5rem;
+    margin: 1rem auto 1.25rem;
   }
 
   #login-screen {
-    margin-top: 1.75rem;
-    padding: 1.5rem;
+    margin-top: 1.5rem;
+    padding: 1.25rem;
   }
 
   main {
-    padding: 1.25rem;
-    gap: 1.25rem;
+    padding: 1.15rem;
+    gap: 1.1rem;
   }
 
   body > section,
   main > section {
-    padding: 1.25rem;
+    padding: 1.1rem;
   }
 
   .config-section {
-    padding: 1rem 1.1rem;
-    gap: 1rem;
+    padding: 0.9rem 0.95rem;
+    gap: 0.85rem;
   }
 
   .config-section-body {
+    gap: 0.85rem;
+  }
+
+  .logs-header {
+    gap: 0.5rem;
+  }
+
+  .form-actions {
+    gap: 0.75rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .login-actions {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .login-actions button {
+    width: auto;
+    flex: 0 1 clamp(8rem, 18vw, 12rem);
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  main {
+    gap: 1.5rem;
+  }
+
+  .config-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .config-section-grid,
+  .config-subsection-grid {
+    grid-template-columns: repeat(2, minmax(12rem, 1fr));
+  }
+
+  .config-field .field-input {
+    grid-template-columns: repeat(2, minmax(12rem, 1fr));
+  }
+
+  .logs-header {
+    flex-direction: row;
+    align-items: flex-end;
     gap: 1rem;
   }
 
-  .config-field input[type="text"],
-  .config-field input[type="number"],
-  .config-field select,
-  .config-field textarea {
-    width: 100%;
+  .logs-header select {
+    width: auto;
+    min-width: clamp(12rem, 35vw, 18rem);
   }
 
-  .config-field textarea.multiline-input {
-    width: 100%;
+  .form-actions {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .form-actions button {
+    width: auto;
+    flex: 1 1 clamp(8rem, 20vw, 12rem);
+  }
+
+  #test-config {
+    width: auto;
+    margin-left: auto;
+    justify-content: flex-start;
+  }
+}
+
+@media (min-width: 1025px) {
+  .config-grid {
+    grid-template-columns: repeat(2, minmax(20rem, 1fr));
+  }
+
+  .config-section-grid,
+  .config-subsection-grid {
+    grid-template-columns: repeat(2, minmax(14rem, 1fr));
+  }
+
+  .config-field .field-input {
+    grid-template-columns: repeat(2, minmax(14rem, 1fr));
+  }
+
+  .logs-header {
+    flex-direction: row;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .logs-header select {
+    width: auto;
+    min-width: clamp(12rem, 25vw, 20rem);
+  }
+
+  .form-actions {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+    justify-content: space-between;
+  }
+
+  .form-actions button {
+    width: auto;
+    flex: 0 1 clamp(8rem, 18vw, 11rem);
+  }
+
+  #test-config {
+    width: auto;
+    margin-left: auto;
+    justify-content: flex-start;
+  }
+}
+
+@media (min-width: 1200px) {
+  main {
+    width: min(100%, clamp(48rem, 82vw, 76rem));
+    gap: 2rem;
+  }
+
+  .config-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .config-field .field-input {
+    grid-template-columns: repeat(3, minmax(12rem, 1fr));
+  }
+
+  .form-actions {
+    justify-content: flex-end;
+    gap: 1rem;
   }
 }
