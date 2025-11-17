@@ -1,5 +1,7 @@
 """Pullpilot backend application package."""
-from .app import Authenticator, ConfigAPI, create_app
+from .api import ConfigAPI
+from .app import create_app
+from .auth import Authenticator
 from .config import ConfigData, ConfigError, ConfigStore, ValidationError
 from .schedule import (
     DEFAULT_CRON_EXPRESSION,

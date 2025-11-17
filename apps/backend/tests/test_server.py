@@ -12,15 +12,15 @@ from typing import Any, Mapping, Optional
 
 import pytest
 
-from pullpilot.config import ConfigError, ConfigStore
-from pullpilot.schedule import ScheduleStore
-from pullpilot.app import (
+from pullpilot.api import ConfigAPI
+from pullpilot.app import create_app
+from pullpilot.auth import (
     Authenticator,
-    ConfigAPI,
     _load_token_from_env_files,
     _load_token_from_file_env,
-    create_app,
 )
+from pullpilot.config import ConfigError, ConfigStore
+from pullpilot.schedule import ScheduleStore
 
 @pytest.fixture()
 def store(tmp_path: Path) -> ConfigStore:
@@ -41,7 +41,7 @@ def schedule_store(tmp_path: Path) -> ScheduleStore:
 def fake_ui_resources(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     ui_root = tmp_path / "ui"
     ui_root.mkdir()
-    monkeypatch.setattr("pullpilot.app.get_resource_path", lambda relative: ui_root)
+    monkeypatch.setattr("pullpilot.ui.application.get_resource_path", lambda relative: ui_root)
 
 
 @pytest.fixture()
@@ -135,14 +135,14 @@ def test_load_token_from_env_files_includes_repo_root(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     repo_root = tmp_path / "repo"
-    app_path = repo_root / "src" / "pullpilot" / "app.py"
+    app_path = repo_root / "src" / "pullpilot" / "auth.py"
     app_path.parent.mkdir(parents=True)
     app_path.write_text("# fake app\n", encoding="utf-8")
     (repo_root / ".env").write_text("PULLPILOT_TOKEN=repo-token\n", encoding="utf-8")
 
     original_token = os.environ.get("PULLPILOT_TOKEN")
     monkeypatch.delenv("PULLPILOT_TOKEN", raising=False)
-    monkeypatch.setattr("pullpilot.app.__file__", str(app_path))
+    monkeypatch.setattr("pullpilot.auth.__file__", str(app_path))
 
     elsewhere = tmp_path / "elsewhere"
     elsewhere.mkdir()

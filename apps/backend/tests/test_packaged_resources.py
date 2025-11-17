@@ -1,7 +1,7 @@
 from importlib import resources
 from pathlib import Path
 
-from pullpilot.app import ConfigAPI
+from pullpilot.api import ConfigAPI
 from pullpilot.resources import get_resource_path
 from pullpilot.schedule import ScheduleStore
 from pullpilot.scheduler.watch import DEFAULT_COMMAND, resolve_default_updater_command
