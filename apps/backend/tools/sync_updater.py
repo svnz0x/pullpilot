@@ -11,7 +11,7 @@ from typing import Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
 CANONICAL = ROOT / "tools" / "updater.sh"
-PACKAGE_DEST = ROOT / "src" / "pullpilot" / "resources" / "scripts" / "updater.sh"
+PACKAGE_DEST = ROOT / "pullpilot" / "resources" / "scripts" / "updater.sh"
 WRAPPER_DEST = ROOT / "scripts" / "updater.sh"
 
 STUB_TEMPLATE = """#!/usr/bin/env bash

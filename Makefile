@@ -1,7 +1,7 @@
 .PHONY: validate-config sync-defaults build-ui sync-updater build-backend-package
 
 FRONTEND_DIR := apps/frontend
-BACKEND_UI_DIST := apps/backend/src/pullpilot/resources/ui/dist
+BACKEND_UI_DIST := apps/backend/pullpilot/resources/ui/dist
 
 validate-config:
 	python3 -m pullpilot.cli.validate_config

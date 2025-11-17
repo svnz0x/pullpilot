@@ -20,7 +20,7 @@ from .scheduler.watch import build_watcher
 
 LOGGER = logging.getLogger("pullpilot.runner")
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG_TARGET = Path("/app/config")
 DEFAULT_CONFIG_DIR = PROJECT_ROOT / "config"
 DEFAULT_HOST = "0.0.0.0"
