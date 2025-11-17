@@ -20,7 +20,7 @@ Confirmar que la interfaz web muestra mensajes de error cuando la API responde c
 1. Abre las herramientas de desarrollador del navegador y en la pestaña *Network* habilita "Preserve log" para revisar la petición fallida.
 2. Envía una petición de guardado con datos inválidos. Una forma sencilla es ejecutar en la consola del navegador:
    ```js
-   fetch("http://localhost:8000/api/config", {
+   fetch("http://localhost:8000/config", {
      method: "POST",
      headers: {
        Authorization: "Bearer TU_TOKEN_AQUI",
