@@ -70,34 +70,39 @@ def gather_logs(store: ConfigStore, selected_name: Optional[str] = None) -> Dict
     notice_message = None
     files_payload: List[Dict[str, object]] = []
 
-    entries = sorted(
-        (
-            entry
-            for entry in log_dir_path.iterdir()
-            if entry.is_file() and _LOG_FILE_PATTERN.search(entry.name)
-        ),
-        key=lambda path: path.name,
-    )
-
-    if not entries:
-        notice_message = "No se encontraron archivos de log en el directorio configurado."
-
-    for entry in entries:
+    entries = []
+    for entry in log_dir_path.iterdir():
+        if not entry.is_file() or not _LOG_FILE_PATTERN.search(entry.name):
+            continue
         try:
             file_stat = entry.stat()
         except OSError as exc:
             LOGGER.warning("Failed to stat log '%s': %s", entry, exc, exc_info=True)
             continue
+        entries.append((entry, file_stat))
+
+    entries.sort(key=lambda item: item[1].st_mtime, reverse=True)
+
+    if not entries:
+        notice_message = "No se encontraron archivos de log en el directorio configurado."
+
+    for entry, file_stat in entries:
         file_payload: Dict[str, object] = {
             "name": entry.name,
             "size": file_stat.st_size,
             "modified": file_stat.st_mtime,
         }
         files_payload.append(file_payload)
-        if selected_name and entry.name != selected_name:
+
+        should_select = False
+        if selected_name:
+            should_select = selected_payload is None and entry.name == selected_name
+        else:
+            should_select = selected_payload is None
+
+        if not should_select:
             continue
-        if selected_payload is not None:
-            continue
+
         selected_payload = dict(file_payload)
         try:
             content = read_log_tail(entry)
