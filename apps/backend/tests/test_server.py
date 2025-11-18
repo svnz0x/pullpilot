@@ -1167,3 +1167,41 @@ def test_ui_logs_reads_compressed_content(
     assert logs["selected"].get("notice") is None
     assert logs.get("notice") is None
     assert logs["selected"]["content"] == "línea A\nlínea B\n"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX file permissions not supported on Windows")
+def test_gather_logs_handles_unreadable_directory(
+    store: ConfigStore,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    from pullpilot.ui import logs as logs_module
+
+    log_dir = tmp_path / "restricted"
+    log_dir.mkdir()
+
+    config = store.load()
+    config.values["LOG_DIR"] = str(log_dir)
+    monkeypatch.setattr(store, "load", lambda: config)
+
+    original_iterdir = Path.iterdir
+
+    def fake_iterdir(self: Path):  # type: ignore[override]
+        if self == log_dir:
+            raise PermissionError(errno.EACCES, os.strerror(errno.EACCES))
+        return original_iterdir(self)
+
+    monkeypatch.setattr(Path, "iterdir", fake_iterdir)
+
+    with caplog.at_level("WARNING"):
+        payload = logs_module.gather_logs(store)
+
+    assert payload["log_dir"] == str(log_dir)
+    assert payload["files"] == []
+    assert payload["selected"] is None
+    assert "No se pudo listar el directorio de logs" in payload["notice"]
+    assert os.strerror(errno.EACCES) in payload["notice"]
+    assert any(
+        "Failed to list log directory" in message for message in caplog.messages
+    )
