@@ -4,6 +4,7 @@ import os
 import stat
 import subprocess
 import sys
+import time
 import uuid
 from http import HTTPStatus
 from pathlib import Path
@@ -1079,6 +1080,56 @@ def test_ui_logs_listing_and_selection(
     status, error = api.handle_request("POST", "/ui/logs", {"name": 123}, headers=auth_headers)
     assert status == HTTPStatus.BAD_REQUEST
     assert error["error"] == "'name' must be a string"
+
+
+def test_ui_logs_orders_by_mtime_and_selects_latest(
+    auth_headers: Mapping[str, str],
+    tmp_path: Path,
+    store: ConfigStore,
+    schedule_store: ScheduleStore,
+) -> None:
+    api = ConfigAPI(store=store, schedule_store=schedule_store)
+    status, body = api.handle_request("GET", "/ui/config", headers=auth_headers)
+    assert status == HTTPStatus.OK
+
+    values = dict(body["values"])
+    base_dir = tmp_path / "compose"
+    base_dir.mkdir()
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    values["BASE_DIR"] = str(base_dir)
+    values["LOG_DIR"] = str(log_dir)
+    status, _ = api.handle_request("POST", "/ui/config", {"values": values}, headers=auth_headers)
+    assert status == HTTPStatus.OK
+
+    newest = log_dir / "newest.log"
+    middle = log_dir / "middle.log"
+    oldest = log_dir / "oldest.log"
+
+    newest.write_text("linea nueva\n", encoding="utf-8")
+    middle.write_text("linea media\n", encoding="utf-8")
+    oldest.write_text("linea vieja\n", encoding="utf-8")
+
+    now = time.time()
+    os.utime(oldest, (now - 120, now - 120))
+    os.utime(middle, (now - 60, now - 60))
+    os.utime(newest, (now, now))
+
+    status, logs = api.handle_request("GET", "/ui/logs", headers=auth_headers)
+    assert status == HTTPStatus.OK
+    ordered_names = [entry["name"] for entry in logs["files"]]
+    assert ordered_names == [newest.name, middle.name, oldest.name]
+    assert logs["selected"] is not None
+    assert logs["selected"]["name"] == newest.name
+    assert "linea nueva" in logs["selected"]["content"]
+
+    status, selected = api.handle_request(
+        "GET", "/ui/logs", {"name": oldest.name}, headers=auth_headers
+    )
+    assert status == HTTPStatus.OK
+    assert selected["selected"] is not None
+    assert selected["selected"]["name"] == oldest.name
+    assert "linea vieja" in selected["selected"]["content"]
 
 
 def test_ui_logs_reads_compressed_content(
