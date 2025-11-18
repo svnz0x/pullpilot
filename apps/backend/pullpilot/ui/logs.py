@@ -35,6 +35,15 @@ _LOG_FILE_PATTERN = re.compile(
 )
 
 
+def _empty_directory_payload(log_dir: str, notice: str) -> Dict[str, object]:
+    return {
+        "log_dir": log_dir,
+        "files": [],
+        "selected": None,
+        "notice": notice,
+    }
+
+
 class LogReadError(RuntimeError):
     """Raised when a log file cannot be read."""
 
@@ -46,12 +55,10 @@ def gather_logs(store: ConfigStore, selected_name: Optional[str] = None) -> Dict
     log_dir_raw = data.values.get("LOG_DIR", "")
     log_dir_str = str(log_dir_raw).strip() if log_dir_raw is not None else ""
     if not log_dir_str:
-        return {
-            "log_dir": "",
-            "files": [],
-            "selected": None,
-            "notice": "LOG_DIR no está configurado. Define un directorio absoluto para poder consultar los logs.",
-        }
+        return _empty_directory_payload(
+            "",
+            "LOG_DIR no está configurado. Define un directorio absoluto para poder consultar los logs.",
+        )
 
     try:
         log_dir_path = Path(log_dir_str).expanduser()
@@ -59,19 +66,28 @@ def gather_logs(store: ConfigStore, selected_name: Optional[str] = None) -> Dict
         log_dir_path = Path(log_dir_str)
 
     if not log_dir_path.exists() or not log_dir_path.is_dir():
-        return {
-            "log_dir": log_dir_str,
-            "files": [],
-            "selected": None,
-            "notice": f"El directorio de logs '{log_dir_str}' no existe o no es accesible.",
-        }
+        return _empty_directory_payload(
+            log_dir_str,
+            f"El directorio de logs '{log_dir_str}' no existe o no es accesible.",
+        )
 
     selected_payload = None
     notice_message = None
     files_payload: List[Dict[str, object]] = []
 
     entries = []
-    for entry in log_dir_path.iterdir():
+    try:
+        iterator = log_dir_path.iterdir()
+    except (OSError, PermissionError) as exc:
+        LOGGER.warning(
+            "Failed to list log directory '%s': %s", log_dir_path, exc, exc_info=True
+        )
+        return _empty_directory_payload(
+            log_dir_str,
+            f"No se pudo listar el directorio de logs '{log_dir_str}': {exc}",
+        )
+
+    for entry in iterator:
         if not entry.is_file() or not _LOG_FILE_PATTERN.search(entry.name):
             continue
         try:
